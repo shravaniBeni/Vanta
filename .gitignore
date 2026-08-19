@@ -1,8 +1,21 @@
 node_modules/
 client/node_modules/
 server/node_modules/
+
+# Runtime data (SQLite DB, uploads, model cache)
 data/
+
+# Environment files — never commit real secrets
 server/.env
 client/.env
+
+# Build output
 dist/
+client/dist/
+
+# OS
 .DS_Store
+Thumbs.db
+
+# Editor
+.vscode/settings.json
