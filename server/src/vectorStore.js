@@ -1,72 +1,144 @@
 /**
- * Vector store using cosine similarity on SQLite-persisted embeddings.
- * Uses @libsql/client for all DB operations.
+ * server/src/vectorStore.js
+ *
+ * Phase 4: Vector store fully migrated to Supabase PostgreSQL + pgvector.
+ * SQLite is no longer used by this module.
+ *
+ * indexChunk()      — embed text with local BGE model → insert into document_chunks
+ * retrieveChunks()  — embed query → call match_chunks RPC → return results
+ * deleteChunksForDocument() — remove all chunks for one document
  */
 
-import { client } from './db.js';
-import { embedText } from './openai.js';
 import { v4 as uuidv4 } from 'uuid';
+import supabase from './supabase.js';
+import { embedText, embedQuery } from './embeddings.js';
 
-function cosineSim(a, b) {
-  if (a.length !== b.length) return 0;
-  let dot = 0, normA = 0, normB = 0;
-  for (let i = 0; i < a.length; i++) {
-    dot += a[i] * b[i];
-    normA += a[i] * a[i];
-    normB += b[i] * b[i];
-  }
-  const denom = Math.sqrt(normA) * Math.sqrt(normB);
-  return denom === 0 ? 0 : dot / denom;
-}
+const EXPECTED_DIM = 384;
 
-export async function retrieveChunks(chatbotId, query, topK = 5) {
-  const result = await client.execute({
-    sql: 'SELECT id, content, file_name, embedding FROM document_chunks WHERE chatbot_id = ?',
-    args: [chatbotId],
-  });
+// ─── Index ────────────────────────────────────────────────────────────────────
 
-  if (!result.rows.length) return [];
+/**
+ * Embed a single chunk and insert it into document_chunks.
+ * Throws on embedding or DB failure — no silent fallback.
+ *
+ * @param {{
+ *   userId: string,
+ *   ragAppId: string,
+ *   documentId: string,
+ *   nodeId: string,
+ *   fileName: string,
+ *   content: string,
+ *   chunkIndex: number,
+ * }} params
+ * @returns {Promise<string>} — the inserted chunk UUID
+ */
+export async function indexChunk({ userId, ragAppId, documentId, nodeId, fileName, content, chunkIndex }) {
+  // Embed with local BGE model — no pseudo fallback
+  const embedding = await embedText(content);
 
-  let queryEmb;
-  try {
-    queryEmb = await embedText(query);
-  } catch (err) {
-    console.error('[vectorStore] embedding error:', err.message);
-    return [];
-  }
-
-  const scored = result.rows
-    .filter(r => r.embedding)
-    .map(r => {
-      let emb;
-      try { emb = JSON.parse(r.embedding); } catch { return null; }
-      return { content: r.content, fileName: r.file_name, score: cosineSim(queryEmb, emb) };
-    })
-    .filter(Boolean);
-
-  scored.sort((a, b) => b.score - a.score);
-  return scored.slice(0, topK);
-}
-
-export async function indexChunk(chatbotId, nodeId, fileName, content, embeddingModel = 'text-embedding-3-small') {
-  let embeddingJson = null;
-  try {
-    const emb = await embedText(content, embeddingModel);
-    embeddingJson = JSON.stringify(emb);
-  } catch (err) {
-    console.warn('[vectorStore] could not embed chunk:', err.message);
+  if (embedding.length !== EXPECTED_DIM) {
+    throw new Error(
+      `[vectorStore] Unexpected embedding dimension ${embedding.length} (expected ${EXPECTED_DIM})`
+    );
   }
 
-  await client.execute({
-    sql: `INSERT INTO document_chunks (id, chatbot_id, node_id, file_name, content, embedding)
-          VALUES (?, ?, ?, ?, ?, ?)`,
-    args: [uuidv4(), chatbotId, nodeId, fileName, content, embeddingJson],
-  });
+  const id = uuidv4();
+
+  const { error } = await supabase
+    .from('document_chunks')
+    .insert({
+      id,
+      user_id:     userId,
+      rag_app_id:  ragAppId,
+      document_id: documentId,
+      node_id:     nodeId,
+      file_name:   fileName,
+      content,
+      embedding,       // Supabase JS client serializes number[] → vector(384)
+      chunk_index: chunkIndex,
+      metadata:    {},
+    });
+
+  if (error) {
+    throw new Error(`[vectorStore] Failed to insert chunk: ${error.message}`);
+  }
+
+  return id;
 }
 
-export async function clearChunks(chatbotId) {
-  await client.execute({
-    sql: 'DELETE FROM document_chunks WHERE chatbot_id = ?',
-    args: [chatbotId],
+// ─── Retrieve ─────────────────────────────────────────────────────────────────
+
+/**
+ * Retrieve the top-K most semantically similar chunks for a query.
+ * Uses pgvector exact cosine search via the match_chunks RPC.
+ *
+ * @param {string} ragAppId
+ * @param {string} query
+ * @param {number} topK
+ * @returns {Promise<Array<{ id: string, content: string, fileName: string, score: number }>>}
+ */
+export async function retrieveChunks(ragAppId, query, topK = 5) {
+  // Apply BGE query prefix — only for retrieval queries, not document text
+  const queryEmbedding = await embedQuery(query);
+
+  if (queryEmbedding.length !== EXPECTED_DIM) {
+    throw new Error(
+      `[vectorStore] Query embedding dimension ${queryEmbedding.length} (expected ${EXPECTED_DIM})`
+    );
+  }
+
+  const { data, error } = await supabase.rpc('match_chunks', {
+    query_embedding: queryEmbedding,
+    p_rag_app_id:    ragAppId,
+    match_count:     topK,
   });
+
+  if (error) {
+    throw new Error(`[vectorStore] match_chunks RPC failed: ${error.message}`);
+  }
+
+  return (data ?? []).map(row => ({
+    id:       row.id,
+    content:  row.content,
+    fileName: row.file_name,
+    score:    row.score,
+  }));
+}
+
+// ─── Delete ───────────────────────────────────────────────────────────────────
+
+/**
+ * Delete all document_chunks rows for a specific document.
+ * Called on indexing failure (cleanup) and on document deletion.
+ *
+ * @param {string} documentId
+ * @returns {Promise<void>}
+ */
+export async function deleteChunksForDocument(documentId) {
+  const { error } = await supabase
+    .from('document_chunks')
+    .delete()
+    .eq('document_id', documentId);
+
+  if (error) {
+    // Log but don't throw — deletion failure should not block the caller
+    console.error(`[vectorStore] Failed to delete chunks for document ${documentId}: ${error.message}`);
+  }
+}
+
+/**
+ * Delete all document_chunks for a RAG app (used when clearing an entire app).
+ *
+ * @param {string} ragAppId
+ * @returns {Promise<void>}
+ */
+export async function deleteChunksForApp(ragAppId) {
+  const { error } = await supabase
+    .from('document_chunks')
+    .delete()
+    .eq('rag_app_id', ragAppId);
+
+  if (error) {
+    console.error(`[vectorStore] Failed to delete chunks for app ${ragAppId}: ${error.message}`);
+  }
 }

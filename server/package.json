@@ -6,7 +6,8 @@
     "dev": "node --watch src/index.js",
     "start": "node src/index.js",
     "verify:embeddings": "node scripts/verify-embeddings.js",
-    "verify:phase3": "node scripts/verify-phase3.js"
+    "verify:phase3": "node scripts/verify-phase3.js",
+    "verify:phase4": "node scripts/verify-phase4.js"
   },
   "dependencies": {
     "@huggingface/transformers": "^3.5.2",

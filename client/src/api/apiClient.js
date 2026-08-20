@@ -71,7 +71,7 @@ export const documentsApi = {
   },
 
   /** Delete all indexed chunks for a chatbot */
-  clear: (chatbotId) => request('DELETE', `/api/documents/${chatbotId}`),
+  clear: (chatbotId) => request('DELETE', `/api/documents/app/${chatbotId}`),
 };
 
 // ─── Chat ─────────────────────────────────────────────────────────────────────

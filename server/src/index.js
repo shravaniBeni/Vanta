@@ -86,9 +86,9 @@ app.use('/api/documents', requireAuth, documentRoutes);
 // Temporary persistence split:
 //   /api/projects  → Supabase rag_apps + projects   ✅
 //   /api/chatbots  → Supabase rag_apps               ✅
-//   /api/documents → SQLite document_chunks          (migrated Phase 4)
+//   /api/documents → Supabase Storage + pgvector     ✅  (Phase 4)
 //   /api/messages  → SQLite chat_messages            (migrated Phase 5)
-//   /api/chat      → SQLite retrieval                (migrated Phase 5)
+//   /api/chat      → Supabase retrieval (pgvector)   ✅  (Phase 4 partial)
 app.use('/api/projects', requireAuth, projectRoutes);
 
 // ─── Global error handler ─────────────────────────────────────────────────────

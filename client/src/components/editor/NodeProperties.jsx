@@ -88,7 +88,13 @@ export default function NodeProperties({ node, chatbotId, onUpdate, onClose }) {
     for (const file of files) {
       try {
         const result = await documentsApi.upload(file, chatbotId, node.id);
-        uploaded.push({ name: file.name, url: result.file_url, size: file.size, chunks: result.chunks_indexed });
+        uploaded.push({
+          name:    result.file_name || file.name,
+          id:      result.id,
+          size:    result.size_bytes || file.size,
+          chunks:  result.chunk_count,
+          status:  result.status,
+        });
       } catch (err) {
         console.error('Upload failed:', err);
         alert(`Failed to upload ${file.name}: ${err.message}`);
