@@ -11,6 +11,7 @@ import chatbotRoutes from './routes/chatbots.js';
 import messageRoutes from './routes/messages.js';
 import documentRoutes from './routes/documents.js';
 import chatRoutes from './routes/chat.js';
+import projectRoutes from './routes/projects.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -81,6 +82,14 @@ function chatbotAuth(req, res, next) {
 app.use('/api/chatbots', chatbotAuth, chatbotRoutes);
 app.use('/api/messages', requireAuth, messageRoutes);
 app.use('/api/documents', requireAuth, documentRoutes);
+// Phase 3: projects now on Supabase
+// Temporary persistence split:
+//   /api/projects  → Supabase rag_apps + projects   ✅
+//   /api/chatbots  → Supabase rag_apps               ✅
+//   /api/documents → SQLite document_chunks          (migrated Phase 4)
+//   /api/messages  → SQLite chat_messages            (migrated Phase 5)
+//   /api/chat      → SQLite retrieval                (migrated Phase 5)
+app.use('/api/projects', requireAuth, projectRoutes);
 
 // ─── Global error handler ─────────────────────────────────────────────────────
 

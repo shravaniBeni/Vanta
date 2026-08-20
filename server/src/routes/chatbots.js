@@ -1,70 +1,174 @@
+/**
+ * server/src/routes/chatbots.js
+ *
+ * Phase 3: Chatbot (rag_apps) routes — fully migrated to Supabase PostgreSQL.
+ * SQLite is no longer used by this file.
+ *
+ * Temporary persistence split (resolved in later phases):
+ *   rag_apps        → Supabase  ✅ (this file)
+ *   projects        → Supabase  ✅ (projects.js)
+ *   document_chunks → SQLite    (migrated in Phase 4)
+ *   chat_messages   → SQLite    (migrated in Phase 5)
+ *
+ * Public API contract (unchanged from Phase 1):
+ *   GET    /api/chatbots              — list user's apps (auth required)
+ *   GET    /api/chatbots?embed_id=X   — public embed lookup (no auth, deployed only)
+ *   GET    /api/chatbots?id=X         — get by id (auth required)
+ *   GET    /api/chatbots/:id          — get by id (auth required)
+ *   POST   /api/chatbots/generate     — AI-generate workflow (auth required)
+ *   POST   /api/chatbots              — manual create (auth required)
+ *   PATCH  /api/chatbots/:id          — update fields (auth required, owner only)
+ *   DELETE /api/chatbots/:id          — delete (auth required, owner only)
+ */
+
 import { Router } from 'express';
-import { v4 as uuidv4 } from 'uuid';
-import { client } from '../db.js';
+import supabase from '../supabase.js';
 import { invokeLLMJson } from '../openai.js';
+import { getOwnedRagApp, getOwnedProject, getOrCreateDefaultProject } from '../helpers.js';
 
 const router = Router();
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// ─── Response shape ───────────────────────────────────────────────────────────
+//
+// The frontend currently uses these fields from the chatbot response:
+//   id, title, description, status, embed_id, nodes, connections,
+//   created_at, updated_at
+//
+// Phase 3 adds (additive — frontend ignores unknown fields):
+//   project_id, architect_plan, architect_status, architect_version
+//
+// Fields removed (were SQLite-only, never used by the active frontend):
+//   amd_enabled, sample_documents
 
-function safeJson(str, fallback) {
-  try { return JSON.parse(str); } catch { return fallback; }
-}
-
-function parseChatbot(row) {
+/**
+ * Format a rag_apps row into the API response shape.
+ * JSONB columns (nodes, connections, architect_plan) are already parsed
+ * by Supabase JS client — no manual JSON.parse needed.
+ */
+function formatApp(row) {
   return {
-    ...row,
-    nodes: safeJson(row.nodes, []),
-    connections: safeJson(row.connections, []),
-    sample_documents: safeJson(row.sample_documents, []),
-    amd_enabled: Boolean(row.amd_enabled),
+    id:                row.id,
+    title:             row.title,
+    description:       row.description,
+    status:            row.status,
+    embed_id:          row.embed_id,
+    nodes:             row.nodes             ?? [],
+    connections:       row.connections       ?? [],
+    project_id:        row.project_id,
+    architect_plan:    row.architect_plan    ?? null,
+    architect_status:  row.architect_status,
+    architect_version: row.architect_version,
+    created_at:        row.created_at,
+    updated_at:        row.updated_at,
   };
 }
 
-// ─── List / Filter ────────────────────────────────────────────────────────────
+// ─── GET /api/chatbots ────────────────────────────────────────────────────────
+//
+// Handles three patterns:
+//   1. ?embed_id=X  — public embed lookup (no auth guard in index.js chatbotAuth)
+//   2. ?id=X        — single app by id (auth required, returns array for compat)
+//   3. (none)       — list all apps owned by authenticated user
 
 router.get('/', async (req, res) => {
-  try {
-    const { id, embed_id } = req.query;
-    let result;
+  const { id, embed_id } = req.query;
 
-    if (id) {
-      result = await client.execute({ sql: 'SELECT * FROM chatbots WHERE id = ?', args: [id] });
-    } else if (embed_id) {
-      result = await client.execute({ sql: 'SELECT * FROM chatbots WHERE embed_id = ?', args: [embed_id] });
-    } else {
-      result = await client.execute('SELECT * FROM chatbots ORDER BY created_at DESC');
+  try {
+    // ── Public embed lookup ───────────────────────────────────────────────────
+    if (embed_id) {
+      // Must be deployed. Return only minimal public-safe fields.
+      const { data, error } = await supabase
+        .from('rag_apps')
+        .select('id, title, description, embed_id, nodes, connections, status')
+        .eq('embed_id', embed_id)
+        .eq('status', 'deployed')
+        .single();
+
+      if (error || !data) {
+        // Return empty array — consistent with old SQLite behavior, Chat.jsx
+        // checks array.length > 0 to decide whether to load the chatbot.
+        return res.json([]);
+      }
+
+      // Return only public-safe fields — no user_id, project_id, architect_plan
+      return res.json([{
+        id:          data.id,
+        title:       data.title,
+        description: data.description,
+        embed_id:    data.embed_id,
+        nodes:       data.nodes       ?? [],
+        connections: data.connections ?? [],
+        status:      data.status,
+      }]);
     }
 
-    res.json(result.rows.map(parseChatbot));
+    // ── Filter by id ──────────────────────────────────────────────────────────
+    if (id) {
+      const app = await getOwnedRagApp(id, req.user.id);
+      if (!app) return res.json([]);
+      return res.json([formatApp(app)]);
+    }
+
+    // ── List all user's apps ──────────────────────────────────────────────────
+    const { data, error } = await supabase
+      .from('rag_apps')
+      .select('*')
+      .eq('user_id', req.user.id)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('[chatbots GET /]', error.message);
+      return res.status(500).json({ error: 'Failed to fetch chatbots' });
+    }
+
+    res.json((data ?? []).map(formatApp));
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('[chatbots GET /]', err.message);
+    res.status(500).json({ error: 'Failed to fetch chatbots' });
   }
 });
 
-// ─── Get one ──────────────────────────────────────────────────────────────────
+// ─── GET /api/chatbots/:id ────────────────────────────────────────────────────
 
 router.get('/:id', async (req, res) => {
   try {
-    const result = await client.execute({ sql: 'SELECT * FROM chatbots WHERE id = ?', args: [req.params.id] });
-    if (!result.rows.length) return res.status(404).json({ error: 'Not found' });
-    res.json(parseChatbot(result.rows[0]));
+    const app = await getOwnedRagApp(req.params.id, req.user.id);
+    // Return 404 regardless of whether the app exists for a different user.
+    if (!app) return res.status(404).json({ error: 'Chatbot not found' });
+    res.json(formatApp(app));
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('[chatbots GET /:id]', err.message);
+    res.status(500).json({ error: 'Failed to fetch chatbot' });
   }
 });
 
-// ─── Generate workflow from description ───────────────────────────────────────
+// ─── POST /api/chatbots/generate ─────────────────────────────────────────────
+//
+// Note: Express matches routes in registration order. Because this file is
+// used as a sub-router mounted at /api/chatbots, '/generate' is registered
+// before '/:id' so there is no route conflict.
 
 router.post('/generate', async (req, res) => {
-  const { description } = req.body;
-  if (!description) return res.status(400).json({ error: 'description is required' });
+  const { description, project_id: requestedProjectId } = req.body;
+  if (!description || typeof description !== 'string' || description.trim().length === 0) {
+    return res.status(400).json({ error: 'description is required' });
+  }
 
   try {
-    const result = await invokeLLMJson(`
+    // ── Resolve project ───────────────────────────────────────────────────────
+    let project;
+    if (requestedProjectId) {
+      project = await getOwnedProject(requestedProjectId, req.user.id);
+      if (!project) return res.status(404).json({ error: 'Project not found' });
+    } else {
+      project = await getOrCreateDefaultProject(req.user.id);
+    }
+
+    // ── Generate workflow via LLM ─────────────────────────────────────────────
+    const generated = await invokeLLMJson(`
 You are a RAG workflow generator. Given a user's plain English description of a chatbot, generate a complete RAG workflow.
 
-User description: "${description}"
+User description: "${description.trim()}"
 
 Generate a workflow with appropriate nodes from: DocumentUpload, WebCrawler, OCR, TextSplitter, DocumentProcessor, Embeddings, VectorStore, LLM, APIIntegration, ChatOutput
 
@@ -93,80 +197,160 @@ Return ONLY valid JSON:
 }
 `);
 
-    const id = uuidv4();
-    await client.execute({
-      sql: `INSERT INTO chatbots (id, title, description, status, nodes, connections) VALUES (?, ?, ?, 'draft', ?, ?)`,
-      args: [id, result.title || 'Untitled Chatbot', description, JSON.stringify(result.nodes || []), JSON.stringify(result.connections || [])],
-    });
+    // ── Insert into Supabase ──────────────────────────────────────────────────
+    const { data, error } = await supabase
+      .from('rag_apps')
+      .insert({
+        user_id:           req.user.id,
+        project_id:        project.id,
+        title:             generated.title || 'Untitled Chatbot',
+        description:       description.trim(),
+        status:            'draft',
+        nodes:             generated.nodes        ?? [],
+        connections:       generated.connections  ?? [],
+        architect_status:  'pending',
+        architect_version: 0,
+      })
+      .select()
+      .single();
 
-    const row = await client.execute({ sql: 'SELECT * FROM chatbots WHERE id = ?', args: [id] });
-    res.status(201).json(parseChatbot(row.rows[0]));
+    if (error || !data) {
+      console.error('[chatbots POST /generate]', error?.message);
+      return res.status(500).json({ error: 'Failed to create chatbot' });
+    }
+
+    res.status(201).json(formatApp(data));
   } catch (err) {
-    console.error('[generate]', err);
+    console.error('[chatbots POST /generate]', err.message);
     res.status(500).json({ error: err.message });
   }
 });
 
-// ─── Create ───────────────────────────────────────────────────────────────────
+// ─── POST /api/chatbots ───────────────────────────────────────────────────────
 
 router.post('/', async (req, res) => {
-  const { title, description, status, nodes, connections, amd_enabled, sample_documents } = req.body;
-  if (!title) return res.status(400).json({ error: 'title is required' });
+  const { title, description, status, nodes, connections, project_id: requestedProjectId } = req.body;
+
+  if (!title || typeof title !== 'string' || title.trim().length === 0) {
+    return res.status(400).json({ error: 'title is required' });
+  }
 
   try {
-    const id = uuidv4();
-    await client.execute({
-      sql: `INSERT INTO chatbots (id, title, description, status, nodes, connections, amd_enabled, sample_documents)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      args: [id, title, description || '', status || 'draft', JSON.stringify(nodes || []), JSON.stringify(connections || []), amd_enabled ? 1 : 0, JSON.stringify(sample_documents || [])],
-    });
-    const row = await client.execute({ sql: 'SELECT * FROM chatbots WHERE id = ?', args: [id] });
-    res.status(201).json(parseChatbot(row.rows[0]));
+    let project;
+    if (requestedProjectId) {
+      project = await getOwnedProject(requestedProjectId, req.user.id);
+      if (!project) return res.status(404).json({ error: 'Project not found' });
+    } else {
+      project = await getOrCreateDefaultProject(req.user.id);
+    }
+
+    const { data, error } = await supabase
+      .from('rag_apps')
+      .insert({
+        user_id:           req.user.id,
+        project_id:        project.id,
+        title:             title.trim(),
+        description:       description?.trim() ?? '',
+        status:            status ?? 'draft',
+        nodes:             Array.isArray(nodes)       ? nodes       : [],
+        connections:       Array.isArray(connections) ? connections : [],
+        architect_status:  'pending',
+        architect_version: 0,
+      })
+      .select()
+      .single();
+
+    if (error || !data) {
+      console.error('[chatbots POST /]', error?.message);
+      return res.status(500).json({ error: 'Failed to create chatbot' });
+    }
+
+    res.status(201).json(formatApp(data));
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('[chatbots POST /]', err.message);
+    res.status(500).json({ error: 'Failed to create chatbot' });
   }
 });
 
-// ─── Update ───────────────────────────────────────────────────────────────────
+// ─── PATCH /api/chatbots/:id ──────────────────────────────────────────────────
 
 router.patch('/:id', async (req, res) => {
   try {
-    const existing = await client.execute({ sql: 'SELECT * FROM chatbots WHERE id = ?', args: [req.params.id] });
-    if (!existing.rows.length) return res.status(404).json({ error: 'Not found' });
+    const existing = await getOwnedRagApp(req.params.id, req.user.id);
+    if (!existing) return res.status(404).json({ error: 'Chatbot not found' });
 
-    const allowed = ['title', 'description', 'status', 'nodes', 'connections', 'amd_enabled', 'sample_documents', 'embed_id'];
-    const updates = [];
-    const values = [];
+    // Fields the frontend/API can update. user_id and created_at are never
+    // updatable. project_id is only updated if the caller supplies a valid
+    // project they own.
+    const allowed = ['title', 'description', 'status', 'embed_id', 'nodes', 'connections'];
+    const updates = {};
 
     for (const key of allowed) {
       if (req.body[key] !== undefined) {
-        updates.push(`${key} = ?`);
-        const val = req.body[key];
-        values.push(typeof val === 'object' && val !== null ? JSON.stringify(val) : val);
+        updates[key] = req.body[key];
       }
     }
 
-    if (updates.length === 0) return res.json(parseChatbot(existing.rows[0]));
+    // Allow architect fields (additive, no logic attached)
+    if (req.body.architect_plan    !== undefined) updates.architect_plan    = req.body.architect_plan;
+    if (req.body.architect_status  !== undefined) updates.architect_status  = req.body.architect_status;
+    if (req.body.architect_version !== undefined) updates.architect_version = req.body.architect_version;
 
-    updates.push("updated_at = datetime('now')");
-    values.push(req.params.id);
+    // Optional project reassignment — validate ownership
+    if (req.body.project_id !== undefined) {
+      const newProject = await getOwnedProject(req.body.project_id, req.user.id);
+      if (!newProject) return res.status(404).json({ error: 'Project not found' });
+      updates.project_id = req.body.project_id;
+    }
 
-    await client.execute({ sql: `UPDATE chatbots SET ${updates.join(', ')} WHERE id = ?`, args: values });
-    const updated = await client.execute({ sql: 'SELECT * FROM chatbots WHERE id = ?', args: [req.params.id] });
-    res.json(parseChatbot(updated.rows[0]));
+    if (Object.keys(updates).length === 0) {
+      return res.json(formatApp(existing));
+    }
+
+    updates.updated_at = new Date().toISOString();
+
+    const { data, error } = await supabase
+      .from('rag_apps')
+      .update(updates)
+      .eq('id', req.params.id)
+      .eq('user_id', req.user.id)
+      .select()
+      .single();
+
+    if (error || !data) {
+      console.error('[chatbots PATCH /:id]', error?.message);
+      return res.status(500).json({ error: 'Failed to update chatbot' });
+    }
+
+    res.json(formatApp(data));
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('[chatbots PATCH /:id]', err.message);
+    res.status(500).json({ error: 'Failed to update chatbot' });
   }
 });
 
-// ─── Delete ───────────────────────────────────────────────────────────────────
+// ─── DELETE /api/chatbots/:id ─────────────────────────────────────────────────
 
 router.delete('/:id', async (req, res) => {
   try {
-    await client.execute({ sql: 'DELETE FROM chatbots WHERE id = ?', args: [req.params.id] });
+    const existing = await getOwnedRagApp(req.params.id, req.user.id);
+    if (!existing) return res.status(404).json({ error: 'Chatbot not found' });
+
+    const { error } = await supabase
+      .from('rag_apps')
+      .delete()
+      .eq('id', req.params.id)
+      .eq('user_id', req.user.id);
+
+    if (error) {
+      console.error('[chatbots DELETE /:id]', error.message);
+      return res.status(500).json({ error: 'Failed to delete chatbot' });
+    }
+
     res.json({ success: true });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('[chatbots DELETE /:id]', err.message);
+    res.status(500).json({ error: 'Failed to delete chatbot' });
   }
 });
 
