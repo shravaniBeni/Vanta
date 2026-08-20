@@ -5,6 +5,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { migrate } from './db.js';
 import { requireAuth } from './middleware/auth.js';
+import { loadEmbedder } from './embeddings.js';
 
 import chatbotRoutes from './routes/chatbots.js';
 import messageRoutes from './routes/messages.js';
@@ -90,13 +91,16 @@ app.use((err, req, res, next) => {
 
 // ─── Startup ──────────────────────────────────────────────────────────────────
 
-migrate().then(() => {
-  app.listen(PORT, () => {
-    console.log(`\n🚀 Vanta server → http://localhost:${PORT}`);
-    console.log(`   Health: http://localhost:${PORT}/api/health`);
-    console.log(`   Auth test: GET http://localhost:${PORT}/api/me\n`);
+migrate()
+  .then(() => loadEmbedder())
+  .then(() => {
+    app.listen(PORT, () => {
+      console.log(`\n🚀 Vanta server → http://localhost:${PORT}`);
+      console.log(`   Health: http://localhost:${PORT}/api/health`);
+      console.log(`   Auth test: GET http://localhost:${PORT}/api/me\n`);
+    });
+  })
+  .catch(err => {
+    console.error('[startup] Fatal error:', err.message);
+    process.exit(1);
   });
-}).catch(err => {
-  console.error('Failed to run migrations:', err);
-  process.exit(1);
-});

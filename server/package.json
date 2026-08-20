@@ -4,9 +4,11 @@
   "type": "module",
   "scripts": {
     "dev": "node --watch src/index.js",
-    "start": "node src/index.js"
+    "start": "node src/index.js",
+    "verify:embeddings": "node scripts/verify-embeddings.js"
   },
   "dependencies": {
+    "@huggingface/transformers": "^3.5.2",
     "@libsql/client": "^0.14.0",
     "@supabase/supabase-js": "^2.45.4",
     "cors": "^2.8.5",
