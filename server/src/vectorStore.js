@@ -42,9 +42,21 @@ export async function indexChunk({ userId, ragAppId, documentId, nodeId, fileNam
     );
   }
 
+  // Validate all values are finite floats
+  const allFinite = embedding.every(v => isFinite(v));
+  if (!allFinite) {
+    throw new Error('[vectorStore] Embedding contains non-finite values');
+  }
+
+  // Supabase JS client does not auto-cast number[] to vector(384).
+  // pgvector expects a string in the format "[0.1,0.2,...]" for text-cast inserts.
+  const embeddingStr = `[${embedding.join(',')}]`;
+
+  console.log(`[vectorStore] indexChunk: doc=${documentId.slice(0,8)} chunk=${chunkIndex} dim=${embedding.length} first3=[${embedding.slice(0,3).map(v=>v.toFixed(4)).join(',')}]`);
+
   const id = uuidv4();
 
-  const { error } = await supabase
+  const { error, data } = await supabase
     .from('document_chunks')
     .insert({
       id,
@@ -54,15 +66,17 @@ export async function indexChunk({ userId, ragAppId, documentId, nodeId, fileNam
       node_id:     nodeId,
       file_name:   fileName,
       content,
-      embedding,       // Supabase JS client serializes number[] → vector(384)
+      embedding:   embeddingStr,   // string format required by pgvector via Supabase REST
       chunk_index: chunkIndex,
       metadata:    {},
     });
 
   if (error) {
+    console.error(`[vectorStore] insert error for chunk ${chunkIndex}: code=${error.code} msg=${error.message} details=${error.details}`);
     throw new Error(`[vectorStore] Failed to insert chunk: ${error.message}`);
   }
 
+  console.log(`[vectorStore] chunk ${chunkIndex} inserted OK id=${id.slice(0,8)}`);
   return id;
 }
 
@@ -88,7 +102,7 @@ export async function retrieveChunks(ragAppId, query, topK = 5) {
   }
 
   const { data, error } = await supabase.rpc('match_chunks', {
-    query_embedding: queryEmbedding,
+    query_embedding: `[${queryEmbedding.join(',')}]`,
     p_rag_app_id:    ragAppId,
     match_count:     topK,
   });

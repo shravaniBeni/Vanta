@@ -134,6 +134,7 @@ router.post('/upload', upload.single('file'), async (req, res) => {
   let text;
   try {
     text = await extractTextFromBuffer(req.file.buffer, req.file.originalname);
+    console.log(`[documents/upload] parsed text length=${text?.length ?? 0} file=${req.file.originalname}`);
   } catch (parseErr) {
     console.error('[documents/upload] parse error:', parseErr.message);
     await removeStorageObject(storagePath);
@@ -155,6 +156,15 @@ router.post('/upload', upload.single('file'), async (req, res) => {
 
   // ── 7. Chunk + embed + insert ────────────────────────────────────────────
   const chunks = chunkText(text, chunkSize, overlap);
+  console.log(`[documents/upload] chunks=${chunks.length} chunkSize=${chunkSize} overlap=${overlap} docId=${documentId.slice(0,8)}`);
+  if (chunks.length === 0) {
+    await removeStorageObject(storagePath);
+    await supabase.from('documents').update({
+      status: 'error',
+      error_message: 'No chunks produced from document text',
+    }).eq('id', documentId);
+    return res.status(422).json({ error: 'No chunks produced from document text' });
+  }
   let insertedCount = 0;
 
   try {
@@ -188,6 +198,7 @@ router.post('/upload', upload.single('file'), async (req, res) => {
     chunk_count:   insertedCount,
     error_message: null,
   }).eq('id', documentId);
+  console.log(`[documents/upload] DONE docId=${documentId.slice(0,8)} status=indexed chunks=${insertedCount}`);
 
   // Return document metadata — no file_url, no permanent public URL
   res.json({
