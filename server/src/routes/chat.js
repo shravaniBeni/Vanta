@@ -214,9 +214,9 @@ Answer:`;
 });
 
 // ─── POST /api/chat/preview ───────────────────────────────────────────────────
-// Phase 6: Preview now requires authentication.
-// The editor's WorkflowPreview now sends a JWT — temporary exception is closed.
-// Verifies the target RAG app belongs to the authenticated user.
+// Phase 6: Preview requires authentication and uses REAL RAG retrieval.
+// Draft apps are allowed — owner can test before deploying.
+// No messages are persisted for preview requests.
 
 router.post('/preview', requireAuth, async (req, res) => {
   const { chatbot_id, query } = req.body;
@@ -228,26 +228,69 @@ router.post('/preview', requireAuth, async (req, res) => {
     const chatbot = await getRagAppById(chatbot_id);
     if (!chatbot) return res.status(404).json({ error: 'Chatbot not found' });
 
-    // Verify ownership — preview is only available to the app owner
-    if (chatbot.user_id && chatbot.user_id !== req.user.id) {
+    // Verify ownership — preview is only for the app owner, draft apps allowed
+    if (chatbot.user_id !== req.user.id) {
       return res.status(404).json({ error: 'Chatbot not found' });
     }
 
-    const nodes        = safeJson(chatbot.nodes, []);
-    const nodesList    = nodes.map(n => `- ${n.type}: ${n.label}`).join('\n');
-    const uploadedDocs = nodes
-      .filter(n => n.type === 'DocumentUpload' && n.params?.uploaded_files?.length)
-      .flatMap(n => (n.params.uploaded_files || []).map(f => f.name));
+    // ── Real RAG retrieval (same pipeline as POST /api/chat) ──────────────
+    const nodes       = safeJson(chatbot.nodes, []);
+    const llmNode     = nodes.find(n => n.type === 'LLM');
+    const model       = llmNode?.params?.model       || DEFAULT_CHAT_MODEL;
+    const temperature = llmNode?.params?.temperature ?? 0.7;
 
-    const answer = await invokeLLM(
-      `You are a RAG chatbot named "${chatbot.title}". ${chatbot.description || ''}
-Workflow nodes:\n${nodesList}${uploadedDocs.length ? `\nUploaded docs: ${uploadedDocs.join(', ')}` : ''}
-PREVIEW MODE. Simulate a realistic response. If no docs uploaded, say so.
-User: ${query}`,
-      DEFAULT_CHAT_MODEL, 0.7
+    let chunks = [];
+    try {
+      chunks = await retrieveChunks(chatbot.id, query, 5);
+    } catch (retrieveErr) {
+      console.warn('[chat/preview] retrieval error:', retrieveErr.message);
+    }
+
+    const similarityScores  = chunks.map(c => c.score);
+    const retrievedTexts    = chunks.map(c => c.content);
+    const chunkPreviews     = retrievedTexts.map(c =>
+      c.substring(0, 120) + (c.length > 120 ? '...' : '')
     );
+    const avgSimilarity = similarityScores.length
+      ? similarityScores.reduce((a, b) => a + b, 0) / similarityScores.length
+      : 0;
 
-    res.json({ answer });
+    // ── Build grounded prompt ─────────────────────────────────────────────
+    const prompt = chunks.length > 0
+      ? `You are "${chatbot.title}", an AI assistant being tested in preview mode.
+${chatbot.description ? `About you: ${chatbot.description}\n` : ''}Use the following context to answer accurately and concisely.
+If the context doesn't fully address the question, say so.
+
+Context:
+${chunks.map((c, i) => `[Source ${i + 1}]\n${c.content}`).join('\n\n---\n\n')}
+
+User: ${query}
+Answer:`
+      : `You are "${chatbot.title}", an AI assistant being tested in preview mode.
+${chatbot.description ? chatbot.description + '\n' : ''}No documents have been indexed yet for this chatbot. Please upload documents using the DocumentUpload node, then test again.
+
+User: ${query}
+Answer:`;
+
+    const answer = await invokeLLM(prompt, model, temperature);
+
+    res.json({
+      answer,
+      // Return retrieval telemetry for diagnostics panel in WorkflowPreview
+      retrievedChunks: chunkPreviews,
+      similarityScores,
+      avgSimilarity,
+      telemetry: {
+        timestamp:       new Date().toISOString(),
+        query,
+        llmResponse:     answer,
+        similarityScores,
+        avgSimilarity,
+        retrievedChunks: retrievedTexts,
+        chunkPreviews,
+        configUsed:      { model, topK: 5 },
+      },
+    });
   } catch (err) {
     console.error('[chat/preview]', err);
     res.status(500).json({ error: err.message });

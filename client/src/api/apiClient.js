@@ -100,6 +100,7 @@ export const messagesApi = {
 // ─── Documents ────────────────────────────────────────────────────────────────
 
 export const documentsApi = {
+  list: (ragAppId) => request('GET', `/api/documents?rag_app_id=${ragAppId}`),
   upload: (file, chatbotId, nodeId) => {
     const form = new FormData();
     form.append('file', file);

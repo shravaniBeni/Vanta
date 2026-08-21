@@ -8,7 +8,8 @@
     "verify:embeddings": "node scripts/verify-embeddings.js",
     "verify:phase3": "node scripts/verify-phase3.js",
     "verify:phase4": "node scripts/verify-phase4.js",
-    "verify:phase5": "node scripts/verify-phase5.js"
+    "verify:phase5": "node scripts/verify-phase5.js",
+    "verify:stabilization": "node scripts/verify-stabilization.js"
   },
   "dependencies": {
     "@huggingface/transformers": "^3.5.2",

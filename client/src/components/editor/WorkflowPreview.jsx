@@ -23,7 +23,15 @@ export default function WorkflowPreview({ chatbot, onClose }) {
 
     try {
       const result = await chatApi.preview(chatbot.id, text);
-      setMessages(prev => [...prev, { role: 'assistant', content: result.answer }]);
+      const content = result.answer;
+      const confidence = result.avgSimilarity;
+      const chunks = result.retrievedChunks?.length ?? 0;
+      setMessages(prev => [...prev, {
+        role: 'assistant',
+        content,
+        confidence,
+        chunks,
+      }]);
     } catch (err) {
       setMessages(prev => [...prev, { role: 'assistant', content: 'Preview failed: ' + err.message }]);
     } finally {
@@ -103,6 +111,16 @@ export default function WorkflowPreview({ chatbot, onClose }) {
               whiteSpace: 'pre-wrap',
             }}>
               {msg.content}
+              {msg.role === 'assistant' && msg.confidence !== undefined && (
+                <div style={{ marginTop: 5, display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div style={{ width: 50, height: 2, background: 'rgba(255,255,255,0.08)', borderRadius: 1, overflow: 'hidden' }}>
+                    <div style={{ width: `${Math.max(0, Math.min(1, msg.confidence)) * 100}%`, height: '100%', background: msg.confidence > 0.6 ? '#22c55e' : msg.confidence > 0.3 ? '#f59e0b' : '#ef4444', borderRadius: 1 }} />
+                  </div>
+                  <span style={{ fontSize: 9, color: '#475569', fontFamily: 'JetBrains Mono, monospace' }}>
+                    {(msg.confidence * 100).toFixed(0)}% · {msg.chunks ?? 0} chunks
+                  </span>
+                </div>
+              )}
             </div>
           </div>
         ))}

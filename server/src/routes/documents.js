@@ -44,6 +44,35 @@ const STORAGE_BUCKET = 'knowledge-docs';
 
 const router = Router();
 
+// ─── GET /api/documents — list documents for a RAG app ────────────────────────
+
+router.get('/', async (req, res) => {
+  const { rag_app_id } = req.query;
+  if (!rag_app_id) return res.status(400).json({ error: 'rag_app_id is required' });
+
+  try {
+    // Verify ownership before listing
+    const ragApp = await getOwnedRagApp(rag_app_id, req.user.id);
+    if (!ragApp) return res.status(404).json({ error: 'Chatbot not found' });
+
+    const { data, error } = await supabase
+      .from('documents')
+      .select('id, rag_app_id, node_id, file_name, mime_type, size_bytes, chunk_count, status, error_message, created_at')
+      .eq('rag_app_id', rag_app_id)
+      .order('created_at', { ascending: true });
+
+    if (error) {
+      console.error('[documents GET /]', error.message);
+      return res.status(500).json({ error: 'Failed to fetch documents' });
+    }
+
+    res.json(data ?? []);
+  } catch (err) {
+    console.error('[documents GET /]', err.message);
+    res.status(500).json({ error: 'Failed to fetch documents' });
+  }
+});
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 /**

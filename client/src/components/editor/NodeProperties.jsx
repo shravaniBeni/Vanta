@@ -1,5 +1,5 @@
-import React, { useState, useRef } from 'react';
-import { X, Settings, Upload, FileText, Trash2 } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { X, Settings, Upload, FileText, Trash2, AlertCircle } from 'lucide-react';
 import { documentsApi } from '@/api/apiClient';
 
 const inputStyle = {
@@ -72,7 +72,45 @@ function Toggle({ checked, onChange }) {
 export default function NodeProperties({ node, chatbotId, onUpdate, onClose }) {
   const [params, setParams] = useState(node.params || {});
   const [uploading, setUploading] = useState(false);
+  const [docsLoading, setDocsLoading] = useState(false);
+  const [docsError, setDocsError] = useState('');
   const fileInputRef = useRef(null);
+
+  // Rehydrate document list from backend when DocumentUpload node opens
+  useEffect(() => {
+    if (node.type === 'DocumentUpload' && chatbotId) {
+      loadPersistedDocuments();
+    }
+  }, [node.id, chatbotId]);
+
+  const loadPersistedDocuments = async () => {
+    setDocsLoading(true);
+    setDocsError('');
+    try {
+      const docs = await documentsApi.list(chatbotId);
+      // Filter to this node's documents (or all if node_id is 'default')
+      const nodeId = node.id;
+      const filtered = docs.filter(d => d.node_id === nodeId || d.node_id === 'default');
+      // Use whichever set is larger — node-specific or all
+      const relevant = filtered.length > 0 ? filtered : docs;
+      const uploaded = relevant.map(d => ({
+        id:     d.id,
+        name:   d.file_name,
+        size:   d.size_bytes || 0,
+        chunks: d.chunk_count || 0,
+        status: d.status,
+        error:  d.error_message,
+      }));
+      const newParams = { ...params, uploaded_files: uploaded };
+      setParams(newParams);
+      // Don't call onUpdate here — this is a read-only rehydration, not a user edit
+    } catch (err) {
+      console.error('[NodeProperties] failed to load documents:', err.message);
+      setDocsError('Failed to load documents from server');
+    } finally {
+      setDocsLoading(false);
+    }
+  };
 
   const set = (key, value) => {
     const newParams = { ...params, [key]: value };
@@ -162,22 +200,39 @@ export default function NodeProperties({ node, chatbotId, onUpdate, onClose }) {
               </button>
             </Field>
 
+            {/* Loading / error state */}
+            {docsLoading && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 0' }}>
+                <div style={{ width: 12, height: 12, border: '2px solid #6366f1', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
+                <span style={{ fontSize: 10, color: '#475569', fontFamily: 'JetBrains Mono, monospace' }}>Loading documents...</span>
+              </div>
+            )}
+            {docsError && !docsLoading && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 8px', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)', borderRadius: 6, marginBottom: 8 }}>
+                <AlertCircle size={11} color="#ef4444" />
+                <span style={{ fontSize: 10, color: '#fca5a5' }}>{docsError}</span>
+              </div>
+            )}
+
             {(params.uploaded_files || []).length > 0 && (
               <Field label={`Files (${params.uploaded_files.length})`}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
                   {params.uploaded_files.map((f, i) => (
-                    <div key={i} style={{
+                    <div key={f.id || i} style={{
                       display: 'flex', alignItems: 'center', gap: 7,
                       padding: '6px 9px',
-                      background: 'rgba(99,102,241,0.06)',
-                      border: '1px solid rgba(99,102,241,0.15)',
+                      background: f.status === 'error' ? 'rgba(239,68,68,0.06)' : 'rgba(99,102,241,0.06)',
+                      border: `1px solid ${f.status === 'error' ? 'rgba(239,68,68,0.2)' : 'rgba(99,102,241,0.15)'}`,
                       borderRadius: 7,
                     }}>
-                      <FileText size={11} color="#6366f1" style={{ flexShrink: 0 }} />
+                      <FileText size={11} color={f.status === 'error' ? '#ef4444' : '#6366f1'} style={{ flexShrink: 0 }} />
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontSize: 10, color: '#cbd5e1', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name}</div>
                         <div style={{ fontSize: 9, color: '#475569', fontFamily: 'JetBrains Mono, monospace' }}>
-                          {formatSize(f.size)}{f.chunks ? ` · ${f.chunks} chunks` : ''}
+                          {formatSize(f.size)}
+                          {f.status === 'indexed' && f.chunks ? ` · ${f.chunks} chunks` : ''}
+                          {f.status === 'processing' ? ' · indexing...' : ''}
+                          {f.status === 'error' ? ` · error` : ''}
                         </div>
                       </div>
                       <button onClick={() => removeFile(i)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#475569', padding: 0, flexShrink: 0 }}
@@ -190,6 +245,12 @@ export default function NodeProperties({ node, chatbotId, onUpdate, onClose }) {
                   ))}
                 </div>
               </Field>
+            )}
+
+            {!docsLoading && (params.uploaded_files || []).length === 0 && !docsError && (
+              <p style={{ fontSize: 10, color: '#334155', fontFamily: 'JetBrains Mono, monospace', textAlign: 'center', marginTop: 4 }}>
+                // No documents yet
+              </p>
             )}
 
             <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
