@@ -70,7 +70,26 @@ async function removeStorageObject(storagePath) {
 
 // ─── POST /api/documents/upload ───────────────────────────────────────────────
 
-router.post('/upload', upload.single('file'), async (req, res) => {
+router.post('/upload', (req, res, next) => {
+  upload.single('file')(req, res, (err) => {
+    if (err) {
+      // multer errors (file too large, wrong type, etc.)
+      console.error('[documents/upload] multer error:', err.message, err.code);
+      return res.status(400).json({ error: err.message });
+    }
+    next();
+  });
+}, async (req, res) => {
+  // Wrap the entire handler so no error silently becomes a generic 500
+  try {
+    await handleUpload(req, res);
+  } catch (unexpectedErr) {
+    console.error('[documents/upload] UNHANDLED ERROR:', unexpectedErr.message, unexpectedErr.stack);
+    res.status(500).json({ error: 'Internal server error: ' + unexpectedErr.message });
+  }
+});
+
+async function handleUpload(req, res) {
   if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
 
   const { chatbot_id, node_id } = req.body;
@@ -113,15 +132,16 @@ router.post('/upload', upload.single('file'), async (req, res) => {
   }
 
   // ── 5. Upload buffer to Supabase Storage ────────────────────────────────
+  console.log(`[documents/upload] uploading to storage: path=${storagePath} size=${req.file.size}`);
   const { error: storageErr } = await supabase.storage
     .from(STORAGE_BUCKET)
     .upload(storagePath, req.file.buffer, {
       contentType: req.file.mimetype || 'application/octet-stream',
-      upsert: false, // reject collisions — documentId guarantees uniqueness
+      upsert: false,
     });
 
   if (storageErr) {
-    console.error('[documents/upload] storage error:', storageErr.message);
+    console.error('[documents/upload] storage error:', storageErr.message, storageErr);
     // Rollback: mark document as error
     await supabase.from('documents').update({
       status: 'error',
@@ -169,19 +189,21 @@ router.post('/upload', upload.single('file'), async (req, res) => {
 
   try {
     for (let i = 0; i < chunks.length; i++) {
+      // Truncate chunk to 8000 chars — embedder has a token limit
+      const safeContent = chunks[i].slice(0, 8000);
       await indexChunk({
         userId:     req.user.id,
         ragAppId:   chatbot_id,
         documentId,
         nodeId,
         fileName:   req.file.originalname,
-        content:    chunks[i],
+        content:    safeContent,
         chunkIndex: i,
       });
       insertedCount++;
     }
   } catch (embedErr) {
-    console.error('[documents/upload] embedding/insert error:', embedErr.message);
+    console.error('[documents/upload] embedding/insert error:', embedErr.message, embedErr.stack?.split('\n')[1]);
     // Rollback: delete any chunks that were already inserted
     await deleteChunksForDocument(documentId);
     // Original file stays in Storage for potential retry/debug
@@ -208,7 +230,7 @@ router.post('/upload', upload.single('file'), async (req, res) => {
     chunk_count: insertedCount,
     status:      'indexed',
   });
-});
+}
 
 // ─── POST /api/documents/:id/signed-url ──────────────────────────────────────
 
