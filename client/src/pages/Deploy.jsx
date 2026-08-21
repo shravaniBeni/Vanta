@@ -49,7 +49,7 @@ export default function Deploy() {
         {/* Header */}
         <div className="flex items-center gap-4 mb-8">
           <button
-            onClick={() => navigate(createPageUrl('Home'))}
+            onClick={() => navigate(createPageUrl('Dashboard'))}
             className="p-2 rounded-lg border border-indigo-500/20 text-slate-500 hover:text-white hover:border-indigo-500/40 transition-colors"
           >
             <ArrowLeft className="w-5 h-5" />

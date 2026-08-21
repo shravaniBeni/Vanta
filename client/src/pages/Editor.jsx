@@ -108,7 +108,7 @@ export default function Editor() {
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
           <button
-            onClick={() => navigate(createPageUrl('Home'))}
+            onClick={() => navigate(createPageUrl('Dashboard'))}
             style={{ background: 'transparent', border: '1px solid rgba(99,102,241,0.2)', borderRadius: 8, padding: '5px 8px', cursor: 'pointer', color: '#64748b', display: 'flex', alignItems: 'center' }}
             onMouseEnter={e => e.currentTarget.style.color = '#e2e8f0'}
             onMouseLeave={e => e.currentTarget.style.color = '#64748b'}

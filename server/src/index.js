@@ -43,9 +43,10 @@ app.get('/api/health', (req, res) =>
   res.json({ status: 'ok', timestamp: new Date().toISOString() })
 );
 
-// /api/chat — intentionally public:
-//   POST /       — supports both public embed (embed_id) and authenticated chat
-//   POST /preview — TEMPORARY public exception until Phase 6 frontend auth
+// /api/chat — split:
+//   POST /api/chat         — public (embed_id) + optional-auth (chatbot_id)
+//   POST /api/chat/preview — requires authentication (Phase 6 closes the exception)
+//   The preview route inside chatRoutes applies requireAuth internally.
 app.use('/api/chat', chatRoutes);
 
 // ─── Authenticated test endpoint ─────────────────────────────────────────────

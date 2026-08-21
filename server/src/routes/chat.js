@@ -26,6 +26,7 @@ import supabase from '../supabase.js';
 import { invokeLLM } from '../openai.js';
 import { retrieveChunks } from '../vectorStore.js';
 import { DEFAULT_CHAT_MODEL } from '../openai.js';
+import { requireAuth } from '../middleware/auth.js';
 
 const router = Router();
 
@@ -57,7 +58,7 @@ async function tryGetUser(req) {
 async function getRagAppById(id) {
   const { data, error } = await supabase
     .from('rag_apps')
-    .select('id, title, description, status, nodes, connections')
+    .select('id, user_id, title, description, status, nodes, connections')
     .eq('id', id)
     .single();
   if (error || !data) return null;
@@ -213,10 +214,11 @@ Answer:`;
 });
 
 // ─── POST /api/chat/preview ───────────────────────────────────────────────────
-// TEMPORARY SECURITY EXCEPTION — remains public until Phase 6 frontend auth.
-// No message persistence on preview requests.
+// Phase 6: Preview now requires authentication.
+// The editor's WorkflowPreview now sends a JWT — temporary exception is closed.
+// Verifies the target RAG app belongs to the authenticated user.
 
-router.post('/preview', async (req, res) => {
+router.post('/preview', requireAuth, async (req, res) => {
   const { chatbot_id, query } = req.body;
   if (!chatbot_id || !query) {
     return res.status(400).json({ error: 'chatbot_id and query are required' });
@@ -225,6 +227,11 @@ router.post('/preview', async (req, res) => {
   try {
     const chatbot = await getRagAppById(chatbot_id);
     if (!chatbot) return res.status(404).json({ error: 'Chatbot not found' });
+
+    // Verify ownership — preview is only available to the app owner
+    if (chatbot.user_id && chatbot.user_id !== req.user.id) {
+      return res.status(404).json({ error: 'Chatbot not found' });
+    }
 
     const nodes        = safeJson(chatbot.nodes, []);
     const nodesList    = nodes.map(n => `- ${n.type}: ${n.label}`).join('\n');

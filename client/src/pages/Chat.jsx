@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Send, Loader2, Zap, ZapOff } from 'lucide-react';
-import { chatbotsApi, chatApi, messagesApi } from '@/api/apiClient';
+import { chatbotsApi, chatApi } from '@/api/apiClient';
 import DiagnosticPanel from '../components/diagnostic/DiagnosticPanel';
 import { runDiagnostics, buildTelemetry } from '../components/diagnostic/ragDiagnostics';
 
@@ -40,7 +40,8 @@ export default function Chat() {
     setLoading(true);
 
     try {
-      const result = await chatApi.send(chatbot.id, query);
+      // Use public embed path — server persists messages automatically
+      const result = await chatApi.sendPublic(embedId, query);
 
       const telemetry = buildTelemetry({
         query,
@@ -52,26 +53,13 @@ export default function Chat() {
 
       const diagnostics = runDiagnostics(telemetry);
 
-      const assistantMsg = {
+      setMessages(prev => [...prev, {
         role: 'assistant',
         content: result.answer,
         confidence: result.avgSimilarity,
         telemetry,
         diagnostics,
-      };
-
-      setMessages(prev => [...prev, assistantMsg]);
-
-      // Persist messages
-      await messagesApi.create({ chatbot_id: chatbot.id, role: 'user', content: query });
-      await messagesApi.create({
-        chatbot_id: chatbot.id,
-        role: 'assistant',
-        content: result.answer,
-        confidence: result.avgSimilarity,
-        retrieved_chunks: telemetry.chunkPreviews,
-        diagnostic: diagnostics[0] || null,
-      });
+      }]);
     } catch (err) {
       console.error('Chat error:', err);
       setMessages(prev => [...prev, {
