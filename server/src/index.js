@@ -25,6 +25,7 @@ import messageRoutes  from './routes/messages.js';
 import documentRoutes from './routes/documents.js';
 import chatRoutes     from './routes/chat.js';
 import projectRoutes  from './routes/projects.js';
+import architectRoutes from './routes/architect.js';
 
 const app  = express();
 const PORT = process.env.PORT || 3001;
@@ -71,10 +72,11 @@ function chatbotAuth(req, res, next) {
 
 // ─── Protected routes ─────────────────────────────────────────────────────────
 
-app.use('/api/chatbots',  chatbotAuth,   chatbotRoutes);
+app.use('/api/chatbots',   chatbotAuth,   chatbotRoutes);
 app.use('/api/messages',  requireAuth,   messageRoutes);
 app.use('/api/documents', requireAuth,   documentRoutes);
 app.use('/api/projects',  requireAuth,   projectRoutes);
+app.use('/api/architect', requireAuth,   architectRoutes);
 
 // ─── Global error handler ─────────────────────────────────────────────────────
 

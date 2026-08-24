@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Sparkles, Plus, Folder, FolderOpen, Zap, Edit3, Trash2,
-  ChevronRight, MoreHorizontal, LogOut, Clock, Rocket,
+  LogOut, Clock, Rocket, Cpu, AlertTriangle,
 } from 'lucide-react';
 import { useAuth } from '@/lib/AuthContext';
 import { projectsApi, chatbotsApi } from '@/api/apiClient';
@@ -96,18 +96,20 @@ function ProjectModal({ mode, project, onClose, onSave }) {
 }
 
 // ─── Inline modal for new RAG app ─────────────────────────────────────────────
+// Creates a minimal draft rag_app then navigates directly to Architect onboarding.
+// No LLM workflow generation at creation time.
 
 function NewAppModal({ projectId, onClose, onCreated }) {
   const [description, setDescription] = useState('');
   const [loading, setLoading]         = useState(false);
   const [error, setError]             = useState('');
 
-  const handleGenerate = async () => {
+  const handleCreate = async () => {
     if (!description.trim()) { setError('Description is required'); return; }
     setLoading(true);
     setError('');
     try {
-      const app = await chatbotsApi.generate(description.trim(), projectId);
+      const app = await chatbotsApi.createDraft(description.trim(), projectId);
       onCreated(app);
     } catch (err) {
       setError(err.message);
@@ -120,7 +122,10 @@ function NewAppModal({ projectId, onClose, onCreated }) {
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
       <div className="neon-border rounded-2xl bg-[#0d1117] w-full max-w-lg p-6">
         <h2 className="text-lg font-bold text-white mb-1">New RAG Application</h2>
-        <p className="text-slate-500 text-sm mb-4">Describe what this chatbot should do.</p>
+        <p className="text-slate-500 text-sm mb-4">
+          Describe what this assistant should do. You'll upload knowledge sources and configure
+          the architecture on the next screen.
+        </p>
         {error && (
           <div className="mb-4 px-4 py-2 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-sm">
             {error}
@@ -128,7 +133,7 @@ function NewAppModal({ projectId, onClose, onCreated }) {
         )}
         <textarea
           autoFocus
-          placeholder="e.g. A customer support bot for my SaaS product that answers questions about pricing, features, and onboarding..."
+          placeholder="e.g. A technical support assistant for field engineers that answers questions strictly from our maintenance manuals and safety procedures."
           value={description}
           onChange={e => setDescription(e.target.value)}
           rows={4}
@@ -142,17 +147,81 @@ function NewAppModal({ projectId, onClose, onCreated }) {
             Cancel
           </button>
           <button
-            onClick={handleGenerate}
+            onClick={handleCreate}
             disabled={loading || !description.trim()}
             className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-sm font-semibold disabled:opacity-50 flex items-center justify-center gap-2"
           >
             {loading ? (
               <>
                 <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                Generating...
+                Creating...
               </>
             ) : (
-              <><Zap size={14} /> Generate Workflow</>
+              <><Cpu size={14} /> Create & Configure</>
+            )}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Delete confirmation modal ─────────────────────────────────────────────────
+
+function DeleteAppModal({ app, onClose, onConfirm }) {
+  const [loading, setLoading] = useState(false);
+  const [error, setError]     = useState('');
+
+  const handleConfirm = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      await onConfirm(app);
+      onClose();
+    } catch (err) {
+      setError(err.message);
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+      <div className="neon-border rounded-2xl bg-[#0d1117] w-full max-w-md p-6">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-9 h-9 rounded-xl bg-red-500/15 border border-red-500/30 flex items-center justify-center flex-shrink-0">
+            <Trash2 size={15} className="text-red-400" />
+          </div>
+          <h2 className="text-lg font-bold text-white">Delete RAG Application?</h2>
+        </div>
+        <p className="text-slate-400 text-sm leading-relaxed mb-2">
+          <span className="text-white font-semibold">"{app.title}"</span> will be permanently deleted.
+        </p>
+        <p className="text-slate-500 text-xs leading-relaxed mb-5">
+          This will remove the workflow configuration, all uploaded knowledge-base documents,
+          indexed chunks, chat history, and deployment data. This action cannot be undone.
+        </p>
+        {error && (
+          <div className="mb-4 px-4 py-2 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-sm">
+            {error}
+          </div>
+        )}
+        <div className="flex gap-3">
+          <button
+            onClick={onClose}
+            disabled={loading}
+            className="flex-1 py-2.5 rounded-xl border border-slate-700/50 text-slate-400 text-sm hover:border-slate-600 transition-colors disabled:opacity-50"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleConfirm}
+            disabled={loading}
+            className="flex-1 py-2.5 rounded-xl bg-red-600/80 hover:bg-red-600 text-white text-sm font-semibold transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+          >
+            {loading ? (
+              <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Deleting...</>
+            ) : (
+              <><Trash2 size={13} /> Delete Permanently</>
             )}
           </button>
         </div>
@@ -170,8 +239,9 @@ export default function Dashboard() {
   const [apps, setApps]          = useState([]);
   const [loading, setLoading]    = useState(true);
   const [activeProject, setActiveProject] = useState(null);
-  const [modal, setModal]        = useState(null); // null | 'createProject' | 'editProject' | 'newApp'
-  const [editTarget, setEditTarget] = useState(null);
+  const [modal, setModal]        = useState(null); // null | 'createProject' | 'editProject' | 'newApp' | 'deleteApp'
+  const [editTarget, setEditTarget]   = useState(null);
+  const [deleteAppTarget, setDeleteAppTarget] = useState(null);
   const [deleteError, setDeleteError] = useState('');
 
   useEffect(() => { loadData(); }, []);
@@ -220,21 +290,30 @@ export default function Dashboard() {
       }
     } catch (err) {
       if (err.message.includes('RAG applications')) {
-        setDeleteError(`"${project.name}" contains RAG apps. Delete or move them first.`);
+        setDeleteError(`"${project.name}" contains RAG apps. Delete them first.`);
       } else {
         setDeleteError(err.message);
       }
     }
   };
 
-  const handleDeleteApp = async (app) => {
+  // Called after user confirms deletion in DeleteAppModal
+  const handleDeleteAppConfirmed = async (app) => {
     await chatbotsApi.delete(app.id);
     setApps(prev => prev.filter(a => a.id !== app.id));
   };
 
+  // Opens the confirmation modal
+  const requestDeleteApp = (app, e) => {
+    e.stopPropagation();
+    setDeleteAppTarget(app);
+    setModal('deleteApp');
+  };
+
+  // New creation flow: draft → Architect
   const handleAppCreated = (app) => {
     setApps(prev => [app, ...prev]);
-    navigate(createPageUrl(`Editor?id=${app.id}`));
+    navigate(createPageUrl(`Architect?id=${app.id}`));
   };
 
   if (loading) {
@@ -271,6 +350,13 @@ export default function Dashboard() {
           projectId={activeProject}
           onClose={() => setModal(null)}
           onCreated={handleAppCreated}
+        />
+      )}
+      {modal === 'deleteApp' && deleteAppTarget && (
+        <DeleteAppModal
+          app={deleteAppTarget}
+          onClose={() => { setModal(null); setDeleteAppTarget(null); }}
+          onConfirm={handleDeleteAppConfirmed}
         />
       )}
 
@@ -391,7 +477,7 @@ export default function Dashboard() {
             </div>
           )}
 
-          {/* Delete error */}
+          {/* Delete error banner */}
           {deleteError && (
             <div className="mb-6 px-4 py-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400 text-sm flex items-center justify-between">
               {deleteError}
@@ -410,7 +496,7 @@ export default function Dashboard() {
                     onClick={() => setModal('newApp')}
                     className="mt-4 px-5 py-2.5 rounded-xl bg-indigo-600/20 border border-indigo-500/30 text-indigo-400 text-sm hover:bg-indigo-600/30 transition-colors"
                   >
-                    Generate your first app
+                    Create your first app
                   </button>
                 </div>
               ) : (
@@ -420,7 +506,7 @@ export default function Dashboard() {
                     return (
                       <div
                         key={app.id}
-                        className="neon-border rounded-xl bg-[#0d1117]/60 p-5 hover:bg-[#0d1117]/90 transition-colors flex flex-col"
+                        className="group neon-border rounded-xl bg-[#0d1117]/60 p-5 hover:bg-[#0d1117]/90 transition-colors flex flex-col"
                       >
                         <div className="flex items-start justify-between mb-3">
                           <div className="flex items-center gap-2">
@@ -432,12 +518,18 @@ export default function Dashboard() {
                               {sc.label}
                             </span>
                           </div>
-                          <button
-                            onClick={() => handleDeleteApp(app)}
-                            className="p-1 rounded text-slate-700 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100"
-                          >
-                            <Trash2 size={12} />
-                          </button>
+                          {/* Architect status badge */}
+                          {app.architect_status && app.architect_status !== 'pending' && (
+                            <span className={`font-mono text-xs px-1.5 py-0.5 rounded ${
+                              app.architect_status === 'approved'
+                                ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                                : app.architect_status === 'ready'
+                                ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20'
+                                : 'bg-slate-800 text-slate-500'
+                            }`}>
+                              {app.architect_status === 'approved' ? '✓ arch' : app.architect_status === 'ready' ? 'arch ready' : ''}
+                            </span>
+                          )}
                         </div>
 
                         <h3 className="text-white font-semibold text-sm mb-1 leading-snug">{app.title}</h3>
@@ -454,10 +546,17 @@ export default function Dashboard() {
 
                         <div className="flex gap-2">
                           <button
+                            onClick={() => navigate(createPageUrl(`Architect?id=${app.id}`))}
+                            className="flex-1 py-2 rounded-lg border border-purple-500/25 text-purple-400 text-xs font-semibold hover:bg-purple-600/10 transition-colors flex items-center justify-center gap-1.5"
+                            title="AI RAG Architect"
+                          >
+                            <Cpu size={11} /> Architect
+                          </button>
+                          <button
                             onClick={() => navigate(createPageUrl(`Editor?id=${app.id}`))}
                             className="flex-1 py-2 rounded-lg border border-indigo-500/25 text-indigo-400 text-xs font-semibold hover:bg-indigo-600/10 transition-colors flex items-center justify-center gap-1.5"
                           >
-                            <Edit3 size={11} /> Edit
+                            <Edit3 size={11} /> Editor
                           </button>
                           {app.status === 'deployed' && app.embed_id && (
                             <button
@@ -468,8 +567,9 @@ export default function Dashboard() {
                             </button>
                           )}
                           <button
-                            onClick={() => handleDeleteApp(app)}
+                            onClick={(e) => requestDeleteApp(app, e)}
                             className="py-2 px-2.5 rounded-lg border border-red-500/20 text-red-500/60 text-xs hover:text-red-400 hover:border-red-500/40 transition-colors"
+                            title="Delete app"
                           >
                             <Trash2 size={11} />
                           </button>

@@ -71,6 +71,21 @@ export const projectsApi = {
 // ─── Chatbots ─────────────────────────────────────────────────────────────────
 
 export const chatbotsApi = {
+  /**
+   * Create a minimal draft rag_app (no LLM, no nodes).
+   * Used by the new creation flow → navigates to Architect onboarding.
+   */
+  createDraft: (description, projectId) =>
+    request('POST', '/api/chatbots/create-draft', {
+      description,
+      ...(projectId && { project_id: projectId }),
+    }),
+
+  /**
+   * Legacy: AI-generate workflow nodes from a description.
+   * Still used by the verification test suite and kept for backward compat.
+   * The new primary creation flow uses createDraft instead.
+   */
   generate: (description, projectId) =>
     request('POST', '/api/chatbots/generate', {
       description,
@@ -79,7 +94,6 @@ export const chatbotsApi = {
 
   filter: (params = {}) => {
     const qs = new URLSearchParams(params).toString();
-    // embed_id lookup is public — skip auth so the chat widget doesn't need a session
     const isPublicEmbedLookup = params.embed_id && !params.id;
     return request('GET', `/api/chatbots${qs ? `?${qs}` : ''}`, undefined, false, isPublicEmbedLookup);
   },
@@ -101,6 +115,7 @@ export const messagesApi = {
 
 export const documentsApi = {
   list: (ragAppId) => request('GET', `/api/documents?rag_app_id=${ragAppId}`),
+
   upload: (file, chatbotId, nodeId) => {
     const form = new FormData();
     form.append('file', file);
@@ -108,11 +123,72 @@ export const documentsApi = {
     if (nodeId) form.append('node_id', nodeId);
     return request('POST', '/api/documents/upload', form, true);
   },
-  clear:     (chatbotId) => request('DELETE', `/api/documents/app/${chatbotId}`),
-  signedUrl: (docId)     => request('POST',   `/api/documents/${docId}/signed-url`),
+
+  /**
+   * Apply the approved Architect plan to create final document_chunks for one doc.
+   * Requires architect_status = 'approved' on the parent RAG app.
+   */
+  index: (docId) => request('POST', `/api/documents/${docId}/index`),
+
+  /** Delete a single document by ID (chunks + Storage object + row). */
+  delete: (docId) => request('DELETE', `/api/documents/${docId}`),
+
+  /** Delete ALL documents for a RAG app. Use with caution. */
+  clear: (chatbotId) => request('DELETE', `/api/documents/app/${chatbotId}`),
+
+  signedUrl: (docId) => request('POST', `/api/documents/${docId}/signed-url`),
 };
 
-// ─── Chat ─────────────────────────────────────────────────────────────────────
+// ─── Architect ────────────────────────────────────────────────────────────────
+
+export const architectApi = {
+  /** Profile documents + get follow-up questions */
+  analyze: (ragAppId, requirement, previousAnswers = []) =>
+    request('POST', '/api/architect/analyze', {
+      rag_app_id: ragAppId,
+      requirement,
+      previous_answers: previousAnswers,
+    }),
+
+  /** Generate + persist architect plan */
+  plan: (ragAppId, requirement, answers = [], knowledgeProfile = null) =>
+    request('POST', '/api/architect/plan', {
+      rag_app_id:        ragAppId,
+      requirement,
+      answers,
+      knowledge_profile: knowledgeProfile,
+    }),
+
+  /** Approve the current ready plan */
+  approve: (ragAppId) =>
+    request('POST', '/api/architect/approve', { rag_app_id: ragAppId }),
+
+  /**
+   * Execute final indexing for all profiled documents using the approved plan.
+   * Call this after approval to create the final pgvector retrieval representation.
+   */
+  indexAll: (ragAppId) =>
+    request('POST', '/api/architect/index-all', { rag_app_id: ragAppId }),
+
+  /**
+   * Phase 8: Materialize workflow only (nodes + connections persisted, no indexing).
+   * Use buildPipeline for the full approve → build → index flow.
+   */
+  materialize: (ragAppId) =>
+    request('POST', '/api/architect/materialize', { rag_app_id: ragAppId }),
+
+  /**
+   * Phase 8: Build full pipeline — materialize workflow + index all documents.
+   * This is the single user-facing action after plan approval.
+   * Returns { workflow: { nodes, connections }, indexing: { indexed, errors } }
+   */
+  buildPipeline: (ragAppId) =>
+    request('POST', '/api/architect/build-pipeline', { rag_app_id: ragAppId }),
+
+  /** Get current architect state (for reload restoration) */
+  get: (ragAppId) =>
+    request('GET', `/api/architect/${ragAppId}`),
+};
 
 export const chatApi = {
   // Embed-based public chat — no auth required

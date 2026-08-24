@@ -9,7 +9,12 @@
     "verify:phase3": "node scripts/verify-phase3.js",
     "verify:phase4": "node scripts/verify-phase4.js",
     "verify:phase5": "node scripts/verify-phase5.js",
-    "verify:stabilization": "node scripts/verify-stabilization.js"
+    "verify:stabilization": "node scripts/verify-stabilization.js",
+    "verify:phase7": "node scripts/verify-phase7.js",
+    "verify:pre-phase8": "node scripts/verify-pre-phase8.js",
+    "verify:deferred-indexing": "node scripts/verify-deferred-indexing.js",
+    "verify:phase8": "node scripts/verify-phase8.js",
+    "verify:phase8-stabilization": "node scripts/verify-phase8-stabilization.js"
   },
   "dependencies": {
     "@huggingface/transformers": "^3.5.2",
@@ -22,7 +27,8 @@
     "openai": "^4.52.7",
     "pdf-parse": "^1.1.1",
     "uuid": "^10.0.0",
-    "csv-parse": "^5.5.6"
+    "csv-parse": "^5.5.6",
+    "zod": "^3.24.2"
   },
   "devDependencies": {
     "@types/express": "^4.17.21"

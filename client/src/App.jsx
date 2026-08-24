@@ -23,13 +23,14 @@ import { queryClientInstance } from '@/lib/query-client';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import { Toaster } from '@/components/ui/toaster';
 
-import Layout    from '@/Layout';
-import Login     from '@/pages/Login';
-import Dashboard from '@/pages/Dashboard';
-import Home      from '@/pages/Home';
-import Chat      from '@/pages/Chat';
-import Editor    from '@/pages/Editor';
-import Deploy    from '@/pages/Deploy';
+import Layout     from '@/Layout';
+import Login      from '@/pages/Login';
+import Dashboard  from '@/pages/Dashboard';
+import Home       from '@/pages/Home';
+import Chat       from '@/pages/Chat';
+import Editor     from '@/pages/Editor';
+import Deploy     from '@/pages/Deploy';
+import Architect  from '@/pages/Architect';
 
 // ─── Loading spinner ──────────────────────────────────────────────────────────
 
@@ -91,6 +92,11 @@ function AppRoutes() {
       } />
       <Route path="/Deploy" element={
         <RequireAuth><Layout><Deploy /></Layout></RequireAuth>
+      } />
+
+      {/* Phase 7: AI Architect onboarding */}
+      <Route path="/Architect" element={
+        <RequireAuth><Architect /></RequireAuth>
       } />
 
       {/* Catch-all */}

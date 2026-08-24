@@ -106,7 +106,7 @@ CREATE TABLE IF NOT EXISTS rag_apps (
 
   architect_status  TEXT        NOT NULL DEFAULT 'pending'
                                 CHECK (architect_status IN (
-                                  'pending', 'generating', 'ready', 'error'
+                                  'pending', 'generating', 'ready', 'approved', 'error'
                                 )),
 
   architect_version INT         NOT NULL DEFAULT 0,
@@ -126,7 +126,7 @@ COMMENT ON TABLE  rag_apps                   IS 'RAG application definitions. Re
 COMMENT ON COLUMN rag_apps.project_id        IS 'NOT NULL. Every app belongs to a project. project_id is the cross-module entity key.';
 COMMENT ON COLUMN rag_apps.embed_id          IS 'Public chatbot identifier set on deploy. Express API mediates all public access.';
 COMMENT ON COLUMN rag_apps.architect_plan    IS 'Reserved for AI RAG Architect. Stores chunking/embedding/retrieval config + explanations.';
-COMMENT ON COLUMN rag_apps.architect_status  IS 'Lifecycle: pending | generating | ready | error.';
+COMMENT ON COLUMN rag_apps.architect_status  IS 'Lifecycle: pending | generating | ready | approved | error.';
 COMMENT ON COLUMN rag_apps.architect_version IS 'Incremented each time the Architect regenerates a plan.';
 
 
@@ -158,8 +158,8 @@ CREATE TABLE IF NOT EXISTS documents (
   size_bytes    BIGINT,
   chunk_count   INTEGER     NOT NULL DEFAULT 0,
 
-  status        TEXT        NOT NULL DEFAULT 'processing'
-                            CHECK (status IN ('processing', 'indexed', 'error')),
+  status        TEXT        NOT NULL DEFAULT 'uploaded'
+                            CHECK (status IN ('uploaded', 'profiling', 'profiled', 'indexing', 'indexed', 'error')),
 
   error_message TEXT,
   -- Populated when status = 'error'. NULL otherwise.
@@ -173,7 +173,7 @@ CREATE INDEX IF NOT EXISTS idx_documents_user_id    ON documents(user_id);
 COMMENT ON TABLE  documents               IS 'Metadata for uploaded knowledge docs. Files live in Supabase Storage.';
 COMMENT ON COLUMN documents.storage_path  IS 'Private path. Format: {user_id}/{rag_app_id}/{document_id}/{safe_filename}.';
 COMMENT ON COLUMN documents.file_name     IS 'Original filename for display. Never used directly in storage paths.';
-COMMENT ON COLUMN documents.status        IS 'Indexing lifecycle: processing | indexed | error.';
+COMMENT ON COLUMN documents.status        IS 'Document lifecycle: uploaded | profiling | profiled | indexing | indexed | error. Profiled = file stored, text extracted, Architect can analyze; no final chunks yet. Indexed = final document_chunks from approved architect_plan.';
 
 
 -- =============================================================================

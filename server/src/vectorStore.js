@@ -112,11 +112,75 @@ export async function retrieveChunks(ragAppId, query, topK = 5) {
   }
 
   return (data ?? []).map(row => ({
-    id:       row.id,
-    content:  row.content,
-    fileName: row.file_name,
-    score:    row.score,
+    id:          row.id,
+    content:     row.content,
+    fileName:    row.file_name,
+    score:       row.score,
+    document_id: row.document_id,
+    chunk_index: row.chunk_index,
   }));
+}
+
+/**
+ * Expand a set of primary retrieved chunks with immediate structural neighbors.
+ *
+ * Purpose: For structure-aware / procedural documents, a broad query may
+ * retrieve the heading chunk of a section but miss adjacent sibling subsections
+ * that are semantically similar but not top-ranked. This expansion fetches
+ * the immediate next chunk (chunk_index + 1) for each primary result to
+ * provide better procedural context coverage.
+ *
+ * Rules:
+ *   - Stays strictly within the same rag_app_id (isolation enforced)
+ *   - Stays strictly within the same document_id (no cross-doc mixing)
+ *   - Only fetches chunk_index + 1 (one forward neighbor per primary chunk)
+ *   - Deduplicates: skips neighbors already in the primary result set
+ *   - Hard limit: adds at most MAX_EXPANSION_NEIGHBORS additional chunks total
+ *   - Neighbor chunks are appended AFTER primary results, marked with score=0
+ *     so they don't affect similarity averages
+ *   - Applied only when the chunking strategy is 'structure-aware' or 'recursive'
+ *
+ * @param {string} ragAppId
+ * @param {Array<{id, content, fileName, score, document_id, chunk_index}>} primaryChunks
+ * @param {number} maxNeighbors — max additional chunks to add (default 3)
+ * @returns {Promise<Array>} — primary chunks + deduplicated expansion chunks
+ */
+export async function expandWithNeighbors(ragAppId, primaryChunks, maxNeighbors = 3) {
+  if (!primaryChunks.length || maxNeighbors <= 0) return primaryChunks;
+
+  const primaryIds = new Set(primaryChunks.map(c => c.id));
+  const expansionChunks = [];
+
+  for (const chunk of primaryChunks) {
+    if (expansionChunks.length >= maxNeighbors) break;
+    if (chunk.document_id == null || chunk.chunk_index == null) continue;
+
+    const nextIndex = chunk.chunk_index + 1;
+
+    const { data: neighbors } = await supabase
+      .from('document_chunks')
+      .select('id, content, file_name, document_id, chunk_index')
+      .eq('rag_app_id', ragAppId)             // isolation: same RAG app
+      .eq('document_id', chunk.document_id)   // isolation: same document
+      .eq('chunk_index', nextIndex)
+      .limit(1);
+
+    if (neighbors?.[0] && !primaryIds.has(neighbors[0].id)) {
+      primaryIds.add(neighbors[0].id);
+      expansionChunks.push({
+        id:          neighbors[0].id,
+        content:     neighbors[0].content,
+        fileName:    neighbors[0].file_name,
+        score:       0,                        // expansion chunk, not semantically ranked
+        document_id: neighbors[0].document_id,
+        chunk_index: neighbors[0].chunk_index,
+        is_expansion: true,
+      });
+    }
+  }
+
+  // Primary chunks first, then expansion (maintains retrieval order)
+  return [...primaryChunks, ...expansionChunks];
 }
 
 // ─── Delete ───────────────────────────────────────────────────────────────────

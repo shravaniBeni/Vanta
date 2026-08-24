@@ -142,6 +142,61 @@ router.get('/:id', async (req, res) => {
   }
 });
 
+// ─── POST /api/chatbots/create-draft ─────────────────────────────────────────
+//
+// Creates a minimal draft rag_app with no workflow nodes.
+// Used by the new "Create New RAG" flow that routes directly to the Architect.
+// No LLM call. No node generation.
+
+router.post('/create-draft', async (req, res) => {
+  const { description, project_id: requestedProjectId } = req.body;
+  if (!description || typeof description !== 'string' || description.trim().length === 0) {
+    return res.status(400).json({ error: 'description is required' });
+  }
+
+  try {
+    // Resolve project
+    let project;
+    if (requestedProjectId) {
+      project = await getOwnedProject(requestedProjectId, req.user.id);
+      if (!project) return res.status(404).json({ error: 'Project not found' });
+    } else {
+      project = await getOrCreateDefaultProject(req.user.id);
+    }
+
+    // Derive a working title from the description (first sentence or first 60 chars)
+    const rawTitle = description.trim().split(/[.!?\n]/)[0].trim();
+    const title    = rawTitle.length > 60 ? rawTitle.slice(0, 57) + '...' : rawTitle || 'New RAG App';
+
+    const { data, error } = await supabase
+      .from('rag_apps')
+      .insert({
+        user_id:           req.user.id,
+        project_id:        project.id,
+        title,
+        description:       description.trim(),
+        status:            'draft',
+        nodes:             [],
+        connections:       [],
+        architect_status:  'pending',
+        architect_plan:    null,
+        architect_version: 0,
+      })
+      .select()
+      .single();
+
+    if (error || !data) {
+      console.error('[chatbots POST /create-draft]', error?.message);
+      return res.status(500).json({ error: 'Failed to create RAG app' });
+    }
+
+    res.status(201).json(formatApp(data));
+  } catch (err) {
+    console.error('[chatbots POST /create-draft]', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ─── POST /api/chatbots/generate ─────────────────────────────────────────────
 //
 // Note: Express matches routes in registration order. Because this file is
@@ -330,12 +385,45 @@ router.patch('/:id', async (req, res) => {
 });
 
 // ─── DELETE /api/chatbots/:id ─────────────────────────────────────────────────
+//
+// Deletes a rag_app and all its associated data.
+// Storage objects must be explicitly deleted — ON DELETE CASCADE only handles DB rows.
+//
+// Deletion order:
+//   1. Verify ownership
+//   2. Collect all document storage_path values
+//   3. Delete Storage objects from knowledge-docs bucket
+//   4. Delete rag_app row → DB cascades: documents, document_chunks, messages, deployments
+
+const STORAGE_BUCKET_NAME = 'knowledge-docs';
 
 router.delete('/:id', async (req, res) => {
   try {
     const existing = await getOwnedRagApp(req.params.id, req.user.id);
     if (!existing) return res.status(404).json({ error: 'Chatbot not found' });
 
+    // Collect storage paths for all documents belonging to this app
+    const { data: docs } = await supabase
+      .from('documents')
+      .select('id, storage_path')
+      .eq('rag_app_id', req.params.id);
+
+    // Delete Storage objects first (best-effort — log warnings, don't fail the deletion)
+    if (docs?.length) {
+      const paths = docs.map(d => d.storage_path).filter(Boolean);
+      if (paths.length > 0) {
+        const { error: storageErr } = await supabase.storage
+          .from(STORAGE_BUCKET_NAME)
+          .remove(paths);
+        if (storageErr) {
+          console.warn(`[chatbots DELETE /:id] Storage cleanup warning for app ${req.params.id}: ${storageErr.message}`);
+        } else {
+          console.log(`[chatbots DELETE /:id] Deleted ${paths.length} Storage object(s) for app ${req.params.id.slice(0,8)}`);
+        }
+      }
+    }
+
+    // Delete rag_app row — DB cascades handle documents, document_chunks, messages, deployments
     const { error } = await supabase
       .from('rag_apps')
       .delete()

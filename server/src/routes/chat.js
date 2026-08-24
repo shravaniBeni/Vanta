@@ -1,32 +1,27 @@
 /**
  * server/src/routes/chat.js
  *
- * Phase 5: All persistence migrated to Supabase. No SQLite.
+ * Phase 8 stabilization: unified runtime configuration.
  *
  * POST /api/chat         — RAG chat (public embed OR authenticated)
- * POST /api/chat/preview — LLM-only preview (temporarily public — see note)
+ * POST /api/chat/preview — authenticated preview with real RAG
  *
- * ── Auth model ────────────────────────────────────────────────────────────
- * /api/chat has no requireAuth middleware (index.js mounts it as public).
- * Instead, tryGetUser() optionally extracts the JWT if present.
+ * Both paths now use resolveRagRuntimeConfig() to read top_k, temperature,
+ * grounding_required, and response_style from the persisted workflow nodes.
+ * This ensures architect_plan == workflow == runtime for all paths.
  *
- * embed_id path  → always public, must be deployed, user_id = NULL
- * chatbot_id path with JWT → userId set, deployed check skipped
- * chatbot_id path without JWT → treated as public, must be deployed
- *
- * ── /api/chat/preview — TEMPORARY SECURITY EXCEPTION ────────────────────
- * Preview is used by the editor's WorkflowPreview panel. The frontend does
- * not yet send a JWT (frontend auth not implemented until Phase 6).
- * Preview remains public until Phase 6. No messages are persisted.
+ * Neighbor expansion is applied for structure-aware/recursive workflows
+ * to improve retrieval completeness for broad procedural queries.
  */
 
 import { Router } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import supabase from '../supabase.js';
 import { invokeLLM } from '../openai.js';
-import { retrieveChunks } from '../vectorStore.js';
+import { retrieveChunks, expandWithNeighbors } from '../vectorStore.js';
 import { DEFAULT_CHAT_MODEL } from '../openai.js';
 import { requireAuth } from '../middleware/auth.js';
+import { resolveRagRuntimeConfig } from '../ragRuntimeConfig.js';
 
 const router = Router();
 
@@ -37,11 +32,6 @@ function safeJson(val, fallback) {
   try { return JSON.parse(val); } catch { return fallback; }
 }
 
-/**
- * Optionally extract the authenticated user from the Authorization header.
- * Does NOT reject unauthenticated requests — returns null if no valid JWT.
- * /api/chat is mounted without requireAuth so we must do this ourselves.
- */
 async function tryGetUser(req) {
   const authHeader = req.headers['authorization'];
   if (!authHeader?.startsWith('Bearer ')) return null;
@@ -62,6 +52,8 @@ async function getRagAppById(id) {
     .eq('id', id)
     .single();
   if (error || !data) return null;
+  // Parse JSONB nodes
+  data.nodes = safeJson(data.nodes, []);
   return data;
 }
 
@@ -72,14 +64,10 @@ async function getRagAppByEmbedId(embedId) {
     .eq('embed_id', embedId)
     .single();
   if (error || !data) return null;
+  data.nodes = safeJson(data.nodes, []);
   return data;
 }
 
-/**
- * Persist a user + assistant message pair to Supabase.
- * userId may be null for public embed sessions.
- * Non-fatal — logs but does not throw.
- */
 async function persistMessages({
   ragAppId, userId, sessionId,
   userQuery, assistantAnswer, confidence, retrievedChunkIds,
@@ -102,6 +90,96 @@ async function persistMessages({
   }
 }
 
+/**
+ * Detect whether neighbor expansion should be applied.
+ * Only benefits structure-aware and recursive workflows.
+ * Checks the TextSplitter node's strategy param.
+ */
+function shouldExpandNeighbors(nodes) {
+  const splitter = nodes.find(n => n.type === 'TextSplitter');
+  const strategy = splitter?.params?.strategy;
+  return strategy === 'structure-aware' || strategy === 'recursive';
+}
+
+/**
+ * Build a grounded RAG prompt using the runtime configuration.
+ *
+ * @param {{
+ *   title: string,
+ *   description: string,
+ *   grounding_required: boolean,
+ *   response_style: string,
+ *   chunks: Array<{content: string}>,
+ *   query: string,
+ *   isPreview: boolean,
+ * }} params
+ * @returns {string}
+ */
+function buildRagPrompt({ title, description, grounding_required, response_style, chunks, query, isPreview = false }) {
+  const previewNote = isPreview ? ' (preview mode)' : '';
+
+  // ── Response style instruction ─────────────────────────────────────────────
+  let styleInstruction = '';
+  if (response_style) {
+    const style = response_style.toLowerCase();
+    if (style.includes('concise') || style.includes('factual')) {
+      styleInstruction = 'Respond concisely and factually. Avoid unnecessary elaboration.';
+    } else if (style.includes('step-by-step')) {
+      styleInstruction = 'Respond with clear step-by-step structure. Number each step.';
+    } else if (style.includes('detailed')) {
+      styleInstruction = 'Provide a detailed, comprehensive response covering all relevant aspects.';
+    } else if (style.includes('conversational')) {
+      styleInstruction = 'Respond in a natural, conversational tone.';
+    } else {
+      styleInstruction = `Response style: ${response_style}.`;
+    }
+  }
+
+  if (chunks.length === 0) {
+    return `You are "${title}", an AI assistant${previewNote}.
+${description ? `About you: ${description}\n` : ''}No documents have been indexed yet. Inform the user politely and suggest uploading and indexing documents.
+
+User: ${query}
+Answer:`;
+  }
+
+  const contextText = chunks
+    .map((c, i) => `[Source ${i + 1}]\n${c.content}`)
+    .join('\n\n---\n\n');
+
+  if (grounding_required) {
+    // Strict grounding: only answer from retrieved context
+    return `You are "${title}", an AI assistant${previewNote}.
+${description ? `About you: ${description}\n` : ''}${styleInstruction ? styleInstruction + '\n' : ''}
+IMPORTANT: Answer ONLY using the provided context below. Do NOT use any knowledge outside this context.
+If the retrieved context addresses the question, answer completely and accurately using it.
+If the context is partially relevant, provide what you can from the context and clearly state what is not covered.
+If the context does not address the question at all, state: "The available knowledge base does not contain information about this topic."
+Do NOT fabricate information. Do NOT invent document-specific facts, procedures, thresholds, or specifications.
+Preserve all safety warnings, caution notices, and numeric thresholds exactly as stated in the context.
+Do not tell the user to consult the source if the requested information is already present in the context below.
+
+Context:
+${contextText}
+
+User: ${query}
+Answer:`;
+  } else {
+    // Flexible grounding: context-first but general knowledge allowed
+    return `You are "${title}", an AI assistant${previewNote}.
+${description ? `About you: ${description}\n` : ''}${styleInstruction ? styleInstruction + '\n' : ''}
+Use the following retrieved context as your primary source. Supplement with general knowledge only for non-document-specific facts.
+Preserve all safety warnings, caution notices, and numeric thresholds exactly as stated in the context.
+Do not tell the user to consult the source if the requested information is already present in the context below.
+
+Context:
+${contextText}
+
+User: ${query}
+Answer:`;
+  }
+}
+
 // ─── POST /api/chat ───────────────────────────────────────────────────────────
 
 router.post('/', async (req, res) => {
@@ -117,24 +195,18 @@ router.post('/', async (req, res) => {
     let userId = null;
 
     if (embed_id) {
-      // ── Public embed path — must be deployed ──────────────────────────────
       chatbot = await getRagAppByEmbedId(embed_id);
       if (!chatbot) return res.status(404).json({ error: 'Chatbot not found' });
       if (chatbot.status !== 'deployed') {
         return res.status(403).json({ error: 'Chatbot is not deployed' });
       }
-      // userId stays null
     } else {
-      // ── Direct chatbot_id path ────────────────────────────────────────────
       chatbot = await getRagAppById(chatbot_id);
       if (!chatbot) return res.status(404).json({ error: 'Chatbot not found' });
-
-      // Optionally resolve user from JWT — does not block unauthenticated requests
       const user = await tryGetUser(req);
       if (user) {
-        userId = user.id;  // Authenticated — set user_id on messages
+        userId = user.id;
       } else {
-        // Unauthenticated — treat as public, must be deployed
         if (chatbot.status !== 'deployed') {
           return res.status(403).json({ error: 'Chatbot is not deployed' });
         }
@@ -143,51 +215,49 @@ router.post('/', async (req, res) => {
 
     const sessionId = session_id || uuidv4();
 
-    // ── Workflow config ───────────────────────────────────────────────────────
-    const nodes       = safeJson(chatbot.nodes, []);
-    const llmNode     = nodes.find(n => n.type === 'LLM');
-    const model       = llmNode?.params?.model       || DEFAULT_CHAT_MODEL;
-    const temperature = llmNode?.params?.temperature ?? 0.7;
+    // ── Resolve runtime config from persisted workflow ─────────────────────
+    const cfg = resolveRagRuntimeConfig(chatbot);
+    const { top_k, model, temperature, grounding_required, response_style } = cfg;
 
-    // ── Retrieve via pgvector ─────────────────────────────────────────────────
+    // ── Retrieve via pgvector ─────────────────────────────────────────────
     let chunks = [];
     try {
-      chunks = await retrieveChunks(chatbot.id, query, 5);
+      const primary = await retrieveChunks(chatbot.id, query, top_k);
+
+      // Apply neighbor expansion for structure-aware/recursive workflows
+      if (shouldExpandNeighbors(chatbot.nodes)) {
+        chunks = await expandWithNeighbors(chatbot.id, primary, 3);
+      } else {
+        chunks = primary;
+      }
     } catch (err) {
       console.warn('[chat] retrieval error:', err.message);
     }
 
-    const similarityScores  = chunks.map(c => c.score);
+    const similarityScores  = chunks.filter(c => !c.is_expansion).map(c => c.score);
     const retrievedChunkIds = chunks.map(c => c.id).filter(Boolean);
-    const retrievedTexts    = chunks.map(c => c.content);
-    const chunkPreviews     = retrievedTexts.map(c =>
-      c.substring(0, 120) + (c.length > 120 ? '...' : '')
-    );
     const avgSimilarity = similarityScores.length
       ? similarityScores.reduce((a, b) => a + b, 0) / similarityScores.length
       : 0;
+    const chunkPreviews = chunks.map(c =>
+      c.content.substring(0, 120) + (c.content.length > 120 ? '...' : '')
+    );
 
-    // ── Build prompt ──────────────────────────────────────────────────────────
-    const prompt = chunks.length > 0
-      ? `You are "${chatbot.title}", an AI assistant.
-${chatbot.description ? `About you: ${chatbot.description}\n` : ''}Use the following context to answer accurately and concisely.
-If the context doesn't fully address the question, say so.
+    // ── Build prompt ──────────────────────────────────────────────────────
+    const prompt = buildRagPrompt({
+      title: chatbot.title,
+      description: chatbot.description,
+      grounding_required,
+      response_style,
+      chunks,
+      query,
+      isPreview: false,
+    });
 
-Context:
-${chunks.map((c, i) => `[Source ${i + 1}]\n${c.content}`).join('\n\n---\n\n')}
-
-User: ${query}
-Answer:`
-      : `You are "${chatbot.title}", an AI assistant.
-${chatbot.description ? chatbot.description + '\n' : ''}No documents have been indexed yet. Inform the user politely and suggest uploading documents.
-
-User: ${query}
-Answer:`;
-
-    // ── Generate ──────────────────────────────────────────────────────────────
+    // ── Generate ──────────────────────────────────────────────────────────
     const answer = await invokeLLM(prompt, model, temperature);
 
-    // ── Persist to Supabase ───────────────────────────────────────────────────
+    // ── Persist ───────────────────────────────────────────────────────────
     await persistMessages({
       ragAppId: chatbot.id, userId, sessionId,
       userQuery: query, assistantAnswer: answer,
@@ -199,8 +269,9 @@ Answer:`;
       telemetry: {
         timestamp: new Date().toISOString(), query,
         llmResponse: answer, similarityScores, avgSimilarity,
-        retrievedChunks: retrievedTexts, chunkPreviews,
-        configUsed: { model, topK: 5 },
+        retrievedChunks: chunks.map(c => c.content),
+        chunkPreviews,
+        configUsed: { model, topK: top_k, grounding_required, response_style },
       },
       retrievedChunks: chunkPreviews,
       similarityScores,
@@ -214,9 +285,6 @@ Answer:`;
 });
 
 // ─── POST /api/chat/preview ───────────────────────────────────────────────────
-// Phase 6: Preview requires authentication and uses REAL RAG retrieval.
-// Draft apps are allowed — owner can test before deploying.
-// No messages are persisted for preview requests.
 
 router.post('/preview', requireAuth, async (req, res) => {
   const { chatbot_id, query } = req.body;
@@ -228,55 +296,53 @@ router.post('/preview', requireAuth, async (req, res) => {
     const chatbot = await getRagAppById(chatbot_id);
     if (!chatbot) return res.status(404).json({ error: 'Chatbot not found' });
 
-    // Verify ownership — preview is only for the app owner, draft apps allowed
     if (chatbot.user_id !== req.user.id) {
       return res.status(404).json({ error: 'Chatbot not found' });
     }
 
-    // ── Real RAG retrieval (same pipeline as POST /api/chat) ──────────────
-    const nodes       = safeJson(chatbot.nodes, []);
-    const llmNode     = nodes.find(n => n.type === 'LLM');
-    const model       = llmNode?.params?.model       || DEFAULT_CHAT_MODEL;
-    const temperature = llmNode?.params?.temperature ?? 0.7;
+    // ── Resolve runtime config from persisted workflow ─────────────────────
+    const cfg = resolveRagRuntimeConfig(chatbot);
+    const { top_k, model, temperature, grounding_required, response_style } = cfg;
 
+    // ── Retrieve via pgvector ─────────────────────────────────────────────
     let chunks = [];
     try {
-      chunks = await retrieveChunks(chatbot.id, query, 5);
+      const primary = await retrieveChunks(chatbot.id, query, top_k);
+
+      // Apply neighbor expansion for structure-aware/recursive workflows
+      if (shouldExpandNeighbors(chatbot.nodes)) {
+        chunks = await expandWithNeighbors(chatbot.id, primary, 3);
+      } else {
+        chunks = primary;
+      }
     } catch (retrieveErr) {
       console.warn('[chat/preview] retrieval error:', retrieveErr.message);
     }
 
-    const similarityScores  = chunks.map(c => c.score);
-    const retrievedTexts    = chunks.map(c => c.content);
-    const chunkPreviews     = retrievedTexts.map(c =>
+    const similarityScores = chunks.filter(c => !c.is_expansion).map(c => c.score);
+    const retrievedTexts   = chunks.map(c => c.content);
+    const chunkPreviews    = retrievedTexts.map(c =>
       c.substring(0, 120) + (c.length > 120 ? '...' : '')
     );
     const avgSimilarity = similarityScores.length
       ? similarityScores.reduce((a, b) => a + b, 0) / similarityScores.length
       : 0;
 
-    // ── Build grounded prompt ─────────────────────────────────────────────
-    const prompt = chunks.length > 0
-      ? `You are "${chatbot.title}", an AI assistant being tested in preview mode.
-${chatbot.description ? `About you: ${chatbot.description}\n` : ''}Use the following context to answer accurately and concisely.
-If the context doesn't fully address the question, say so.
-
-Context:
-${chunks.map((c, i) => `[Source ${i + 1}]\n${c.content}`).join('\n\n---\n\n')}
-
-User: ${query}
-Answer:`
-      : `You are "${chatbot.title}", an AI assistant being tested in preview mode.
-${chatbot.description ? chatbot.description + '\n' : ''}No documents have been indexed yet for this chatbot. Please upload documents using the DocumentUpload node, then test again.
-
-User: ${query}
-Answer:`;
+    // ── Build prompt ──────────────────────────────────────────────────────
+    const prompt = buildRagPrompt({
+      title: chatbot.title,
+      description: chatbot.description,
+      grounding_required,
+      response_style,
+      chunks,
+      query,
+      isPreview: true,
+    });
 
     const answer = await invokeLLM(prompt, model, temperature);
 
     res.json({
       answer,
-      // Return retrieval telemetry for diagnostics panel in WorkflowPreview
       retrievedChunks: chunkPreviews,
       similarityScores,
       avgSimilarity,
@@ -288,7 +354,7 @@ Answer:`;
         avgSimilarity,
         retrievedChunks: retrievedTexts,
         chunkPreviews,
-        configUsed:      { model, topK: 5 },
+        configUsed:      { model, topK: top_k, grounding_required, response_style },
       },
     });
   } catch (err) {

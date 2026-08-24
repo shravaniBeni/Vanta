@@ -158,6 +158,62 @@ export default function NodeProperties({ node, chatbotId, onUpdate, onClose }) {
   const renderParams = () => {
     switch (node.type) {
       case 'DocumentUpload':
+        // For Architect-generated workflows (params.documents from workflowBuilder),
+        // show the persisted document list from the knowledge source node params.
+        if (params.architect_version !== undefined && Array.isArray(params.documents)) {
+          return (
+            <>
+              <Field label="Knowledge Source">
+                <div style={{ ...inputStyle, color: '#3b82f6' }}>
+                  RAG App Knowledge Base
+                </div>
+              </Field>
+              <Field label={`Documents (${params.documents.length})`}>
+                {params.documents.length === 0 ? (
+                  <p style={{ fontSize: 10, color: '#334155', fontFamily: 'JetBrains Mono, monospace', margin: 0 }}>
+                    // No documents indexed
+                  </p>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                    {params.documents.map((doc, i) => {
+                      const statusColor = doc.status === 'indexed' ? '#22c55e'
+                        : doc.status === 'profiled' ? '#6366f1'
+                        : doc.status === 'error' ? '#ef4444' : '#f59e0b';
+                      return (
+                        <div key={doc.id || i} style={{
+                          display: 'flex', alignItems: 'center', gap: 7,
+                          padding: '6px 9px',
+                          background: 'rgba(59,130,246,0.06)',
+                          border: '1px solid rgba(59,130,246,0.15)',
+                          borderRadius: 7,
+                        }}>
+                          <FileText size={11} color="#3b82f6" style={{ flexShrink: 0 }} />
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: 10, color: '#cbd5e1', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {doc.file_name}
+                            </div>
+                            <div style={{ fontSize: 9, color: '#475569', fontFamily: 'JetBrains Mono, monospace' }}>
+                              {doc.status}
+                              {doc.chunk_count > 0 ? ` · ${doc.chunk_count} chunks` : ''}
+                            </div>
+                          </div>
+                          <div style={{ width: 6, height: 6, borderRadius: '50%', background: statusColor, boxShadow: `0 0 5px ${statusColor}`, flexShrink: 0 }} />
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </Field>
+              <div style={{ padding: '6px 8px', background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.15)', borderRadius: 7, marginTop: 4 }}>
+                <p style={{ fontSize: 9, color: '#94a3b8', fontFamily: 'JetBrains Mono, monospace', margin: 0 }}>
+                  Architect v{params.architect_version} · {params.document_count || 0} document(s). Manage knowledge in the Architect onboarding screen.
+                </p>
+              </div>
+              <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+            </>
+          );
+        }
+        // Legacy / non-architect DocumentUpload — original upload UI
         return (
           <>
             <Field label="Upload Documents">
@@ -342,6 +398,37 @@ export default function NodeProperties({ node, chatbotId, onUpdate, onClose }) {
           </Field>
         );
       case 'TextSplitter':
+        // For Architect-generated workflows (has params.architect_version), show actual plan values
+        if (params.architect_version !== undefined) {
+          const SUPPORTED = ['fixed', 'recursive', 'structure-aware'];
+          return (
+            <>
+              <Field label="Strategy">
+                {SUPPORTED.includes(params.strategy) ? (
+                  <div style={{ ...inputStyle, color: '#a855f7', display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#a855f7', boxShadow: '0 0 6px #a855f7' }} />
+                    {params.strategy}
+                    <span style={{ marginLeft: 'auto', fontSize: 9, color: '#475569' }}>read-only</span>
+                  </div>
+                ) : (
+                  <input style={inputStyle} value={params.strategy || ''} readOnly />
+                )}
+              </Field>
+              <Field label="Chunk Size">
+                <input type="number" style={inputStyle} value={params.chunk_size || 1000} onChange={e => set('chunk_size', parseInt(e.target.value))} />
+              </Field>
+              <Field label="Overlap">
+                <input type="number" style={inputStyle} value={params.overlap ?? params.chunk_overlap ?? 200} onChange={e => { set('overlap', parseInt(e.target.value)); set('chunk_overlap', parseInt(e.target.value)); }} />
+              </Field>
+              <div style={{ padding: '6px 8px', background: 'rgba(168,85,247,0.06)', border: '1px solid rgba(168,85,247,0.15)', borderRadius: 7, marginTop: 4 }}>
+                <p style={{ fontSize: 9, color: '#94a3b8', fontFamily: 'JetBrains Mono, monospace', margin: 0 }}>
+                  Generated by Architect v{params.architect_version}. Changing chunk_size or overlap here does not re-index documents. Use "Build RAG Pipeline" after editing.
+                </p>
+              </div>
+            </>
+          );
+        }
+        // Legacy workflow — original editable UI
         return (
           <>
             <Field label="Chunk Size">
@@ -353,6 +440,31 @@ export default function NodeProperties({ node, chatbotId, onUpdate, onClose }) {
           </>
         );
       case 'Embeddings':
+        // For Architect-generated workflows, show actual BGE runtime config (read-only)
+        if (params.architect_version !== undefined || params.provider === 'local') {
+          return (
+            <>
+              <Field label="Provider">
+                <div style={{ ...inputStyle, color: '#a855f7' }}>Local · @huggingface/transformers.js</div>
+              </Field>
+              <Field label="Model">
+                <div style={{ ...inputStyle, color: '#a855f7' }}>{params.model || 'Xenova/bge-small-en-v1.5'}</div>
+              </Field>
+              <Field label="Dimension">
+                <div style={{ ...inputStyle, color: '#a855f7' }}>{params.dimension || 384}</div>
+              </Field>
+              <Field label="Normalization">
+                <div style={{ ...inputStyle, color: '#22c55e' }}>Enabled</div>
+              </Field>
+              <div style={{ padding: '6px 8px', background: 'rgba(168,85,247,0.06)', border: '1px solid rgba(168,85,247,0.15)', borderRadius: 7, marginTop: 4 }}>
+                <p style={{ fontSize: 9, color: '#94a3b8', fontFamily: 'JetBrains Mono, monospace', margin: 0 }}>
+                  Embedding model is fixed at the platform runtime level. All values are read-only.
+                </p>
+              </div>
+            </>
+          );
+        }
+        // Legacy workflow — original selector (kept for backward compatibility)
         return (
           <Field label="Model">
             <select style={selectStyle} value={params.model || 'text-embedding-ada-002'} onChange={e => set('model', e.target.value)}>
@@ -363,6 +475,37 @@ export default function NodeProperties({ node, chatbotId, onUpdate, onClose }) {
           </Field>
         );
       case 'VectorStore':
+        // For Architect-generated workflows, show actual pgvector runtime config
+        if (params.architect_version !== undefined || params.type === 'pgvector') {
+          return (
+            <>
+              <Field label="Store">
+                <div style={{ ...inputStyle, color: '#f97316' }}>PostgreSQL + pgvector</div>
+              </Field>
+              <Field label="Retrieval Strategy">
+                <div style={{ ...inputStyle, color: '#f97316' }}>similarity (exact cosine)</div>
+              </Field>
+              <Field label="Similarity Metric">
+                <div style={{ ...inputStyle, color: '#f97316' }}>{params.metric || 'cosine'}</div>
+              </Field>
+              <Field label="Top-K">
+                <input type="number" style={inputStyle} min="1" max="10" value={params.top_k || 5} onChange={e => set('top_k', parseInt(e.target.value))} />
+              </Field>
+              <Field label="Reranking">
+                <div style={{ ...inputStyle, color: '#64748b' }}>Disabled</div>
+              </Field>
+              <Field label="Vector Dimension">
+                <div style={{ ...inputStyle, color: '#f97316' }}>{params.vector_dimension || 384}</div>
+              </Field>
+              <div style={{ padding: '6px 8px', background: 'rgba(249,115,22,0.06)', border: '1px solid rgba(249,115,22,0.15)', borderRadius: 7, marginTop: 4 }}>
+                <p style={{ fontSize: 9, color: '#94a3b8', fontFamily: 'JetBrains Mono, monospace', margin: 0 }}>
+                  Vanta uses Supabase pgvector with exact cosine similarity. Top-K is configurable.
+                </p>
+              </div>
+            </>
+          );
+        }
+        // Legacy workflow — original selector
         return (
           <Field label="Store Type">
             <select style={selectStyle} value={params.type || 'FAISS'} onChange={e => set('type', e.target.value)}>
@@ -373,6 +516,36 @@ export default function NodeProperties({ node, chatbotId, onUpdate, onClose }) {
           </Field>
         );
       case 'LLM':
+        // For Architect-generated workflows, show all fields including response_style and grounding
+        if (params.architect_version !== undefined) {
+          return (
+            <>
+              <Field label="Model">
+                <input style={inputStyle} value={params.model || 'openai/gpt-4o-mini'} onChange={e => set('model', e.target.value)} />
+              </Field>
+              <Field label="Temperature">
+                <input type="number" style={inputStyle} step="0.1" min="0" max="2" value={params.temperature ?? 0.4} onChange={e => set('temperature', parseFloat(e.target.value))} />
+              </Field>
+              <Field label="Response Style">
+                <input style={{ ...inputStyle, color: '#06b6d4' }} value={params.response_style || ''} onChange={e => set('response_style', e.target.value)} />
+              </Field>
+              <Field label="Grounding">
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: 11, color: params.grounding_required ? '#22c55e' : '#94a3b8' }}>
+                    {params.grounding_required ? 'Strict (knowledge base only)' : 'Flexible (general knowledge allowed)'}
+                  </span>
+                  <Toggle checked={params.grounding_required || false} onChange={v => set('grounding_required', v)} />
+                </div>
+              </Field>
+              <div style={{ padding: '6px 8px', background: 'rgba(99,102,241,0.06)', border: '1px solid rgba(99,102,241,0.15)', borderRadius: 7, marginTop: 4 }}>
+                <p style={{ fontSize: 9, color: '#94a3b8', fontFamily: 'JetBrains Mono, monospace', margin: 0 }}>
+                  response_style and temperature are independent fields. Generated by Architect v{params.architect_version}.
+                </p>
+              </div>
+            </>
+          );
+        }
+        // Legacy workflow
         return (
           <>
             <Field label="Model">

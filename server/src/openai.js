@@ -38,6 +38,8 @@ export async function invokeLLM(prompt, model, temperature = 0.7) {
 
 /**
  * Call LLM and parse a JSON response.
+ * Throws a descriptive error if the LLM returns malformed JSON,
+ * so callers can distinguish a parse failure from a Zod validation failure.
  */
 export async function invokeLLMJson(prompt) {
   const resp = await openai.chat.completions.create({
@@ -49,8 +51,13 @@ export async function invokeLLMJson(prompt) {
       { role: 'user', content: prompt },
     ],
   });
-  const raw = resp.choices[0]?.message?.content?.trim() ?? '{}';
-  try { return JSON.parse(raw); } catch { return {}; }
+  const raw = resp.choices[0]?.message?.content?.trim() ?? '';
+  if (!raw) throw new Error('[invokeLLMJson] LLM returned empty response');
+  try {
+    return JSON.parse(raw);
+  } catch (parseErr) {
+    throw new Error(`[invokeLLMJson] LLM returned malformed JSON: ${parseErr.message} — raw: ${raw.slice(0, 200)}`);
+  }
 }
 
 /**
