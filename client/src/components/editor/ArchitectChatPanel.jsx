@@ -18,7 +18,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   X, Send, Bot, User, Cpu, RefreshCw, XCircle,
   CheckCircle, AlertTriangle, ChevronDown, ChevronUp,
-  GitBranch, Zap,
+  GitBranch, Zap, Loader, Play,
 } from 'lucide-react';
 import { architectChatApi } from '@/api/apiClient';
 
@@ -45,32 +45,49 @@ function ProposalSection({ title, children, defaultOpen = false }) {
   );
 }
 
-function ProposalDisplay({ proposal, onContinue }) {
+function ProposalDisplay({ proposal, proposalStatus, onContinue, onApprove, approving }) {
   if (!proposal) return null;
 
+  const isActivated    = proposalStatus === 'activated';
+  const isActivating   = proposalStatus === 'activating' || approving;
+  const isError        = proposalStatus === 'activation_error';
+  const isBlocked      = !proposal.executable;
   const executableColor = proposal.executable ? '#22c55e' : '#f59e0b';
+
+  // Progress steps shown during/after activation
+  const steps = [
+    'Validating proposal',
+    'Building candidate workflow',
+    'Analyzing impact',
+    proposal.requires_reindex ? 'Re-indexing knowledge' : null,
+    'Activating workflow',
+  ].filter(Boolean);
 
   return (
     <div style={{
       margin: '10px 0',
       padding: '12px',
-      background: 'rgba(99,102,241,0.06)',
-      border: '1px solid rgba(99,102,241,0.2)',
+      background: isActivated
+        ? 'rgba(34,197,94,0.06)'
+        : 'rgba(99,102,241,0.06)',
+      border: `1px solid ${isActivated ? 'rgba(34,197,94,0.25)' : 'rgba(99,102,241,0.2)'}`,
       borderRadius: 10,
       fontSize: 11,
     }}>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
-        <Cpu size={12} color="#6366f1" />
-        <span style={{ color: '#e2e8f0', fontWeight: 700, fontSize: 12 }}>Architecture Proposal</span>
+        <Cpu size={12} color={isActivated ? '#22c55e' : '#6366f1'} />
+        <span style={{ color: '#e2e8f0', fontWeight: 700, fontSize: 12 }}>
+          {isActivated ? 'Architecture Activated' : 'Architecture Proposal'}
+        </span>
         <span style={{
           marginLeft: 'auto', fontSize: 9, fontFamily: 'JetBrains Mono, monospace',
-          color: executableColor,
-          background: `${executableColor}18`,
-          border: `1px solid ${executableColor}44`,
+          color: isActivated ? '#22c55e' : executableColor,
+          background: `${isActivated ? '#22c55e' : executableColor}18`,
+          border: `1px solid ${isActivated ? '#22c55e' : executableColor}44`,
           padding: '2px 6px', borderRadius: 4,
         }}>
-          {proposal.executable ? 'EXECUTABLE' : 'NOT EXECUTABLE'}
+          {isActivated ? 'ACTIVATED' : proposal.executable ? 'EXECUTABLE' : 'NOT EXECUTABLE'}
         </span>
       </div>
 
@@ -79,8 +96,8 @@ function ProposalDisplay({ proposal, onContinue }) {
         {proposal.summary}
       </p>
 
-      {/* Unsupported capabilities warning */}
-      {proposal.unsupported_capabilities?.length > 0 && (
+      {/* Blocked explanation */}
+      {isBlocked && !isActivated && (
         <div style={{
           display: 'flex', alignItems: 'flex-start', gap: 6, padding: '6px 8px',
           background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.25)',
@@ -88,11 +105,26 @@ function ProposalDisplay({ proposal, onContinue }) {
         }}>
           <AlertTriangle size={11} color="#f59e0b" style={{ flexShrink: 0, marginTop: 1 }} />
           <div>
-            <span style={{ fontSize: 10, color: '#fbbf24', fontWeight: 600 }}>Not executable: </span>
+            <span style={{ fontSize: 10, color: '#fbbf24', fontWeight: 600 }}>Cannot activate: </span>
             <span style={{ fontSize: 10, color: '#fbbf24' }}>
-              {proposal.unsupported_capabilities.join(', ')} not available in current runtime.
+              {proposal.unsupported_capabilities?.join(', ')} not available in current runtime.
+              This proposal is saved for future review when these capabilities become available.
             </span>
           </div>
+        </div>
+      )}
+
+      {/* Unsupported warning when executable */}
+      {!isBlocked && proposal.unsupported_capabilities?.length > 0 && !isActivated && (
+        <div style={{
+          display: 'flex', alignItems: 'flex-start', gap: 6, padding: '6px 8px',
+          background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.25)',
+          borderRadius: 6, marginBottom: 8,
+        }}>
+          <AlertTriangle size={11} color="#f59e0b" style={{ flexShrink: 0, marginTop: 1 }} />
+          <span style={{ fontSize: 10, color: '#fbbf24' }}>
+            {proposal.unsupported_capabilities.join(', ')} will not be active in production.
+          </span>
         </div>
       )}
 
@@ -136,41 +168,123 @@ function ProposalDisplay({ proposal, onContinue }) {
         </ProposalSection>
       )}
 
-      {/* Re-index warning */}
-      {proposal.requires_reindex && (
+      {/* Re-index notice */}
+      {proposal.requires_reindex && !isActivated && (
         <div style={{
-          fontSize: 9, color: '#f59e0b', fontFamily: 'JetBrains Mono, monospace',
-          marginTop: 6,
+          fontSize: 9, color: '#f59e0b', fontFamily: 'JetBrains Mono, monospace', marginTop: 6,
         }}>
-          ⚠ This proposal would require document re-indexing when activated.
+          ⚠ Activation will re-index all knowledge documents.
+        </div>
+      )}
+
+      {/* Activation progress (shown while activating) */}
+      {isActivating && (
+        <div style={{
+          marginTop: 8, padding: '8px 10px',
+          background: 'rgba(99,102,241,0.08)', borderRadius: 7,
+          border: '1px solid rgba(99,102,241,0.2)',
+        }}>
+          {steps.map((step, i) => (
+            <div key={i} style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              marginBottom: i < steps.length - 1 ? 5 : 0,
+            }}>
+              <div style={{
+                width: 12, height: 12, borderRadius: '50%',
+                border: '2px solid #6366f1', borderTopColor: 'transparent',
+                animation: 'spin 0.7s linear infinite', flexShrink: 0,
+              }} />
+              <span style={{ fontSize: 10, color: '#818cf8', fontFamily: 'JetBrains Mono, monospace' }}>
+                {step}...
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Error state */}
+      {isError && (
+        <div style={{
+          marginTop: 8, padding: '6px 10px',
+          background: 'rgba(239,68,68,0.08)', borderRadius: 7,
+          border: '1px solid rgba(239,68,68,0.2)', fontSize: 10, color: '#fca5a5',
+          fontFamily: 'JetBrains Mono, monospace',
+        }}>
+          ✕ Activation failed. Active workflow is unchanged. You may retry.
+        </div>
+      )}
+
+      {/* Activated confirmation */}
+      {isActivated && (
+        <div style={{
+          marginTop: 8, display: 'flex', alignItems: 'center', gap: 6,
+          padding: '6px 10px',
+          background: 'rgba(34,197,94,0.08)', borderRadius: 7,
+          border: '1px solid rgba(34,197,94,0.2)', fontSize: 10, color: '#86efac',
+          fontFamily: 'JetBrains Mono, monospace',
+        }}>
+          <CheckCircle size={11} color="#22c55e" />
+          Workflow activated. Preview and deployed chat now use the new configuration.
         </div>
       )}
 
       {/* Actions */}
-      <div style={{ display: 'flex', gap: 6, marginTop: 10 }}>
-        <button
-          onClick={onContinue}
-          style={{
-            flex: 1, padding: '6px 10px', borderRadius: 7,
-            border: '1px solid rgba(99,102,241,0.3)',
-            background: 'transparent', color: '#818cf8',
-            fontSize: 11, fontWeight: 600, cursor: 'pointer',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
-          }}
-        >
-          <RefreshCw size={10} /> Continue Discussion
-        </button>
-        <div style={{
-          flex: 1, padding: '6px 10px', borderRadius: 7,
-          background: 'rgba(99,102,241,0.08)',
-          border: '1px solid rgba(99,102,241,0.2)',
-          color: '#64748b', fontSize: 11, textAlign: 'center',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
-          fontFamily: 'JetBrains Mono, monospace',
-        }}>
-          <Zap size={10} /> Ready for 9C
+      {!isActivated && (
+        <div style={{ display: 'flex', gap: 6, marginTop: 10 }}>
+          <button
+            onClick={onContinue}
+            disabled={isActivating}
+            style={{
+              flex: 1, padding: '6px 10px', borderRadius: 7,
+              border: '1px solid rgba(99,102,241,0.3)',
+              background: 'transparent', color: isActivating ? '#334155' : '#818cf8',
+              fontSize: 11, fontWeight: 600, cursor: isActivating ? 'default' : 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
+            }}
+          >
+            <RefreshCw size={10} /> Continue Discussion
+          </button>
+
+          {/* Approve Proposal button — disabled when not executable */}
+          <button
+            onClick={!isBlocked && !isActivating ? onApprove : undefined}
+            disabled={isBlocked || isActivating}
+            title={isBlocked
+              ? `Cannot activate: ${proposal.unsupported_capabilities?.join(', ')} not supported`
+              : isActivating ? 'Activating...'
+              : 'Approve and activate this proposal'}
+            style={{
+              flex: 1, padding: '6px 10px', borderRadius: 7,
+              background: isBlocked
+                ? 'rgba(71,85,105,0.15)'
+                : isActivating
+                  ? 'rgba(99,102,241,0.2)'
+                  : 'rgba(99,102,241,0.85)',
+              border: `1px solid ${isBlocked ? 'rgba(71,85,105,0.3)' : 'rgba(99,102,241,0.5)'}`,
+              color: isBlocked ? '#475569' : '#fff',
+              fontSize: 11, fontWeight: 700,
+              cursor: isBlocked || isActivating ? 'default' : 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
+              transition: 'all 0.15s',
+            }}
+            onMouseEnter={e => {
+              if (!isBlocked && !isActivating)
+                e.currentTarget.style.background = 'rgba(99,102,241,0.95)';
+            }}
+            onMouseLeave={e => {
+              if (!isBlocked && !isActivating)
+                e.currentTarget.style.background = 'rgba(99,102,241,0.85)';
+            }}
+          >
+            {isActivating
+              ? <><div style={{ width: 10, height: 10, border: '2px solid #fff', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} /> Activating...</>
+              : isBlocked
+                ? <><AlertTriangle size={10} /> Activation Blocked</>
+                : <><Play size={10} /> Approve Proposal</>
+            }
+          </button>
         </div>
-      </div>
+      )}
     </div>
   );
 }
@@ -210,12 +324,13 @@ function MessageBubble({ msg }) {
 
 // ─── Main panel ───────────────────────────────────────────────────────────────
 
-export default function ArchitectChatPanel({ chatbotId, hasDraft, onClose }) {
+export default function ArchitectChatPanel({ chatbotId, hasDraft, onClose, onActivated }) {
   const [messages,     setMessages]     = useState([]);
   const [proposal,     setProposal]     = useState(null);
-  const [chatStatus,   setChatStatus]   = useState('idle');  // idle | clarifying | ready_for_review
+  const [chatStatus,   setChatStatus]   = useState('idle');  // idle | clarifying | ready_for_review | activating | activated | activation_error
   const [input,        setInput]        = useState('');
   const [loading,      setLoading]      = useState(false);
+  const [approving,    setApproving]    = useState(false);
   const [error,        setError]        = useState('');
   const [initialized,  setInitialized]  = useState(false);
   const bottomRef = useRef(null);
@@ -242,7 +357,12 @@ export default function ArchitectChatPanel({ chatbotId, hasDraft, onClose }) {
           return true;
         });
         setMessages(visible);
-        setChatStatus(data.proposed_status === 'ready_for_review' ? 'ready_for_review' : 'clarifying');
+        // Restore full status from DB, including activation states
+        const dbStatus = data.proposed_status;
+        if (dbStatus === 'activated') setChatStatus('activated');
+        else if (dbStatus === 'activation_error') setChatStatus('activation_error');
+        else if (dbStatus === 'ready_for_review') setChatStatus('ready_for_review');
+        else if (dbStatus) setChatStatus('clarifying');
         if (data.proposed_plan) setProposal(data.proposed_plan);
         setInitialized(true);
       }
@@ -340,6 +460,37 @@ export default function ArchitectChatPanel({ chatbotId, hasDraft, onClose }) {
     addMessage('architect', 'Of course — what would you like to discuss further?');
   };
 
+  const handleApprove = async () => {
+    if (approving || !proposal) return;
+    setApproving(true);
+    setChatStatus('activating');
+    setError('');
+    try {
+      const result = await architectChatApi.approveProposal(chatbotId);
+
+      if (result.activation_blocked || result.approved === false) {
+        // Blocked — unsupported capabilities
+        setChatStatus('ready_for_review');
+        setError(
+          `Activation blocked: ${result.unsupported_capabilities?.join(', ')} ` +
+          `not supported in current runtime.`
+        );
+        return;
+      }
+
+      if (result.activated) {
+        setChatStatus('activated');
+        // Notify parent so Editor can reload the active workflow
+        if (onActivated) onActivated(result);
+      }
+    } catch (err) {
+      setChatStatus('activation_error');
+      setError('Activation failed: ' + err.message);
+    } finally {
+      setApproving(false);
+    }
+  };
+
   return (
     <div style={{
       width: 320, height: '100%',
@@ -369,13 +520,24 @@ export default function ArchitectChatPanel({ chatbotId, hasDraft, onClose }) {
             <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
               <div style={{
                 width: 5, height: 5, borderRadius: '50%',
-                background: chatStatus === 'ready_for_review' ? '#22c55e' :
-                            chatStatus === 'clarifying' ? '#f59e0b' : '#475569',
-                boxShadow: chatStatus !== 'idle' ? `0 0 5px ${chatStatus === 'ready_for_review' ? '#22c55e' : '#f59e0b'}` : 'none',
+                background:
+                  chatStatus === 'activated'        ? '#22c55e' :
+                  chatStatus === 'ready_for_review' ? '#818cf8' :
+                  chatStatus === 'activating'       ? '#f59e0b' :
+                  chatStatus === 'activation_error' ? '#ef4444' :
+                  chatStatus === 'clarifying'       ? '#f59e0b' : '#475569',
+                boxShadow:
+                  chatStatus === 'activated'        ? '0 0 5px #22c55e' :
+                  chatStatus === 'activating'       ? '0 0 5px #f59e0b' :
+                  chatStatus === 'ready_for_review' ? '0 0 5px #818cf8' :
+                  chatStatus === 'activation_error' ? '0 0 5px #ef4444' : 'none',
               }} />
               <span style={{ fontSize: 9, color: '#64748b', fontFamily: 'JetBrains Mono, monospace' }}>
-                {chatStatus === 'ready_for_review' ? 'proposal ready'
-                  : chatStatus === 'clarifying' ? 'clarifying'
+                {chatStatus === 'activated'        ? 'activated'
+                  : chatStatus === 'activating'    ? 'activating...'
+                  : chatStatus === 'activation_error' ? 'activation failed'
+                  : chatStatus === 'ready_for_review' ? 'proposal ready'
+                  : chatStatus === 'clarifying'    ? 'clarifying'
                   : 'advisory only — not activating'}
               </span>
             </div>
@@ -491,9 +653,15 @@ export default function ArchitectChatPanel({ chatbotId, hasDraft, onClose }) {
           </div>
         )}
 
-        {/* Proposal display */}
-        {proposal && chatStatus === 'ready_for_review' && (
-          <ProposalDisplay proposal={proposal} onContinue={handleContinueDiscussion} />
+        {/* Proposal display — shown for all post-generation states */}
+        {proposal && ['ready_for_review', 'activating', 'activated', 'activation_error'].includes(chatStatus) && (
+          <ProposalDisplay
+            proposal={proposal}
+            proposalStatus={chatStatus}
+            onContinue={handleContinueDiscussion}
+            onApprove={handleApprove}
+            approving={approving}
+          />
         )}
 
         <div ref={bottomRef} />

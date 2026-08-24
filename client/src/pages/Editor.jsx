@@ -444,6 +444,10 @@ export default function Editor() {
             chatbotId={chatbot.id}
             hasDraft={hasDraft}
             onClose={() => setShowArchitect(false)}
+            onActivated={async (result) => {
+              // Architect activated a proposal — reload the editor to show the new active workflow
+              await loadEditor();
+            }}
           />
         )}
       </div>

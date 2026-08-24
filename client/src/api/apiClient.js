@@ -236,6 +236,14 @@ export const architectChatApi = {
   reviewDraft: (ragAppId) =>
     request('POST', `/api/architect-chat/${ragAppId}/review-draft`),
 
+  /**
+   * Phase 9C: Approve and activate a ready_for_review proposal.
+   * Returns { approved, activated, nodes, connections, architect_version, impact, reindexed }
+   * or { approved: false, activation_blocked: true, unsupported_capabilities: [...] }
+   */
+  approveProposal: (ragAppId) =>
+    request('POST', `/api/architect-chat/${ragAppId}/approve-proposal`),
+
   /** Cancel the current proposal (preserves the user's draft unchanged) */
   cancel: (ragAppId) =>
     request('DELETE', `/api/architect-chat/${ragAppId}/cancel`),

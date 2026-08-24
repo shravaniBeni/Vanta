@@ -16,6 +16,7 @@
 import { Router } from 'express';
 import supabase from '../supabase.js';
 import { getOwnedRagApp } from '../helpers.js';
+import { getNodeCapability } from '../nodeCapabilityRegistry.js';
 import {
   buildArchitectContext,
   buildContextAcknowledgement,
@@ -24,6 +25,8 @@ import {
   clearConversation,
   processArchitectMessage,
 } from '../architect/chatService.js';
+import { validateAndNormalizeProposal } from '../architect/proposalSchema.js';
+import { activateProposal } from '../architect/proposalActivator.js';
 
 const router = Router();
 
@@ -274,6 +277,155 @@ router.post('/:ragAppId/review-draft', async (req, res) => {
   } catch (err) {
     console.error('[architect-chat POST review-draft]', err.message);
     res.status(500).json({ error: 'Failed to review draft: ' + err.message });
+  }
+});
+
+// ─── POST /api/architect-chat/:ragAppId/approve-proposal ─────────────────────
+// Phase 9C: Approve and activate a ready_for_review proposal.
+//
+// Guard conditions (all checked server-side — never trust stored executable):
+//   1. Authentication + ownership
+//   2. proposed_status === 'ready_for_review'
+//   3. proposed_architect_plan exists
+//   4. proposed_architect_base_version === current architect_version (staleness)
+//   5. Zod re-validation of stored proposal
+//   6. Re-check capability support from live registry (don't trust stored executable)
+//
+// If any unsupported capabilities detected → return blocked, do NOT activate.
+// If executable → build candidate, validate, analyze impact, activate.
+
+router.post('/:ragAppId/approve-proposal', async (req, res) => {
+  try {
+    const ragApp = await getOwnedRagApp(req.params.ragAppId, req.user.id);
+    if (!ragApp) return res.status(404).json({ error: 'RAG app not found' });
+
+    // ── Guard 1: Must have a proposal ────────────────────────────────────────
+    if (!ragApp.proposed_architect_plan) {
+      return res.status(400).json({
+        error: 'No proposal found. Generate a proposal through Architect Chat first.',
+      });
+    }
+
+    // ── Guard 2: Must be ready_for_review ─────────────────────────────────────
+    if (ragApp.proposed_architect_status !== 'ready_for_review') {
+      return res.status(400).json({
+        error: `Proposal is not in a reviewable state. Current status: ${ragApp.proposed_architect_status}`,
+        proposed_status: ragApp.proposed_architect_status,
+      });
+    }
+
+    // ── Guard 3: Staleness check ──────────────────────────────────────────────
+    // The proposal was generated against a specific architect_version.
+    // If the active plan version has changed since then, the proposal is stale.
+    const proposalBaseVersion = ragApp.proposed_architect_base_version ?? -1;
+    const currentVersion      = ragApp.architect_version || 0;
+
+    if (proposalBaseVersion !== currentVersion) {
+      return res.status(409).json({
+        error: `Proposal is stale. It was generated for architect version ${proposalBaseVersion} ` +
+               `but the current version is ${currentVersion}. ` +
+               `Please start a new Architect conversation to generate a fresh proposal.`,
+        proposed_base_version: proposalBaseVersion,
+        current_version:       currentVersion,
+        stale: true,
+      });
+    }
+
+    // ── Guard 4: Re-validate proposal with Zod ────────────────────────────────
+    // Never trust the stored blob — always re-validate before activation.
+    const revalidated = validateAndNormalizeProposal(
+      JSON.parse(JSON.stringify(ragApp.proposed_architect_plan)),
+      currentVersion
+    );
+
+    if (!revalidated.success) {
+      return res.status(422).json({
+        error: 'Stored proposal failed re-validation. Please generate a new proposal.',
+        details: revalidated.error,
+      });
+    }
+
+    const proposal = revalidated.data;
+
+    // ── Guard 5: Re-check capability support from live registry ───────────────
+    // Never trust proposal.executable — always recompute from current registry.
+    const recomputedUnsupported = (proposal.unsupported_capabilities || []).filter(type => {
+      const cap = getNodeCapability(type);
+      return !cap || cap.runtime_status !== 'supported';
+    });
+
+    // Also check requested_capabilities
+    const requestedUnsupported = (proposal.requested_capabilities || [])
+      .filter(rc => {
+        const cap = getNodeCapability(rc.type);
+        return !cap || cap.runtime_status !== 'supported';
+      })
+      .map(rc => rc.type);
+
+    const allUnsupported = [...new Set([...recomputedUnsupported, ...requestedUnsupported])];
+
+    if (allUnsupported.length > 0) {
+      return res.status(200).json({
+        approved:               false,
+        executable:             false,
+        activation_blocked:     true,
+        unsupported_capabilities: allUnsupported,
+        message: `Cannot activate this proposal because the following capabilities are not supported by the current runtime: ${allUnsupported.join(', ')}. The proposal remains saved for future review.`,
+        proposed_status:        'ready_for_review',
+      });
+    }
+
+    // ── Activate ───────────────────────────────────────────────────────────────
+    const result = await activateProposal(
+      req.params.ragAppId,
+      req.user.id,
+      ragApp,
+      proposal
+    );
+
+    res.json({
+      approved:          true,
+      activated:         true,
+      rag_app_id:        req.params.ragAppId,
+      architect_version: result.architect_version,
+      nodes:             result.nodes,
+      connections:       result.connections,
+      impact:            result.impact,
+      reindexed:         result.reindexed,
+      indexing_result:   result.indexing_result,
+      proposed_status:   'activated',
+    });
+  } catch (err) {
+    console.error('[architect-chat POST approve-proposal]', err.message);
+
+    // Return structured error for known failure modes
+    if (err.code === 'INVALID_CANDIDATE') {
+      return res.status(422).json({
+        error:          'Candidate workflow failed validation',
+        details:        err.validation?.errors,
+        proposed_status: 'activation_error',
+      });
+    }
+    if (err.code === 'NOT_EXECUTABLE') {
+      return res.status(422).json({
+        error:          'Candidate workflow is not executable',
+        details:        err.validation?.unsupported_capabilities,
+        proposed_status: 'activation_error',
+      });
+    }
+    if (err.code === 'BLOCKED_UNSUPPORTED') {
+      return res.status(422).json({
+        activation_blocked: true,
+        error:              err.message,
+        impact:             err.impact,
+        proposed_status:    'activation_error',
+      });
+    }
+
+    res.status(500).json({
+      error: 'Proposal activation failed: ' + err.message,
+      proposed_status: 'activation_error',
+    });
   }
 });
 
