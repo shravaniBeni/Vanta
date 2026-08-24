@@ -109,9 +109,11 @@ export const ArchitectProposalSchema = z.object({
  *
  * @param {object} raw
  * @param {number} expectedBaseVersion
+ * @param {string[]} [discussedCapabilities] — capability types explicitly mentioned
+ *   in the conversation (used to filter future_recommendations)
  * @returns {{ success: boolean, data?: object, error?: object }}
  */
-export function validateAndNormalizeProposal(raw, expectedBaseVersion) {
+export function validateAndNormalizeProposal(raw, expectedBaseVersion, discussedCapabilities = []) {
   if (!raw || typeof raw !== 'object') {
     return { success: false, error: { message: 'Proposal is not an object' } };
   }
@@ -124,7 +126,6 @@ export function validateAndNormalizeProposal(raw, expectedBaseVersion) {
     for (const node of raw.recommended_changes.add_nodes) {
       const cap = getNodeCapability(node.type);
       if (!cap) {
-        // Unknown type — remove from add_nodes to avoid invalid state
         node._invalid = true;
       }
     }
@@ -142,6 +143,56 @@ export function validateAndNormalizeProposal(raw, expectedBaseVersion) {
   // Force executable=false if any unsupported capability present
   if (raw.unsupported_capabilities?.length > 0) {
     raw.executable = false;
+  }
+
+  // ── Future recommendations grounding filter ──────────────────────────────
+  // Keep a recommendation only if:
+  //   a) its feature corresponds to a known registry capability type, AND
+  //   b) that type was explicitly requested/discussed in the conversation
+  //      OR is a direct prerequisite/companion of a requested capability
+  //      OR is present in unsupported_capabilities (i.e. user asked for it)
+  //
+  // When discussedCapabilities is empty (no tracking available), keep only
+  // recommendations whose feature appears in unsupported_capabilities —
+  // those are definitively grounded in what the user asked for.
+  if (Array.isArray(raw.future_recommendations)) {
+    // Build the allowed set: discussed + unsupported + their registry prerequisites
+    const requested = new Set([
+      ...discussedCapabilities.map(t => t.toLowerCase()),
+      ...(raw.unsupported_capabilities || []).map(t => t.toLowerCase()),
+      ...(raw.requested_capabilities || []).map(c => c.type.toLowerCase()),
+    ]);
+
+    // Prerequisite adjacency map — capabilities that are direct technical
+    // prerequisites or strongly justified companions (both directions)
+    const prerequisites = {
+      ocr:             ['documentprocessor', 'imageanalysis'],
+      imageanalysis:   ['ocr', 'documentprocessor'],
+      documentprocessor: ['ocr', 'imageanalysis'],
+      voicerecognition: [],
+      webcrawler:      [],
+      translator:      [],
+      datafilter:      [],
+      datavalidation:  [],
+      customcode:      [],
+      codeexecution:   [],
+      apiintegration:  [],
+    };
+
+    const allowedTypes = new Set(requested);
+    for (const type of requested) {
+      const prereqs = prerequisites[type] || [];
+      for (const p of prereqs) allowedTypes.add(p);
+    }
+
+    raw.future_recommendations = raw.future_recommendations.filter(rec => {
+      if (!rec.feature) return false;
+      const featureKey = rec.feature.toLowerCase().replace(/\s+/g, '');
+      // Check if the feature maps to a known registry type or allowed set
+      const cap = getNodeCapability(rec.feature);
+      if (!cap) return false; // unknown type — strip
+      return allowedTypes.has(featureKey) || allowedTypes.has(rec.feature.toLowerCase());
+    });
   }
 
   const result = ArchitectProposalSchema.safeParse(raw);

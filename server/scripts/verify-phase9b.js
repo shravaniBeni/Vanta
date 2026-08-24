@@ -291,7 +291,8 @@ async function run() {
     summary: 'Both OCR and VoiceRecognition are recognized as valid future capabilities. The current active workflow remains unchanged and fully functional.',
   };
 
-  const validResult = validateAndNormalizeProposal(validProposal, 1);
+  // Pass discussedCapabilities so the filter keeps OCR+VoiceRecognition in future_recs
+  const validResult = validateAndNormalizeProposal(validProposal, 1, ['OCR', 'VoiceRecognition']);
   if (validResult.success) pass('18: Valid proposal passes Zod validation');
   else fail('18: Valid proposal failed validation', JSON.stringify(validResult.error).slice(0, 100));
 
@@ -303,9 +304,8 @@ async function run() {
       add_nodes: [{ type: 'INVALID_NODE_XYZ', label: 'Bad', params: {}, reason: 'test' }],
     },
   };
-  const invalidResult = validateAndNormalizeProposal(invalidNodeProposal, 1);
+  const invalidResult = validateAndNormalizeProposal(invalidNodeProposal, 1, ['OCR', 'VoiceRecognition']);
   if (invalidResult.success) {
-    // Unknown node type should be stripped in normalization
     const hasInvalid = invalidResult.data?.recommended_changes?.add_nodes
       .some(n => n.type === 'INVALID_NODE_XYZ');
     if (!hasInvalid) pass('19: Invalid node type in LLM output is stripped by normalizer');
@@ -334,11 +334,60 @@ async function run() {
   const executableFalseForced = validateAndNormalizeProposal({
     ...validProposal,
     unsupported_capabilities: ['OCR'],
-    executable: true, // should be overridden
-  }, 1);
+    executable: true,
+  }, 1, ['OCR']);
   if (executableFalseForced.success && executableFalseForced.data?.executable === false)
     pass('21b: Normalization forces executable=false when unsupported_capabilities present');
   else fail('21b: executable=true was not corrected by normalizer');
+
+  // ── Recommendation grounding filter tests ────────────────────────────────
+  section('Recommendation grounding filter');
+
+  // Unrelated capabilities (not discussed) must be stripped
+  const ungroundedProposal = {
+    ...validProposal,
+    future_recommendations: [
+      { feature: 'OCR',              reason: 'User requested this.' },
+      { feature: 'VoiceRecognition', reason: 'Also requested.' },
+      { feature: 'WebCrawler',       reason: 'Might be useful.' },       // unrelated
+      { feature: 'Translator',       reason: 'Could help someday.' },    // unrelated
+    ],
+  };
+  // Only OCR discussed — VoiceRecognition not in scope here
+  const groundedResult = validateAndNormalizeProposal(ungroundedProposal, 1, ['OCR']);
+  if (groundedResult.success) {
+    const recs = groundedResult.data?.future_recommendations || [];
+    const hasWebCrawler  = recs.some(r => r.feature === 'WebCrawler');
+    const hasTranslator  = recs.some(r => r.feature === 'Translator');
+    const hasOCR         = recs.some(r => r.feature === 'OCR');
+    if (!hasWebCrawler && !hasTranslator)
+      pass('Recs: unrelated capabilities (WebCrawler, Translator) stripped by grounding filter');
+    else
+      fail('Recs: unrelated capabilities not stripped', recs.map(r=>r.feature).join(','));
+    if (hasOCR)
+      pass('Recs: discussed capability (OCR) preserved after grounding filter');
+    else
+      fail('Recs: discussed capability (OCR) incorrectly stripped');
+  } else {
+    fail('Recs: grounded proposal failed Zod', JSON.stringify(groundedResult.error).slice(0,100));
+  }
+
+  // All unrelated → empty array
+  const allUnrelatedProposal = {
+    ...validProposal,
+    future_recommendations: [
+      { feature: 'WebCrawler',  reason: 'Maybe useful' },
+      { feature: 'Translator',  reason: 'Maybe useful' },
+    ],
+  };
+  const allUnrelatedResult = validateAndNormalizeProposal(allUnrelatedProposal, 1, ['OCR']);
+  if (allUnrelatedResult.success) {
+    const recs = allUnrelatedResult.data?.future_recommendations || [];
+    if (recs.length === 0)
+      pass('Recs: all-unrelated recs produce empty future_recommendations');
+    else
+      fail('Recs: all-unrelated recs not cleared', recs.map(r=>r.feature).join(','));
+  }
 
   // ── Tests 26-31: Active workflow protection ───────────────────────────────
   section('Tests 26-31. Active Workflow Protection');
@@ -379,6 +428,30 @@ async function run() {
   if (reload.body.proposed_status !== null)
     pass('33: Proposal status persisted on reload', `status=${reload.body.proposed_status}`);
   else fail('33: Proposal not persisted (proposal may not have been generated yet)');
+
+  // When a structured proposal exists, proposal-announcement messages must be
+  // tagged with is_proposal_announcement so the UI can suppress the duplicate bubble.
+  if (reload.body.proposed_plan) {
+    const announcementMsgs = (reload.body.messages || []).filter(
+      m => m.metadata?.is_proposal_announcement === true
+    );
+    if (announcementMsgs.length > 0)
+      pass('33b: Proposal-announcement messages are tagged with is_proposal_announcement');
+    else
+      fail('33b: No proposal-announcement tag found — duplicate bubble cannot be suppressed');
+
+    // The announcement text must be the short form, not the old verbose summary
+    const verboseSummary = announcementMsgs.find(
+      m => m.content.includes('**Summary:**') || m.content.includes("I've prepared a structured")
+    );
+    if (!verboseSummary)
+      pass('33c: Proposal announcement is short form (no verbose duplicate summary)');
+    else
+      fail('33c: Verbose proposal summary still being stored as chat message');
+  } else {
+    pass('33b: No proposal generated yet — skipping announcement tag check');
+    pass('33c: No proposal generated yet — skipping verbose summary check');
+  }
 
   // ── Tests 34-36: Cancel behavior ──────────────────────────────────────────
   section('Tests 34-36. Cancel Behavior');

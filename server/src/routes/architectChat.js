@@ -103,9 +103,15 @@ router.post('/:ragAppId/start', async (req, res) => {
       req.user.id, ragApp, openingMsg, startHistory, ctx
     );
 
-    // Save Architect response
+    // Save Architect response — proposal announcements are tagged so the UI
+    // can suppress the bubble when the structured ProposalDisplay card is shown.
+    const isProposalAnnouncement = result.status === 'ready_for_review' && result.proposal !== null;
     await saveMessage(req.user.id, req.params.ragAppId, baseVersion, 'architect',
-      result.message, { status: result.status, turn_count: result.turn_count });
+      result.message, {
+        status:                result.status,
+        turn_count:            result.turn_count,
+        is_proposal_announcement: isProposalAnnouncement,
+      });
 
     // Persist proposal if produced
     if (result.proposal && result.status === 'ready_for_review') {
@@ -158,8 +164,13 @@ router.post('/:ragAppId/message', async (req, res) => {
     );
 
     // Save Architect response
+    const isProposalAnnouncement = result.status === 'ready_for_review' && result.proposal !== null;
     await saveMessage(req.user.id, req.params.ragAppId, baseVersion, 'architect',
-      result.message, { status: result.status, turn_count: result.turn_count });
+      result.message, {
+        status:                   result.status,
+        turn_count:               result.turn_count,
+        is_proposal_announcement: isProposalAnnouncement,
+      });
 
     // Persist proposal if produced
     if (result.proposal && result.status === 'ready_for_review') {
@@ -237,8 +248,14 @@ router.post('/:ragAppId/review-draft', async (req, res) => {
       req.user.id, ragApp, reviewPrompt, reviewHistory, ctx
     );
 
+    const isProposalAnnouncement = result.status === 'ready_for_review' && result.proposal !== null;
     await saveMessage(req.user.id, req.params.ragAppId, baseVersion, 'architect',
-      result.message, { status: result.status, turn_count: result.turn_count, review_draft: true });
+      result.message, {
+        status:                   result.status,
+        turn_count:               result.turn_count,
+        review_draft:             true,
+        is_proposal_announcement: isProposalAnnouncement,
+      });
 
     if (result.proposal && result.status === 'ready_for_review') {
       await _persistProposal(req.params.ragAppId, req.user.id, result.proposal, baseVersion);

@@ -233,8 +233,15 @@ export default function ArchitectChatPanel({ chatbotId, hasDraft, onClose }) {
     try {
       const data = await architectChatApi.get(chatbotId);
       if (data.has_conversation && data.messages?.length > 0) {
-        // Filter out system-only messages; show user + architect (including context-ack turns)
-        setMessages(data.messages.filter(m => m.role !== 'system'));
+        // Filter system messages; suppress proposal-announcement bubbles when
+        // the structured ProposalDisplay card is already present.
+        const hasProposal = !!data.proposed_plan;
+        const visible = data.messages.filter(m => {
+          if (m.role === 'system') return false;
+          if (hasProposal && m.metadata?.is_proposal_announcement) return false;
+          return true;
+        });
+        setMessages(visible);
         setChatStatus(data.proposed_status === 'ready_for_review' ? 'ready_for_review' : 'clarifying');
         if (data.proposed_plan) setProposal(data.proposed_plan);
         setInitialized(true);
@@ -262,7 +269,11 @@ export default function ArchitectChatPanel({ chatbotId, hasDraft, onClose }) {
       if (result.context_ack) {
         msgs.push({ role: 'architect', content: result.context_ack, created_at: new Date().toISOString() });
       }
-      msgs.push({ role: 'architect', content: result.message, created_at: new Date().toISOString() });
+      // Only add the Architect's response as a bubble if it's NOT a proposal announcement.
+      // When a proposal is produced, the ProposalDisplay card is the authoritative UI.
+      if (!result.proposal) {
+        msgs.push({ role: 'architect', content: result.message, created_at: new Date().toISOString() });
+      }
       setMessages(msgs);
       setChatStatus(result.status);
       if (result.proposal) setProposal(result.proposal);
@@ -293,7 +304,11 @@ export default function ArchitectChatPanel({ chatbotId, hasDraft, onClose }) {
         // Continue conversation
         result = await architectChatApi.message(chatbotId, text);
       }
-      addMessage('architect', result.message);
+      // If proposal arrived, the ProposalDisplay card is authoritative.
+      // Suppress the short announcement bubble — the card renders instead.
+      if (!result.proposal) {
+        addMessage('architect', result.message);
+      }
       setChatStatus(result.status);
       if (result.proposal) setProposal(result.proposal);
     } catch (err) {

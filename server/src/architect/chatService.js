@@ -379,6 +379,18 @@ When producing the final proposal, respond with ONLY valid JSON matching this sc
   "summary": "2-3 sentences"
 }
 
+STRICT RULE FOR future_recommendations:
+Only include a capability in future_recommendations if it meets at least one of these criteria:
+  1. The user explicitly requested or discussed it in this conversation.
+  2. It is a direct technical prerequisite for a capability the user requested
+     (e.g. a document image preprocessor is a prerequisite for OCR).
+  3. It is strongly justified by the current knowledge profile or document types
+     (e.g. documents are scanned images → OCR is relevant; documents are text → OCR is NOT relevant).
+Do NOT suggest capabilities merely because they exist in the registry.
+Do NOT suggest VoiceRecognition, WebCrawler, Translator, or any other unrelated capability
+unless the user explicitly asked for it or the knowledge profile clearly demands it.
+When in doubt, use an empty array: "future_recommendations": []
+
 For conversational turns, respond with plain text only.
 Signal readiness with: "I have enough information to propose an updated architecture."
 ════════════════════════════════════════════════════`;
@@ -489,6 +501,52 @@ export async function clearConversation(userId, ragAppId, baseVersion) {
 
 function countArchitectTurns(messages) {
   return messages.filter(m => m.role === 'architect').length;
+}
+
+// ─── Discussed capability extractor ──────────────────────────────────────────
+
+/**
+ * Extract capability type names that were explicitly discussed in the conversation.
+ * Used to ground future_recommendations filtering.
+ *
+ * Sources (in priority order):
+ *   1. Unsupported capabilities already in the draft (from ctx.validation)
+ *   2. Added nodes in the diff (user explicitly put them in the draft)
+ *   3. Capability type names mentioned by name in user messages
+ */
+function _extractDiscussedCapabilities(history, currentUserMessage, ctx) {
+  const discussed = new Set();
+
+  // From draft diff — user explicitly added these
+  if (ctx.diff?.added_nodes) {
+    for (const n of ctx.diff.added_nodes) discussed.add(n.type);
+  }
+
+  // From validation — unsupported types in current draft
+  for (const t of (ctx.validation?.unsupported_capabilities || [])) {
+    discussed.add(t);
+  }
+
+  // From conversation text — scan user messages for registry type names
+  const allCapabilityTypes = getAllCapabilities().map(c => c.type.toLowerCase());
+  const allMessages = [
+    ...history.filter(m => m.role === 'user').map(m => m.content.toLowerCase()),
+    currentUserMessage.toLowerCase(),
+  ];
+
+  for (const msg of allMessages) {
+    for (const cap of getAllCapabilities()) {
+      // Match by type name or label (case-insensitive)
+      if (
+        msg.includes(cap.type.toLowerCase()) ||
+        msg.includes(cap.label.toLowerCase())
+      ) {
+        discussed.add(cap.type);
+      }
+    }
+  }
+
+  return [...discussed];
 }
 
 // ─── Main chat function ───────────────────────────────────────────────────────
@@ -603,19 +661,17 @@ Do NOT include any conversational text, markdown fences, or explanation outside 
       }
     }
 
-    const validationResult = validateAndNormalizeProposal(rawProposalJson, baseVersion);
+    // Extract capability types mentioned in the conversation to ground
+    // future_recommendations — prevents the LLM from hallucinating unrelated suggestions
+    const discussedCapabilities = _extractDiscussedCapabilities(history, userMessage, ctx);
+
+    const validationResult = validateAndNormalizeProposal(rawProposalJson, baseVersion, discussedCapabilities);
     if (validationResult.success) {
       proposal  = validationResult.data;
       status    = 'ready_for_review';
-      architectResponse =
-        `I've prepared a structured architecture proposal for you.\n\n` +
-        `**Summary:** ${proposal.summary}\n\n` +
-        `**Executable:** ${proposal.executable
-          ? 'Yes — this can be activated in the current runtime.'
-          : 'No — contains capabilities not yet available in this runtime.'}\n\n` +
-        (proposal.unsupported_capabilities.length > 0
-          ? `**Unsupported capabilities:** ${proposal.unsupported_capabilities.join(', ')}`
-          : '');
+      // Short transition line — the ProposalDisplay card is the authoritative UI.
+      // Marked with a metadata tag so the frontend can suppress it when the card is present.
+      architectResponse = `Proposal ready. See the architecture proposal below.`;
     } else {
       console.error('[chatService] Proposal validation failed:', JSON.stringify(validationResult.error).slice(0, 200));
       architectResponse =

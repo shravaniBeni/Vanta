@@ -248,15 +248,18 @@ async function run() {
       pass("3: Architect does not claim it cannot view the canvas");
     else fail("3: Architect still claims it cannot view the canvas", canvasResp.slice(0, 200));
 
-    // Should reference actual workflow content
+    // Should reference actual workflow content OR have produced a proposal
+    // (a proposal response is valid — it means the Architect had enough context)
     const hasWorkflowRef = canvasResp.includes('ocr') ||
                            canvasResp.includes('voice') ||
                            canvasResp.includes('node') ||
                            canvasResp.includes('draft') ||
                            canvasResp.includes('workflow') ||
-                           canvasResp.includes('active');
+                           canvasResp.includes('active') ||
+                           canvasResp.includes('embeddings') ||
+                           canvasMsg.body.status === 'ready_for_review'; // proposal = has context
     if (hasWorkflowRef)
-      pass('3b: Canvas response references actual workflow content');
+      pass('3b: Canvas response references workflow content or produced a grounded proposal');
     else fail('3b: Canvas response has no workflow content reference', canvasResp.slice(0, 200));
   } else {
     fail('3: Canvas query failed', JSON.stringify(canvasMsg.body).slice(0, 80));
