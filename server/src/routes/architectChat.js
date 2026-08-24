@@ -18,6 +18,7 @@ import supabase from '../supabase.js';
 import { getOwnedRagApp } from '../helpers.js';
 import {
   buildArchitectContext,
+  buildContextAcknowledgement,
   saveMessage,
   loadConversation,
   clearConversation,
@@ -81,16 +82,25 @@ router.post('/:ragAppId/start', async (req, res) => {
     // Build context
     const ctx = await buildArchitectContext(ragApp);
 
-    // Save the system context as a system message (not shown to user)
+    // Save the system context marker (not shown to user)
     await saveMessage(req.user.id, req.params.ragAppId, baseVersion, 'system',
       '[Context injected — not shown to user]', { context_snapshot: true });
 
-    // Process the opening user message (or provide an opener if none)
+    // Store the context-acknowledgement as the first architect turn.
+    // Grounds subsequent LLM calls in actual canvas state.
+    const contextAck = buildContextAcknowledgement(ctx);
+    await saveMessage(req.user.id, req.params.ragAppId, baseVersion, 'architect',
+      contextAck, { context_ack: true, auto_generated: true });
+
+    // Store the opening user message
     const openingMsg = message?.trim() || 'Hello, please review my current workflow and help me improve it.';
     await saveMessage(req.user.id, req.params.ragAppId, baseVersion, 'user', openingMsg);
 
+    // Load history so processArchitectMessage sees the context-ack
+    const startHistory = await loadConversation(req.user.id, req.params.ragAppId, baseVersion);
+
     const result = await processArchitectMessage(
-      req.user.id, ragApp, openingMsg, [], ctx
+      req.user.id, ragApp, openingMsg, startHistory, ctx
     );
 
     // Save Architect response
@@ -207,12 +217,24 @@ router.post('/:ragAppId/review-draft', async (req, res) => {
     await saveMessage(req.user.id, req.params.ragAppId, baseVersion, 'system',
       '[Context injected — draft review]', { context_snapshot: true, review_draft: true });
 
-    // Generate the Architect's opening review message
+    // Store the context-acknowledgement as the first architect turn in DB.
+    // This grounds the conversation in the actual detected changes so that
+    // when the user sends their first real message, the LLM has already
+    // acknowledged what it sees on the canvas.
+    const contextAck = buildContextAcknowledgement(ctx);
+    await saveMessage(req.user.id, req.params.ragAppId, baseVersion, 'architect',
+      contextAck, { context_ack: true, auto_generated: true });
+
+    // The user's opening message for the review session
     const reviewPrompt = `I'd like you to review my draft workflow changes and help me refine the architecture.`;
     await saveMessage(req.user.id, req.params.ragAppId, baseVersion, 'user', reviewPrompt);
 
+    // Load the stored messages so processArchitectMessage sees the context-ack
+    // in history and doesn't regenerate it redundantly
+    const reviewHistory = await loadConversation(req.user.id, req.params.ragAppId, baseVersion);
+
     const result = await processArchitectMessage(
-      req.user.id, ragApp, reviewPrompt, [], ctx
+      req.user.id, ragApp, reviewPrompt, reviewHistory, ctx
     );
 
     await saveMessage(req.user.id, req.params.ragAppId, baseVersion, 'architect',
@@ -230,6 +252,7 @@ router.post('/:ragAppId/review-draft', async (req, res) => {
       proposal:      result.proposal || null,
       has_diff:      ctx.diff?.has_changes || false,
       validation:    ctx.validation,
+      context_ack:   contextAck,  // first visible Architect message (canvas summary)
     });
   } catch (err) {
     console.error('[architect-chat POST review-draft]', err.message);

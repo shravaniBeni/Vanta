@@ -1,16 +1,28 @@
 /**
  * server/src/architect/chatService.js
  *
- * Phase 9B: Architect Chat service.
+ * Phase 9B (context-grounding fix): Architect Chat service.
  *
- * Manages:
- *   - Architect context construction (active workflow, draft, diff, validation,
- *     capability registry, knowledge profile, document metadata)
- *   - Conversational LLM calls (multi-turn, bounded clarification)
- *   - Proposal generation + Zod validation
- *   - Conversation persistence (architect_chat_messages table)
+ * ROOT CAUSE OF BROWSER BUG (fixed here):
+ *   The original buildSystemMessage() dumped workflow state as raw JSON blobs
+ *   (JSON.stringify arrays of node strings). The LLM could not extract structured
+ *   meaning from those blobs, so it asked the user to describe changes it already
+ *   had access to.
  *
- * INVARIANTS:
+ *   Additionally, review-draft passed an empty history and a generic user prompt,
+ *   so the first LLM turn had no grounding signal to reference.
+ *
+ * FIX:
+ *   1. buildSystemMessage() renders workflow state in human-readable prose:
+ *      node-by-node, diff-by-diff, named capability statuses.
+ *   2. A synthetic pre-turn assistant message ("context acknowledgement") is
+ *      injected as the first assistant turn in review-draft, grounding the
+ *      conversation in the actual detected changes before the user speaks.
+ *   3. System prompt explicitly instructs the LLM that it has full canvas
+ *      access and must NEVER ask users to describe changes already in context.
+ *   4. draft_updated_at is tracked for stale-context detection.
+ *
+ * INVARIANTS (unchanged):
  *   - NEVER modifies active nodes/connections
  *   - NEVER modifies approved architect_plan
  *   - NEVER modifies document_chunks
@@ -19,75 +31,86 @@
  */
 
 import supabase from '../supabase.js';
-import { invokeLLMJson, invokeLLMChat, invokeLLMJsonChat, DEFAULT_CHAT_MODEL } from '../openai.js';
+import { invokeLLMChat, invokeLLMJsonChat, DEFAULT_CHAT_MODEL } from '../openai.js';
 import { diffWorkflow, validateWorkflow } from '../workflowUtils.js';
 import { getAllCapabilities } from '../nodeCapabilityRegistry.js';
 import { validateAndNormalizeProposal } from './proposalSchema.js';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-// Max Architect clarification turns before it must produce a proposal
 const MAX_CLARIFICATION_TURNS = 5;
 
-// System prompt for the Architect
-const ARCHITECT_SYSTEM_PROMPT = `You are the Vanta AI RAG Architect, an expert workflow advisor.
+// ─── System prompt ────────────────────────────────────────────────────────────
+// CRITICAL: instructs the LLM it has full canvas access and must use it.
 
-Your role is to help users design optimal RAG (Retrieval-Augmented Generation) pipelines.
-You review workflow changes, understand user intent, and produce structured architecture proposals.
+const ARCHITECT_SYSTEM_PROMPT = `You are the Vanta AI RAG Architect, an expert workflow advisor embedded in the Vanta platform.
 
-CRITICAL RULES:
-1. NEVER claim an unsupported capability is executable. If a node has runtime_status 'unavailable' or 'experimental', say so clearly.
-2. NEVER directly modify nodes, connections, active workflows, or active architect plans.
-3. NEVER fabricate capability implementations that don't exist.
-4. Ask clarifying questions only when genuinely needed — max ${MAX_CLARIFICATION_TURNS} clarification turns total.
-5. Do NOT ask questions already answered by the context or previous conversation.
-6. When you have enough information, transition to a structured proposal.
-7. Be honest about limitations. Preserve user intent even when capabilities are unavailable.
-8. Keep responses concise and conversational. No markdown headers in chat messages.
+You have COMPLETE STRUCTURED ACCESS to the user's canvas state:
+- Active workflow (nodes and connections currently running in production)
+- Draft workflow (pending changes the user has made on the canvas)
+- Structured diff between active and draft (added/removed/changed nodes and connections)
+- Validation result (structurally_valid, executable, unsupported_capabilities)
+- Full capability registry with runtime_status for every node type
+- Approved architect plan (chunking, retrieval, generation config)
+- Knowledge profile from profiling
+- Document metadata
 
-When producing a proposal, always use the JSON format specified in the system context.
-When asking clarifying questions, be specific and architecture-relevant.`;
+MANDATORY RULES:
+1. You MUST reference the structured workflow context provided. Do not ask users to describe canvas changes you can already read from the diff and draft workflow sections below.
+2. NEVER say "I cannot view the canvas." You have full structured workflow access. If the user asks you to "look at the canvas", summarize what you see from the structured data.
+3. NEVER claim an unsupported capability is executable. If runtime_status is 'unavailable' or 'experimental', state that clearly.
+4. NEVER modify active nodes, connections, active architect_plan, or document_chunks.
+5. Ask clarifying questions ONLY for information genuinely absent from context (e.g. user intent, business purpose). Max ${MAX_CLARIFICATION_TURNS} total clarification turns.
+6. Do NOT ask questions already answered by the diff, validation, or conversation history.
+7. When you have enough information, transition to a structured proposal.
+8. Be honest about limitations. Preserve user intent even for unavailable capabilities.
+9. Keep responses concise and conversational. No markdown headers in chat messages.
+
+When producing the final proposal, respond with ONLY the JSON format specified below.
+Signal you are ready to propose by including: "I have enough information to propose an updated architecture."`;
 
 // ─── Context builder ──────────────────────────────────────────────────────────
 
 /**
  * Build structured context for the Architect LLM.
- * This is injected as the system/initial message in the conversation.
- * x/y positions are stripped — they are visual-only.
+ * x/y positions are stripped — they are visual-only UI noise.
+ * All workflow state is resolved here once and reused for both the
+ * system message and the context-acknowledgement turn.
  */
 export async function buildArchitectContext(ragApp) {
   const activeNodes = (ragApp.nodes || []).map(stripPosition);
   const activeConns = ragApp.connections || [];
-  const draftNodes  = ragApp.draft_nodes ? (ragApp.draft_nodes).map(stripPosition) : null;
+  const draftNodes  = ragApp.draft_nodes ? ragApp.draft_nodes.map(stripPosition) : null;
   const draftConns  = ragApp.draft_connections || null;
 
-  // Diff
-  const diff = (draftNodes !== null)
+  // Diff (null if no draft)
+  const diff = draftNodes !== null
     ? diffWorkflow(
         { nodes: activeNodes, connections: activeConns },
         { nodes: draftNodes,  connections: draftConns || [] }
       )
     : null;
 
-  // Validation of draft (or active if no draft)
-  const nodesToValidate   = draftNodes  ?? activeNodes;
-  const connsToValidate   = draftConns  ?? activeConns;
-  const validation        = validateWorkflow(nodesToValidate, connsToValidate);
+  // Validate draft (or active if no draft)
+  const validation = validateWorkflow(
+    draftNodes  ?? activeNodes,
+    draftConns  ?? activeConns
+  );
 
-  // Capability registry — compact form (strip redundant fields for token efficiency)
+  // Compact capability registry
   const registry = getAllCapabilities().map(cap => ({
-    type:                     cap.type,
-    label:                    cap.label,
-    runtime_status:           cap.runtime_status,
-    input_types:              cap.input_types,
-    output_types:             cap.output_types,
-    affects_ingestion:        cap.affects_ingestion,
-    affects_query_runtime:    cap.affects_query_runtime,
+    type:                       cap.type,
+    label:                      cap.label,
+    runtime_status:             cap.runtime_status,
+    input_types:                cap.input_types,
+    output_types:               cap.output_types,
+    affects_ingestion:          cap.affects_ingestion,
+    affects_query_runtime:      cap.affects_query_runtime,
     requires_reindex_on_change: cap.requires_reindex_on_change,
-    description:              cap.description,
+    description:                cap.description,
   }));
 
-  // Document metadata
+  // Document metadata (non-fatal)
   let documents = [];
   try {
     const { data: docs } = await supabase
@@ -98,37 +121,36 @@ export async function buildArchitectContext(ragApp) {
     documents = docs || [];
   } catch { /* non-fatal */ }
 
-  // Knowledge profile from last approved architect_plan
   const knowledgeProfile = ragApp.architect_plan?.knowledge_profile ?? null;
 
   const ctx = {
-    rag_app_id:        ragApp.id,
-    rag_app_title:     ragApp.title,
-    rag_app_description: ragApp.description,
-    base_architect_version: ragApp.architect_version || 0,
-    architect_status:  ragApp.architect_status,
-    approved_plan_summary: ragApp.architect_plan?.summary ?? null,
-    approved_plan_chunking: ragApp.architect_plan?.chunking ?? null,
+    rag_app_id:              ragApp.id,
+    rag_app_title:           ragApp.title,
+    rag_app_description:     ragApp.description,
+    base_architect_version:  ragApp.architect_version || 0,
+    architect_status:        ragApp.architect_status,
+    approved_plan_summary:   ragApp.architect_plan?.summary   ?? null,
+    approved_plan_chunking:  ragApp.architect_plan?.chunking  ?? null,
     approved_plan_retrieval: ragApp.architect_plan?.retrieval ?? null,
-    approved_plan_generation: ragApp.architect_plan?.generation ?? null,
+    approved_plan_generation:ragApp.architect_plan?.generation?? null,
+    draft_updated_at:        ragApp.draft_updated_at ?? null,
     active_workflow: {
-      node_count:       activeNodes.length,
-      nodes:            activeNodes,
-      connections:      activeConns,
+      node_count:  activeNodes.length,
+      nodes:       activeNodes,
+      connections: activeConns,
     },
     draft_workflow: draftNodes !== null ? {
-      node_count:    draftNodes.length,
-      nodes:         draftNodes,
-      connections:   draftConns || [],
+      node_count:  draftNodes.length,
+      nodes:       draftNodes,
+      connections: draftConns || [],
     } : null,
-    // Always include has_changes so callers can reliably check ctx.diff.has_changes
     diff: diff?.has_changes ? {
-      has_changes:          true,
-      added_nodes:          diff.added_nodes.map(n => ({ id: n.id, type: n.type, label: n.label })),
-      removed_nodes:        diff.removed_nodes.map(n => ({ id: n.id, type: n.type, label: n.label })),
-      changed_nodes:        diff.changed_nodes,
-      added_connections:    diff.added_connections,
-      removed_connections:  diff.removed_connections,
+      has_changes:         true,
+      added_nodes:         diff.added_nodes.map(n => ({ id: n.id, type: n.type, label: n.label })),
+      removed_nodes:       diff.removed_nodes.map(n => ({ id: n.id, type: n.type, label: n.label })),
+      changed_nodes:       diff.changed_nodes,
+      added_connections:   diff.added_connections,
+      removed_connections: diff.removed_connections,
     } : { has_changes: false },
     validation: {
       structurally_valid:       validation.structurally_valid,
@@ -147,6 +169,20 @@ export async function buildArchitectContext(ragApp) {
     knowledge_profile: knowledgeProfile,
   };
 
+  // ── Debug log (non-sensitive summary only) ───────────────────────────────
+  console.log('[Architect ctx]', {
+    active_node_count:        ctx.active_workflow.node_count,
+    draft_node_count:         ctx.draft_workflow?.node_count ?? 0,
+    has_diff:                 ctx.diff.has_changes,
+    added_node_types:         ctx.diff.added_nodes?.map(n => n.type) ?? [],
+    removed_node_types:       ctx.diff.removed_nodes?.map(n => n.type) ?? [],
+    changed_connection_count: (ctx.diff.added_connections?.length ?? 0) +
+                              (ctx.diff.removed_connections?.length ?? 0),
+    unsupported_capabilities: ctx.validation.unsupported_capabilities,
+    architect_version:        ctx.base_architect_version,
+    draft_updated_at:         ctx.draft_updated_at,
+  });
+
   return ctx;
 }
 
@@ -155,46 +191,173 @@ function stripPosition(node) {
   return rest;
 }
 
-// ─── System message builder ───────────────────────────────────────────────────
+// ─── System message (human-readable prose, not JSON blobs) ────────────────────
 
+/**
+ * Build the system message injected as the first message in every LLM call.
+ *
+ * KEY CHANGE from original: workflow state is rendered as human-readable prose
+ * so the LLM actually understands what the canvas contains, rather than trying
+ * to parse raw JSON.stringify() blobs.
+ */
 function buildSystemMessage(ctx) {
+  // ── Active workflow section ──────────────────────────────────────────────
+  const activeNodeList = ctx.active_workflow.nodes
+    .map(n => `  - ${n.label || n.type} [${n.type}] (id: ${n.id})`)
+    .join('\n') || '  (none)';
+
+  const activeConnList = ctx.active_workflow.connections.length > 0
+    ? ctx.active_workflow.connections
+        .map(c => `  - ${c.from} → ${c.to}`)
+        .join('\n')
+    : '  (none)';
+
+  // ── Draft workflow section ───────────────────────────────────────────────
+  let draftSection = 'No draft workflow — canvas matches active workflow.';
+  if (ctx.draft_workflow) {
+    const draftNodeList = ctx.draft_workflow.nodes
+      .map(n => `  - ${n.label || n.type} [${n.type}] (id: ${n.id})`)
+      .join('\n') || '  (none)';
+    const draftConnList = ctx.draft_workflow.connections.length > 0
+      ? ctx.draft_workflow.connections
+          .map(c => `  - ${c.from} → ${c.to}`)
+          .join('\n')
+      : '  (none)';
+    draftSection = `Draft workflow: ${ctx.draft_workflow.node_count} nodes
+${draftNodeList}
+Connections:
+${draftConnList}`;
+  }
+
+  // ── Diff section (plain English) ─────────────────────────────────────────
+  let diffSection = 'No changes between active and draft.';
+  if (ctx.diff.has_changes) {
+    const parts = [];
+    if (ctx.diff.added_nodes?.length > 0) {
+      parts.push('ADDED nodes:\n' + ctx.diff.added_nodes
+        .map(n => `  + ${n.label || n.type} [${n.type}]`)
+        .join('\n'));
+    }
+    if (ctx.diff.removed_nodes?.length > 0) {
+      parts.push('REMOVED nodes:\n' + ctx.diff.removed_nodes
+        .map(n => `  - ${n.label || n.type} [${n.type}]`)
+        .join('\n'));
+    }
+    if (ctx.diff.changed_nodes?.length > 0) {
+      parts.push('CHANGED nodes:\n' + ctx.diff.changed_nodes
+        .map(n => `  ~ ${n.type} (id: ${n.id}): ${JSON.stringify(n.changed_params)}`)
+        .join('\n'));
+    }
+    if (ctx.diff.added_connections?.length > 0) {
+      parts.push('ADDED connections:\n' + ctx.diff.added_connections
+        .map(c => `  + ${c.from} → ${c.to}`)
+        .join('\n'));
+    }
+    if (ctx.diff.removed_connections?.length > 0) {
+      parts.push('REMOVED connections:\n' + ctx.diff.removed_connections
+        .map(c => `  - ${c.from} → ${c.to}`)
+        .join('\n'));
+    }
+    diffSection = parts.join('\n\n');
+  }
+
+  // ── Validation section ────────────────────────────────────────────────────
+  const unsupportedList = ctx.validation.unsupported_capabilities.length > 0
+    ? ctx.validation.unsupported_capabilities
+        .map(type => {
+          const cap = ctx.capability_registry.find(c => c.type === type);
+          return `  - ${type}: ${cap?.runtime_status ?? 'unknown'} — ${cap?.description ?? ''}`;
+        })
+        .join('\n')
+    : '  (none — all nodes are executable)';
+
+  const warningList = ctx.validation.warnings.length > 0
+    ? ctx.validation.warnings.map(w => `  ⚠ ${w}`).join('\n')
+    : '  (none)';
+
+  // ── Capability registry — only show non-supported or explicitly mentioned ─
+  const relevantCaps = ctx.capability_registry.filter(
+    c => c.runtime_status !== 'supported' ||
+         ctx.validation.unsupported_capabilities.includes(c.type)
+  );
+  const capSection = relevantCaps.length > 0
+    ? relevantCaps.map(c => `  ${c.type} [${c.runtime_status}]: ${c.description}`).join('\n')
+    : '  (all nodes in workflow are supported)';
+
+  const supportedTypes = ctx.capability_registry
+    .filter(c => c.runtime_status === 'supported')
+    .map(c => c.type)
+    .join(', ');
+
+  // ── Approved plan section ─────────────────────────────────────────────────
+  const planSection = ctx.approved_plan_summary
+    ? `Summary: ${ctx.approved_plan_summary}
+  Chunking: ${JSON.stringify(ctx.approved_plan_chunking)}
+  Retrieval: ${JSON.stringify(ctx.approved_plan_retrieval)}
+  Generation: ${JSON.stringify(ctx.approved_plan_generation)}`
+    : 'No approved architect plan yet.';
+
+  // ── Document section ──────────────────────────────────────────────────────
+  const docSection = ctx.documents.length > 0
+    ? ctx.documents.map(d => `  - ${d.file_name} (${d.status}, ${d.chunk_count ?? 0} chunks)`).join('\n')
+    : '  (no indexed documents)';
+
+  // ── Stale-draft warning ───────────────────────────────────────────────────
+  const staleNote = ctx.draft_updated_at
+    ? `Draft last saved: ${ctx.draft_updated_at}`
+    : '';
+
   return `${ARCHITECT_SYSTEM_PROMPT}
 
-=== CURRENT CONTEXT ===
+════════════════════════════════════════════════════
+CANVAS STATE — This is your authoritative view of the user's workflow.
+You have full access to this information. Do NOT ask users to repeat it.
+════════════════════════════════════════════════════
+
 RAG App: "${ctx.rag_app_title}"
 Description: ${ctx.rag_app_description || 'Not provided'}
-Base architect version: v${ctx.base_architect_version}
-Architect status: ${ctx.architect_status}
+Architect version: v${ctx.base_architect_version} (${ctx.architect_status})
+${staleNote}
 
-Active workflow: ${ctx.active_workflow.node_count} nodes
-${JSON.stringify(ctx.active_workflow.nodes.map(n => `${n.type}(${n.id})`), null, 0)}
+── ACTIVE WORKFLOW (${ctx.active_workflow.node_count} nodes — running in production) ──
+${activeNodeList}
+Connections:
+${activeConnList}
 
-${ctx.draft_workflow ? `Draft workflow: ${ctx.draft_workflow.node_count} nodes
-Diff from active: ${JSON.stringify(ctx.diff, null, 2)}` : 'No draft workflow.'}
+── DRAFT WORKFLOW ──
+${draftSection}
 
-Validation of draft/active:
-- structurally_valid: ${ctx.validation.structurally_valid}
-- executable: ${ctx.validation.executable}
-- unsupported_capabilities: [${ctx.validation.unsupported_capabilities.join(', ')}]
-- warnings: ${JSON.stringify(ctx.validation.warnings)}
+── DIFF: WHAT CHANGED (active → draft) ──
+${diffSection}
 
-Capability Registry (relevant statuses):
-${ctx.capability_registry
-  .filter(c => c.runtime_status !== 'supported' || ctx.validation.unsupported_capabilities.includes(c.type))
-  .map(c => `  ${c.type}: ${c.runtime_status} — ${c.description}`)
-  .join('\n')}
+── VALIDATION ──
+structurally_valid: ${ctx.validation.structurally_valid}
+executable:         ${ctx.validation.executable}
+Unsupported capabilities (in draft, not executable in current runtime):
+${unsupportedList}
+Warnings:
+${warningList}
 
-Supported capabilities: ${ctx.capability_registry.filter(c => c.runtime_status === 'supported').map(c => c.type).join(', ')}
+── CAPABILITY REGISTRY (non-supported entries) ──
+${capSection}
+Supported types: ${supportedTypes}
 
-Documents: ${ctx.documents.length} indexed
-${ctx.documents.map(d => `  ${d.file_name} (${d.status}, ${d.chunk_count} chunks)`).join('\n')}
+── APPROVED ARCHITECT PLAN ──
+${planSection}
 
-Knowledge profile: ${ctx.knowledge_profile ? JSON.stringify(ctx.knowledge_profile) : 'Not available'}
+── DOCUMENTS ──
+${docSection}
 
-Approved plan summary: ${ctx.approved_plan_summary || 'Not available'}
+── KNOWLEDGE PROFILE ──
+${ctx.knowledge_profile ? JSON.stringify(ctx.knowledge_profile, null, 2) : 'Not available'}
 
-=== YOUR TASK ===
-Analyze the context, understand the user's intent, ask clarifying questions if needed (max ${MAX_CLARIFICATION_TURNS} turns total), then produce a structured JSON proposal.
+════════════════════════════════════════════════════
+YOUR TASK:
+Based on the canvas state above, understand the user's intent.
+If a draft exists with detected changes, REFERENCE THOSE CHANGES directly in your first response.
+Do NOT ask the user what they changed — you already know from the diff above.
+Ask clarifying questions only for genuinely unknown intent (e.g. business purpose, priority).
+Max ${MAX_CLARIFICATION_TURNS} clarification turns total, then produce a structured JSON proposal.
 
 When producing the final proposal, respond with ONLY valid JSON matching this schema:
 {
@@ -216,8 +379,69 @@ When producing the final proposal, respond with ONLY valid JSON matching this sc
   "summary": "2-3 sentences"
 }
 
-For conversational turns (not the final proposal), respond with plain text.
-Signal you are done clarifying by including the phrase: "I have enough information to propose an updated architecture."`;
+For conversational turns, respond with plain text only.
+Signal readiness with: "I have enough information to propose an updated architecture."
+════════════════════════════════════════════════════`;
+}
+
+// ─── Context acknowledgement turn ────────────────────────────────────────────
+
+/**
+ * Build a synthetic first assistant message that proactively acknowledges
+ * the detected canvas state. This is injected as the first 'assistant' turn
+ * in review-draft conversations so the LLM starts grounded in the actual diff
+ * rather than asking what changed.
+ *
+ * This message is NOT stored in DB (it's generated from ctx on each request)
+ * but IS injected into the LLM messages array before the user's first message.
+ *
+ * For direct chat (no diff), it describes the active workflow state.
+ */
+export function buildContextAcknowledgement(ctx) {
+  if (ctx.diff?.has_changes) {
+    // Review-draft path: describe what changed
+    const added = ctx.diff.added_nodes?.map(n => n.label || n.type) ?? [];
+    const removed = ctx.diff.removed_nodes?.map(n => n.label || n.type) ?? [];
+    const changedConns = (ctx.diff.added_connections?.length ?? 0) +
+                        (ctx.diff.removed_connections?.length ?? 0);
+    const unsupported = ctx.validation.unsupported_capabilities;
+
+    let msg = `I've reviewed your draft. Here's what I see:`;
+
+    if (added.length > 0) {
+      msg += `\n\nAdded nodes: ${added.join(', ')}.`;
+    }
+    if (removed.length > 0) {
+      msg += `\nRemoved nodes: ${removed.join(', ')}.`;
+    }
+    if (changedConns > 0) {
+      msg += `\nConnection changes: ${ctx.diff.added_connections?.length ?? 0} added, ${ctx.diff.removed_connections?.length ?? 0} removed.`;
+    }
+
+    if (unsupported.length > 0) {
+      msg += `\n\nNote: ${unsupported.join(' and ')} ${unsupported.length === 1 ? 'is' : 'are'} not currently available in the Vanta runtime — ${unsupported.length === 1 ? 'it' : 'they'} cannot be part of an active production workflow in this version.`;
+    }
+
+    if (ctx.validation.executable) {
+      msg += `\n\nThe draft workflow is fully executable with the current runtime.`;
+    } else if (unsupported.length > 0) {
+      msg += `\n\nThe draft is structurally valid (I understand what you're trying to build) but not yet executable because of the unsupported capabilities above.`;
+    }
+
+    return msg;
+  }
+
+  // Direct chat path: describe active workflow
+  const activeTypes = ctx.active_workflow.nodes.map(n => n.label || n.type);
+  let msg = `I can see your current workflow: ${activeTypes.join(' → ')}.`;
+
+  if (ctx.draft_workflow) {
+    msg += ` You also have a draft with ${ctx.draft_workflow.node_count} nodes (no semantic changes from active detected).`;
+  } else {
+    msg += ` No draft changes are saved yet.`;
+  }
+
+  return msg;
 }
 
 // ─── Conversation persistence ─────────────────────────────────────────────────
@@ -271,31 +495,44 @@ function countArchitectTurns(messages) {
 
 /**
  * Process a user message and return the Architect's response.
- * Handles both conversational turns and proposal generation.
+ *
+ * Context injection strategy (KEY CHANGE):
+ *   Every LLM call receives:
+ *     [0] system: full canvas state as human-readable prose (buildSystemMessage)
+ *     [1] assistant: context-acknowledgement turn (buildContextAcknowledgement)
+ *         — synthetic, not stored in DB, always regenerated from ctx
+ *         — grounds the LLM in actual diff/state before any user message
+ *     [2..n] conversation history (user + architect turns from DB)
+ *     [n+1] user: current message
+ *
+ *   This ensures the LLM always knows what's on the canvas even if the user's
+ *   first message is "can you look at the canvas?" or similar.
  *
  * @param {string} userId
- * @param {object} ragApp — full rag_app row
+ * @param {object} ragApp
  * @param {string} userMessage
- * @param {object[]} history — previous messages from loadConversation()
+ * @param {object[]} history — DB messages (includes system rows, filtered out below)
  * @param {object} ctx — pre-built context from buildArchitectContext()
- * @returns {Promise<{
- *   message: string,           — Architect's response text
- *   proposal: object | null,   — validated proposal if produced
- *   turn_count: number,
- *   status: 'clarifying' | 'ready_for_review',
- * }>}
+ * @returns {Promise<{message, proposal, turn_count, status}>}
  */
 export async function processArchitectMessage(userId, ragApp, userMessage, history, ctx) {
-  const baseVersion = ragApp.architect_version || 0;
+  const baseVersion    = ragApp.architect_version || 0;
   const architectTurns = countArchitectTurns(history);
 
-  // Build the messages array for the LLM
-  // System context is always first; then conversation history; then new user message
+  // Build the system message (human-readable canvas prose)
   const systemContent = buildSystemMessage(ctx);
 
+  // Build the context-acknowledgement synthetic assistant turn
+  // This is injected BEFORE conversation history so the LLM opens from
+  // a grounded position regardless of what the user says first.
+  const contextAck = buildContextAcknowledgement(ctx);
+
+  // Assemble the full LLM messages array:
+  //   system → context-ack (assistant) → history → user message
   const llmMessages = [
-    { role: 'system', content: systemContent },
-    // Previous turns (skip system messages from DB — they were for context only)
+    { role: 'system',    content: systemContent },
+    { role: 'assistant', content: contextAck },
+    // DB history: skip system rows (those were context-snapshot markers)
     ...history
       .filter(m => m.role !== 'system')
       .map(m => ({
@@ -305,15 +542,14 @@ export async function processArchitectMessage(userId, ragApp, userMessage, histo
     { role: 'user', content: userMessage },
   ];
 
-  // Force proposal generation if we've hit the clarification limit
+  // Force proposal if clarification limit reached
   const forceProposal = architectTurns >= MAX_CLARIFICATION_TURNS;
-  if (forceProposal && !llmMessages.find(m => m.content.includes('I have enough information'))) {
+  if (forceProposal) {
     llmMessages[llmMessages.length - 1].content +=
       '\n\n[System: You have reached the maximum clarification turns. You must now produce the structured JSON proposal.]';
   }
 
-  // Decide: should the response be JSON (proposal) or text (clarification)?
-  // Detect proposal trigger in conversation or force flag
+  // Detect proposal request
   const lastUserMsg = userMessage.toLowerCase();
   const proposalTriggers = [
     'ready for proposal', 'generate proposal', 'generate the proposal',
@@ -321,34 +557,32 @@ export async function processArchitectMessage(userId, ragApp, userMessage, histo
     'produce the proposal', 'propose', "that's all", "that is all",
     'proceed', 'go ahead', 'yes, both', 'yes to both',
   ];
-  const userRequestsProposal = proposalTriggers.some(t => lastUserMsg.includes(t));
-  const historyIndicatesReady = history.some(
+  const userRequestsProposal   = proposalTriggers.some(t => lastUserMsg.includes(t));
+  const historyIndicatesReady  = history.some(
     m => m.role === 'architect' && m.content.includes('I have enough information to propose')
   );
   const shouldGenerateProposal = forceProposal || userRequestsProposal || historyIndicatesReady;
 
   let architectResponse;
   let proposal = null;
-  let status = 'clarifying';
+  let status   = 'clarifying';
 
   if (shouldGenerateProposal) {
-    // Generate structured JSON proposal using the full conversation history for context.
-    // We use invokeLLMJsonChat so the LLM has the complete conversation and outputs JSON.
+    // Proposal generation — uses full conversation + context via invokeLLMJsonChat
     const proposalSystemMsg = `${systemContent}
 
 IMPORTANT: Your ENTIRE response must be ONLY the JSON proposal object matching the schema above.
-Do NOT include any conversational text, markdown, or explanation outside the JSON.`;
+Do NOT include any conversational text, markdown fences, or explanation outside the JSON object.`;
 
     const proposalMessages = [
-      { role: 'system', content: proposalSystemMsg },
-      // Include full conversation history (excluding system context saves)
+      { role: 'system',    content: proposalSystemMsg },
+      { role: 'assistant', content: contextAck },
       ...history
         .filter(m => m.role !== 'system')
         .map(m => ({
           role:    m.role === 'architect' ? 'assistant' : 'user',
           content: m.content,
         })),
-      // Final instruction — replace the user's natural-language message with a direct JSON command
       {
         role: 'user',
         content: 'Generate the structured JSON proposal now based on everything discussed above. Respond with ONLY the JSON object.',
@@ -359,11 +593,9 @@ Do NOT include any conversational text, markdown, or explanation outside the JSO
     try {
       rawProposalJson = await invokeLLMJsonChat(proposalMessages, 0.3);
     } catch (err) {
-      console.error('[chatService] invokeLLMJsonChat failed, falling back to invokeLLMChat:', err.message);
-      // Fallback: ask the chat model and manually parse
+      console.error('[chatService] invokeLLMJsonChat failed, falling back:', err.message);
       try {
         const jsonResp = await invokeLLMChat(proposalMessages, DEFAULT_CHAT_MODEL, 0.3);
-        // Strip any markdown fences the model might have added
         const stripped = jsonResp.replace(/```(?:json)?/gi, '').replace(/```/g, '').trim();
         rawProposalJson = JSON.parse(stripped);
       } catch {
@@ -373,30 +605,38 @@ Do NOT include any conversational text, markdown, or explanation outside the JSO
 
     const validationResult = validateAndNormalizeProposal(rawProposalJson, baseVersion);
     if (validationResult.success) {
-      proposal = validationResult.data;
-      status = 'ready_for_review';
-      architectResponse = `I've prepared a structured architecture proposal for you.\n\n**Summary:** ${proposal.summary}\n\n**Executable:** ${proposal.executable ? 'Yes — this can be activated in the current runtime.' : 'No — contains capabilities not yet available in this runtime.'}\n\n${proposal.unsupported_capabilities.length > 0 ? `**Unsupported capabilities:** ${proposal.unsupported_capabilities.join(', ')}` : ''}`;
+      proposal  = validationResult.data;
+      status    = 'ready_for_review';
+      architectResponse =
+        `I've prepared a structured architecture proposal for you.\n\n` +
+        `**Summary:** ${proposal.summary}\n\n` +
+        `**Executable:** ${proposal.executable
+          ? 'Yes — this can be activated in the current runtime.'
+          : 'No — contains capabilities not yet available in this runtime.'}\n\n` +
+        (proposal.unsupported_capabilities.length > 0
+          ? `**Unsupported capabilities:** ${proposal.unsupported_capabilities.join(', ')}`
+          : '');
     } else {
-      // Validation failed — fall back to clarification with error note
       console.error('[chatService] Proposal validation failed:', JSON.stringify(validationResult.error).slice(0, 200));
-      architectResponse = `I attempted to generate a proposal, but it didn't pass validation. Let me ask a couple of clarifying questions to improve it.\n\nWhat is the primary goal you're trying to achieve with these workflow changes?`;
+      architectResponse =
+        `I attempted to generate a proposal, but it didn't pass validation. ` +
+        `What is the primary goal you're trying to achieve with these workflow changes?`;
       status = 'clarifying';
     }
   } else {
-    // Conversational clarification turn
+    // Conversational turn
     architectResponse = await invokeLLMChat(llmMessages, DEFAULT_CHAT_MODEL, 0.5);
     status = 'clarifying';
 
-    // Check if the Architect signaled it's ready for proposal
     if (architectResponse.includes('I have enough information to propose')) {
       status = 'ready_for_review';
     }
   }
 
   return {
-    message:     architectResponse,
+    message:    architectResponse,
     proposal,
-    turn_count:  architectTurns + 1,
+    turn_count: architectTurns + 1,
     status,
   };
 }

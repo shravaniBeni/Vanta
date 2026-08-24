@@ -233,7 +233,8 @@ export default function ArchitectChatPanel({ chatbotId, hasDraft, onClose }) {
     try {
       const data = await architectChatApi.get(chatbotId);
       if (data.has_conversation && data.messages?.length > 0) {
-        setMessages(data.messages);
+        // Filter out system-only messages; show user + architect (including context-ack turns)
+        setMessages(data.messages.filter(m => m.role !== 'system'));
         setChatStatus(data.proposed_status === 'ready_for_review' ? 'ready_for_review' : 'clarifying');
         if (data.proposed_plan) setProposal(data.proposed_plan);
         setInitialized(true);
@@ -251,10 +252,18 @@ export default function ArchitectChatPanel({ chatbotId, hasDraft, onClose }) {
     setError('');
     try {
       const result = await architectChatApi.reviewDraft(chatbotId);
-      setMessages([
-        { role: 'user', content: 'Please review my draft workflow changes.', created_at: new Date().toISOString() },
-        { role: 'architect', content: result.message, created_at: new Date().toISOString() },
-      ]);
+      // Build the visible message list:
+      // [0] user opening message
+      // [1] context-ack (Architect's canvas summary — always first)
+      // [2] Architect's first real response
+      const msgs = [
+        { role: 'user',      content: 'Please review my draft workflow changes.', created_at: new Date().toISOString() },
+      ];
+      if (result.context_ack) {
+        msgs.push({ role: 'architect', content: result.context_ack, created_at: new Date().toISOString() });
+      }
+      msgs.push({ role: 'architect', content: result.message, created_at: new Date().toISOString() });
+      setMessages(msgs);
       setChatStatus(result.status);
       if (result.proposal) setProposal(result.proposal);
       setInitialized(true);

@@ -16,7 +16,8 @@
     "verify:phase8": "node scripts/verify-phase8.js",
     "verify:phase8-stabilization": "node scripts/verify-phase8-stabilization.js",
     "verify:phase9a": "node scripts/verify-phase9a.js",
-    "verify:phase9b": "node scripts/verify-phase9b.js"
+    "verify:phase9b": "node scripts/verify-phase9b.js",
+    "verify:phase9b-context": "node scripts/verify-phase9b-context.js"
   },
   "dependencies": {
     "@huggingface/transformers": "^3.5.2",
