@@ -4,23 +4,29 @@ import '@xyflow/react/dist/style.css';
 import { X, FileText, Scissors, Sparkles, Database, Cpu, MessageSquare, ScanText, Mic, Globe, Code, Filter, Languages, Image, Workflow, FileSearch, ShieldCheck, Terminal } from 'lucide-react';
 
 const NODE_META = {
-  DocumentUpload:    { icon: FileText,      color: '#3b82f6', bg: 'rgba(59,130,246,0.12)',  border: 'rgba(59,130,246,0.5)'  },
-  WebCrawler:        { icon: Globe,         color: '#06b6d4', bg: 'rgba(6,182,212,0.12)',   border: 'rgba(6,182,212,0.5)'   },
-  OCR:               { icon: ScanText,      color: '#10b981', bg: 'rgba(16,185,129,0.12)',  border: 'rgba(16,185,129,0.5)'  },
-  VoiceRecognition:  { icon: Mic,           color: '#ec4899', bg: 'rgba(236,72,153,0.12)',  border: 'rgba(236,72,153,0.5)'  },
-  TextSplitter:      { icon: Scissors,      color: '#22c55e', bg: 'rgba(34,197,94,0.12)',   border: 'rgba(34,197,94,0.5)'   },
-  DataFilter:        { icon: Filter,        color: '#f59e0b', bg: 'rgba(245,158,11,0.12)',  border: 'rgba(245,158,11,0.5)'  },
-  Translator:        { icon: Languages,     color: '#8b5cf6', bg: 'rgba(139,92,246,0.12)',  border: 'rgba(139,92,246,0.5)'  },
-  ImageAnalysis:     { icon: Image,         color: '#f43f5e', bg: 'rgba(244,63,94,0.12)',   border: 'rgba(244,63,94,0.5)'   },
-  Embeddings:        { icon: Sparkles,      color: '#a855f7', bg: 'rgba(168,85,247,0.12)',  border: 'rgba(168,85,247,0.5)'  },
-  VectorStore:       { icon: Database,      color: '#f97316', bg: 'rgba(249,115,22,0.12)',  border: 'rgba(249,115,22,0.5)'  },
-  LLM:               { icon: Cpu,           color: '#ef4444', bg: 'rgba(239,68,68,0.12)',   border: 'rgba(239,68,68,0.5)'   },
-  APIIntegration:    { icon: Workflow,      color: '#14b8a6', bg: 'rgba(20,184,166,0.12)',  border: 'rgba(20,184,166,0.5)'  },
-  CustomCode:        { icon: Code,          color: '#94a3b8', bg: 'rgba(148,163,184,0.12)', border: 'rgba(148,163,184,0.5)' },
-  ChatOutput:        { icon: MessageSquare, color: '#6366f1', bg: 'rgba(99,102,241,0.12)',  border: 'rgba(99,102,241,0.5)'  },
-  DocumentProcessor: { icon: FileSearch,    color: '#0ea5e9', bg: 'rgba(14,165,233,0.12)',  border: 'rgba(14,165,233,0.5)'  },
-  DataValidation:    { icon: ShieldCheck,   color: '#84cc16', bg: 'rgba(132,204,22,0.12)',  border: 'rgba(132,204,22,0.5)'  },
-  CodeExecution:     { icon: Terminal,      color: '#fb923c', bg: 'rgba(251,146,60,0.12)',  border: 'rgba(251,146,60,0.5)'  },
+  DocumentUpload:    { icon: FileText,      color: '#3b82f6', bg: 'rgba(59,130,246,0.12)',  border: 'rgba(59,130,246,0.5)',  status: 'supported'    },
+  WebCrawler:        { icon: Globe,         color: '#06b6d4', bg: 'rgba(6,182,212,0.12)',   border: 'rgba(6,182,212,0.5)',   status: 'unavailable'  },
+  OCR:               { icon: ScanText,      color: '#10b981', bg: 'rgba(16,185,129,0.12)',  border: 'rgba(16,185,129,0.5)',  status: 'unavailable'  },
+  VoiceRecognition:  { icon: Mic,           color: '#ec4899', bg: 'rgba(236,72,153,0.12)',  border: 'rgba(236,72,153,0.5)',  status: 'unavailable'  },
+  TextSplitter:      { icon: Scissors,      color: '#22c55e', bg: 'rgba(34,197,94,0.12)',   border: 'rgba(34,197,94,0.5)',   status: 'supported'    },
+  DataFilter:        { icon: Filter,        color: '#f59e0b', bg: 'rgba(245,158,11,0.12)',  border: 'rgba(245,158,11,0.5)',  status: 'unavailable'  },
+  Translator:        { icon: Languages,     color: '#8b5cf6', bg: 'rgba(139,92,246,0.12)',  border: 'rgba(139,92,246,0.5)',  status: 'unavailable'  },
+  ImageAnalysis:     { icon: Image,         color: '#f43f5e', bg: 'rgba(244,63,94,0.12)',   border: 'rgba(244,63,94,0.5)',   status: 'unavailable'  },
+  Embeddings:        { icon: Sparkles,      color: '#a855f7', bg: 'rgba(168,85,247,0.12)',  border: 'rgba(168,85,247,0.5)',  status: 'supported'    },
+  VectorStore:       { icon: Database,      color: '#f97316', bg: 'rgba(249,115,22,0.12)',  border: 'rgba(249,115,22,0.5)',  status: 'supported'    },
+  LLM:               { icon: Cpu,           color: '#ef4444', bg: 'rgba(239,68,68,0.12)',   border: 'rgba(239,68,68,0.5)',   status: 'supported'    },
+  APIIntegration:    { icon: Workflow,      color: '#14b8a6', bg: 'rgba(20,184,166,0.12)',  border: 'rgba(20,184,166,0.5)',  status: 'experimental' },
+  CustomCode:        { icon: Code,          color: '#94a3b8', bg: 'rgba(148,163,184,0.12)', border: 'rgba(148,163,184,0.5)', status: 'unavailable'  },
+  ChatOutput:        { icon: MessageSquare, color: '#6366f1', bg: 'rgba(99,102,241,0.12)',  border: 'rgba(99,102,241,0.5)',  status: 'supported'    },
+  DocumentProcessor: { icon: FileSearch,    color: '#0ea5e9', bg: 'rgba(14,165,233,0.12)',  border: 'rgba(14,165,233,0.5)',  status: 'experimental' },
+  DataValidation:    { icon: ShieldCheck,   color: '#84cc16', bg: 'rgba(132,204,22,0.12)',  border: 'rgba(132,204,22,0.5)',  status: 'unavailable'  },
+  CodeExecution:     { icon: Terminal,      color: '#fb923c', bg: 'rgba(251,146,60,0.12)',  border: 'rgba(251,146,60,0.5)',  status: 'unavailable'  },
+};
+
+const STATUS_DOT = {
+  supported:    { color: '#22c55e', label: 'active' },
+  experimental: { color: '#f59e0b', label: 'experimental' },
+  unavailable:  { color: '#475569', label: 'unavailable' },
 };
 
 const CustomNode = ({ data, id }) => {
@@ -84,10 +90,12 @@ const CustomNode = ({ data, id }) => {
         <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 8 }}>
           <div style={{
             width: 6, height: 6, borderRadius: '50%',
-            background: '#22c55e',
-            boxShadow: '0 0 6px #22c55e'
+            background: STATUS_DOT[meta.status]?.color || '#22c55e',
+            boxShadow: `0 0 6px ${STATUS_DOT[meta.status]?.color || '#22c55e'}`
           }} />
-          <span style={{ fontSize: 9, color: '#64748b', fontFamily: 'JetBrains Mono, monospace' }}>ready</span>
+          <span style={{ fontSize: 9, color: '#64748b', fontFamily: 'JetBrains Mono, monospace' }}>
+            {STATUS_DOT[meta.status]?.label || 'active'}
+          </span>
         </div>
       </div>
 

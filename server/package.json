@@ -14,7 +14,9 @@
     "verify:pre-phase8": "node scripts/verify-pre-phase8.js",
     "verify:deferred-indexing": "node scripts/verify-deferred-indexing.js",
     "verify:phase8": "node scripts/verify-phase8.js",
-    "verify:phase8-stabilization": "node scripts/verify-phase8-stabilization.js"
+    "verify:phase8-stabilization": "node scripts/verify-phase8-stabilization.js",
+    "verify:phase9a": "node scripts/verify-phase9a.js",
+    "verify:phase9b": "node scripts/verify-phase9b.js"
   },
   "dependencies": {
     "@huggingface/transformers": "^3.5.2",

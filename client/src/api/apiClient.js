@@ -190,16 +190,84 @@ export const architectApi = {
     request('GET', `/api/architect/${ragAppId}`),
 };
 
+// ─── Workflow (Phase 9A) ──────────────────────────────────────────────────────
+
+export const workflowApi = {
+  /** Full capability registry — all node types with status */
+  getRegistry: () => request('GET', '/api/workflow/registry'),
+
+  /** Active + draft workflow for a RAG app */
+  get: (ragAppId) => request('GET', `/api/workflow/${ragAppId}`),
+
+  /** Save draft canvas changes (does NOT mutate active workflow) */
+  saveDraft: (ragAppId, nodes, connections) =>
+    request('PATCH', `/api/workflow/${ragAppId}/draft`, { nodes, connections }),
+
+  /** Discard draft — clears draft_nodes/connections, visual resets to active */
+  discardDraft: (ragAppId) => request('DELETE', `/api/workflow/${ragAppId}/draft`),
+
+  /** Compute diff between active and provided (or stored) draft */
+  diff: (ragAppId, nodes = undefined, connections = undefined) =>
+    request('POST', `/api/workflow/${ragAppId}/diff`,
+      nodes !== undefined ? { nodes, connections } : {}),
+
+  /** Validate topology of provided (or stored draft) workflow */
+  validate: (ragAppId, nodes = undefined, connections = undefined) =>
+    request('POST', `/api/workflow/${ragAppId}/validate`,
+      nodes !== undefined ? { nodes, connections } : {}),
+};
+
+// ─── Architect Chat (Phase 9B) ────────────────────────────────────────────────
+
+export const architectChatApi = {
+  /** Load conversation history + current proposal state */
+  get: (ragAppId) =>
+    request('GET', `/api/architect-chat/${ragAppId}`),
+
+  /** Start/restart a conversation (clears previous for this version) */
+  start: (ragAppId, message = '') =>
+    request('POST', `/api/architect-chat/${ragAppId}/start`, { message }),
+
+  /** Send a user message and receive the next Architect response */
+  message: (ragAppId, message) =>
+    request('POST', `/api/architect-chat/${ragAppId}/message`, { message }),
+
+  /** PATH A: Review the current saved draft with the Architect */
+  reviewDraft: (ragAppId) =>
+    request('POST', `/api/architect-chat/${ragAppId}/review-draft`),
+
+  /** Cancel the current proposal (preserves the user's draft unchanged) */
+  cancel: (ragAppId) =>
+    request('DELETE', `/api/architect-chat/${ragAppId}/cancel`),
+};
+
 export const chatApi = {
-  // Embed-based public chat — no auth required
+  // Public deployed/embed chatbot
   sendPublic: (embedId, query, sessionId) =>
-    request('POST', '/api/chat', { embed_id: embedId, query, session_id: sessionId }, false, true),
+    request(
+      'POST',
+      '/api/chat',
+      {
+        embed_id: embedId,
+        query,
+        session_id: sessionId,
+      },
+      false,
+      true
+    ),
 
-  // Authenticated internal chat (chatbot_id, JWT attached automatically)
+  // Authenticated internal chat
   send: (chatbotId, query, sessionId) =>
-    request('POST', '/api/chat', { chatbot_id: chatbotId, query, session_id: sessionId }),
+    request('POST', '/api/chat', {
+      chatbot_id: chatbotId,
+      query,
+      session_id: sessionId,
+    }),
 
-  // Editor preview — now requires auth (Phase 6 closes the temporary exception)
+  // Authenticated Editor preview
   preview: (chatbotId, query) =>
-    request('POST', '/api/chat/preview', { chatbot_id: chatbotId, query }),
+    request('POST', '/api/chat/preview', {
+      chatbot_id: chatbotId,
+      query,
+    }),
 };

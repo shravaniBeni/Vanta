@@ -58,6 +58,10 @@ function formatApp(row) {
     architect_plan:    row.architect_plan    ?? null,
     architect_status:  row.architect_status,
     architect_version: row.architect_version,
+    // Phase 9A: draft workflow fields
+    draft_nodes:       row.draft_nodes       ?? null,
+    draft_connections: row.draft_connections ?? null,
+    draft_updated_at:  row.draft_updated_at  ?? null,
     created_at:        row.created_at,
     updated_at:        row.updated_at,
   };

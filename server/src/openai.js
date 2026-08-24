@@ -37,6 +37,24 @@ export async function invokeLLM(prompt, model, temperature = 0.7) {
 }
 
 /**
+ * Call LLM with a full messages array (multi-turn conversation).
+ * Each message: { role: 'system'|'user'|'assistant', content: string }
+ *
+ * @param {Array<{role:string, content:string}>} messages
+ * @param {string} [model]
+ * @param {number} [temperature]
+ * @returns {Promise<string>}
+ */
+export async function invokeLLMChat(messages, model, temperature = 0.7) {
+  const resp = await openai.chat.completions.create({
+    model:       model || DEFAULT_CHAT_MODEL,
+    temperature,
+    messages,
+  });
+  return resp.choices[0]?.message?.content?.trim() ?? '';
+}
+
+/**
  * Call LLM and parse a JSON response.
  * Throws a descriptive error if the LLM returns malformed JSON,
  * so callers can distinguish a parse failure from a Zod validation failure.
@@ -57,6 +75,31 @@ export async function invokeLLMJson(prompt) {
     return JSON.parse(raw);
   } catch (parseErr) {
     throw new Error(`[invokeLLMJson] LLM returned malformed JSON: ${parseErr.message} — raw: ${raw.slice(0, 200)}`);
+  }
+}
+
+/**
+ * Call LLM with a full messages array and force JSON output.
+ * Use this when you need conversation history + structured JSON response.
+ * The last message in the array should instruct the LLM to produce JSON.
+ *
+ * @param {Array<{role:string, content:string}>} messages
+ * @param {number} [temperature]
+ * @returns {Promise<object>} — parsed JSON object
+ */
+export async function invokeLLMJsonChat(messages, temperature = 0.3) {
+  const resp = await openai.chat.completions.create({
+    model:            DEFAULT_JSON_MODEL,
+    temperature,
+    response_format:  { type: 'json_object' },
+    messages,
+  });
+  const raw = resp.choices[0]?.message?.content?.trim() ?? '';
+  if (!raw) throw new Error('[invokeLLMJsonChat] LLM returned empty response');
+  try {
+    return JSON.parse(raw);
+  } catch (parseErr) {
+    throw new Error(`[invokeLLMJsonChat] LLM returned malformed JSON: ${parseErr.message} — raw: ${raw.slice(0, 200)}`);
   }
 }
 
