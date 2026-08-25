@@ -33,15 +33,30 @@ const app  = express();
 const PORT = process.env.PORT || 3001;
 
 // ─── Process-level crash guard ────────────────────────────────────────────────
-// Prevent pdf-parse or other native modules from crashing the whole server
-// on a malformed file. Log the error and let the in-flight request time out.
+// Catches unhandled errors from native modules (e.g. pdf-parse on malformed files)
+// to prevent the server crashing on a single bad request.
+//
+// IMPORTANT: Fatal errors (EADDRINUSE, EACCES, startup failures) must still
+// exit the process — never swallow them. Only log-and-continue for errors
+// that occur during live request handling (not at startup).
+
+const FATAL_CODES = new Set(['EADDRINUSE', 'EACCES', 'ENOENT', 'MODULE_NOT_FOUND']);
 
 process.on('uncaughtException', (err) => {
-  console.error('[uncaughtException] Non-fatal crash caught — server remains running:', err.message);
+  console.error('[uncaughtException] name=%s code=%s message=%s', err.name, err.code, err.message);
+  console.error('[uncaughtException] stack:', err.stack?.slice(0, 800));
+  if (FATAL_CODES.has(err.code)) {
+    console.error('[uncaughtException] FATAL error — process will exit');
+    process.exit(1);
+  }
+  // Non-fatal: log and continue (e.g. pdf-parse crash during a request)
 });
 
 process.on('unhandledRejection', (reason) => {
-  console.error('[unhandledRejection] Unhandled promise rejection — server remains running:', reason);
+  const err = reason instanceof Error ? reason : new Error(String(reason));
+  console.error('[unhandledRejection] name=%s code=%s message=%s', err.name, err.code, err.message);
+  console.error('[unhandledRejection] stack:', err.stack?.slice(0, 800));
+  // Do not exit — unhandled rejections in request handlers are logged but non-fatal
 });
 
 // ─── Global middleware ────────────────────────────────────────────────────────

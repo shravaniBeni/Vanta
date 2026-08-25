@@ -30,14 +30,11 @@ router.post('/analyze', async (req, res) => {
   if (!requirement?.trim()) return res.status(400).json({ error: 'requirement is required' });
 
   try {
-    // Verify ownership — strictly scoped to this user's app
     const ragApp = await getOwnedRagApp(rag_app_id, req.user.id);
     if (!ragApp) return res.status(404).json({ error: 'RAG app not found' });
 
-    // Build deterministic knowledge profile (no LLM, scoped to rag_app_id)
     const knowledgeProfile = await profileDocuments(rag_app_id);
 
-    // Generate follow-up questions if needed (1 LLM call, or skipped)
     const clarification = await generateFollowUpQuestions(
       requirement.trim(),
       knowledgeProfile,
@@ -51,7 +48,7 @@ router.post('/analyze', async (req, res) => {
       questions: clarification.questions,
     });
   } catch (err) {
-    console.error('[architect/analyze]', err.message);
+    console.error('[architect/analyze] name=%s code=%s message=%s', err.name, err.code, err.message);
     res.status(500).json({ error: 'Analysis failed: ' + err.message });
   }
 });
