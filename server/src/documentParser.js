@@ -26,9 +26,23 @@ export async function extractTextFromBuffer(buffer, originalName) {
   const ext = path.extname(originalName).toLowerCase();
 
   if (ext === '.pdf') {
-    const pdfParse = (await import('pdf-parse')).default;
-    const data = await pdfParse(buffer);
-    return data.text;
+    try {
+      const pdfParse = (await import('pdf-parse')).default;
+      // pdf-parse can crash on some PDFs (encrypted, malformed, large XObjects).
+      // Wrap in a timeout to prevent hanging, and catch any thrown error cleanly.
+      // The `max: 0` option disables the default test-suite file scan.
+      const data = await Promise.race([
+        pdfParse(buffer, { max: 0 }),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('PDF parsing timed out after 30s')), 30000)
+        ),
+      ]);
+      if (!data?.text) throw new Error('pdf-parse returned no text content');
+      return data.text;
+    } catch (err) {
+      // Re-throw with a descriptive message so the upload handler surfaces it properly
+      throw new Error(`PDF parsing failed: ${err.message}`);
+    }
   }
 
   if (ext === '.docx' || ext === '.doc') {
