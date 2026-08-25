@@ -26,12 +26,15 @@ export const DEFAULT_EMBED_MODEL = 'text-embedding-3-small';
 
 /**
  * Call LLM with a plain prompt.
+ * max_tokens: 1024 — sufficient for RAG answers; avoids burning credits on
+ * uncapped defaults when using OpenRouter with gpt-3.5-turbo.
  */
 export async function invokeLLM(prompt, model, temperature = 0.7) {
   const resp = await openai.chat.completions.create({
-    model: model || DEFAULT_CHAT_MODEL,
+    model:      model || DEFAULT_CHAT_MODEL,
     temperature,
-    messages: [{ role: 'user', content: prompt }],
+    max_tokens: 1024,
+    messages:   [{ role: 'user', content: prompt }],
   });
   return resp.choices[0]?.message?.content?.trim() ?? '';
 }
@@ -39,6 +42,8 @@ export async function invokeLLM(prompt, model, temperature = 0.7) {
 /**
  * Call LLM with a full messages array (multi-turn conversation).
  * Each message: { role: 'system'|'user'|'assistant', content: string }
+ * max_tokens: 1024 — sufficient for Architect clarification turns and
+ * conversational responses.
  *
  * @param {Array<{role:string, content:string}>} messages
  * @param {string} [model]
@@ -47,8 +52,9 @@ export async function invokeLLM(prompt, model, temperature = 0.7) {
  */
 export async function invokeLLMChat(messages, model, temperature = 0.7) {
   const resp = await openai.chat.completions.create({
-    model:       model || DEFAULT_CHAT_MODEL,
+    model:      model || DEFAULT_CHAT_MODEL,
     temperature,
+    max_tokens: 1024,
     messages,
   });
   return resp.choices[0]?.message?.content?.trim() ?? '';
@@ -56,17 +62,19 @@ export async function invokeLLMChat(messages, model, temperature = 0.7) {
 
 /**
  * Call LLM and parse a JSON response.
- * Throws a descriptive error if the LLM returns malformed JSON,
- * so callers can distinguish a parse failure from a Zod validation failure.
+ * max_tokens: 4096 — sufficient for structured Architect plan + follow-up
+ * question JSON output. gpt-4o-mini default is 16384 which burns credits.
+ * Throws a descriptive error if the LLM returns malformed JSON.
  */
 export async function invokeLLMJson(prompt) {
   const resp = await openai.chat.completions.create({
-    model: DEFAULT_JSON_MODEL,
-    temperature: 0.3,
+    model:           DEFAULT_JSON_MODEL,
+    temperature:     0.3,
+    max_tokens:      4096,
     response_format: { type: 'json_object' },
     messages: [
       { role: 'system', content: 'You are a helpful assistant that always responds with valid JSON.' },
-      { role: 'user', content: prompt },
+      { role: 'user',   content: prompt },
     ],
   });
   const raw = resp.choices[0]?.message?.content?.trim() ?? '';
@@ -80,8 +88,8 @@ export async function invokeLLMJson(prompt) {
 
 /**
  * Call LLM with a full messages array and force JSON output.
- * Use this when you need conversation history + structured JSON response.
- * The last message in the array should instruct the LLM to produce JSON.
+ * max_tokens: 4096 — sufficient for structured proposal JSON output.
+ * gpt-4o-mini default is 16384 which was triggering 402 credit errors.
  *
  * @param {Array<{role:string, content:string}>} messages
  * @param {number} [temperature]
@@ -89,9 +97,10 @@ export async function invokeLLMJson(prompt) {
  */
 export async function invokeLLMJsonChat(messages, temperature = 0.3) {
   const resp = await openai.chat.completions.create({
-    model:            DEFAULT_JSON_MODEL,
+    model:           DEFAULT_JSON_MODEL,
     temperature,
-    response_format:  { type: 'json_object' },
+    max_tokens:      4096,
+    response_format: { type: 'json_object' },
     messages,
   });
   const raw = resp.choices[0]?.message?.content?.trim() ?? '';
