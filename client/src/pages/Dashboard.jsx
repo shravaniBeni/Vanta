@@ -35,24 +35,25 @@ function useTheme() {
 // ─── CSS vars (applied via inline style on root div, override per theme) ──────
 
 const DARK = {
-  bg:        "#0e0e1a",
-  bgSub:     "#13132b",
-  surface:   "#181830",
-  surfaceHi: "#1e1e38",
-  border:    "rgba(255,255,255,0.07)",
-  borderHi:  "rgba(139,92,246,0.5)",
-  t1:        "#f0efff",
-  t2:        "#9d9bb8",
-  t3:        "#4d4b6b",
-  accent:    "#7c3aed",
-  accentLt:  "#a78bfa",
-  accentBg:  "rgba(124,58,237,0.12)",
+  bg:        "#09090f",   // near-true black with a hint of blue
+  bgSub:     "#0e0e18",
+  surface:   "#13131f",   // slightly raised surface
+  surfaceHi: "#19192a",   // hovered surface
+  border:    "rgba(255,255,255,0.06)",
+  borderHi:  "rgba(139,92,246,0.55)",
+  t1:        "#eeeeff",   // cool near-white
+  t2:        "#8888aa",
+  t3:        "#3f3f5c",
+  accent:    "#7c3aed",   // deep violet
+  accentLt:  "#a78bfa",   // lighter violet for text on dark
+  accentBg:  "rgba(124,58,237,0.10)",
   amber:     "#f59e0b",
-  amberBg:   "rgba(245,158,11,0.12)",
+  amberBg:   "rgba(245,158,11,0.10)",
   green:     "#10b981",
-  greenBg:   "rgba(16,185,129,0.12)",
-  shadow:    "0 4px 24px rgba(0,0,0,0.5)",
-  shadowCard:"0 8px 32px rgba(0,0,0,0.4), 0 2px 8px rgba(0,0,0,0.3)",
+  greenBg:   "rgba(16,185,129,0.10)",
+  cyan:      "#22d3ee",   // split accent for variety
+  shadow:    "0 2px 16px rgba(0,0,0,0.6)",
+  shadowCard:"0 8px 40px rgba(0,0,0,0.55), 0 2px 8px rgba(0,0,0,0.4)",
 };
 
 const LIGHT = {
@@ -101,7 +102,9 @@ function Modal({ onClose, children, C, wide }) {
     >
       <div style={{
         background: C.surface, border: `1px solid ${C.borderHi}`,
-        borderRadius: 16, boxShadow: C.shadowCard,
+        // Clip the modal top-right corner too
+        clipPath: "polygon(0 0, calc(100% - 22px) 0, 100% 22px, 100% 100%, 0 100%)",
+        boxShadow: C.shadowCard,
         width: "100%", maxWidth: wide ? 560 : 460,
         padding: 32, animation: "vFadeUp 0.22s ease both",
         fontFamily: "Plus Jakarta Sans, sans-serif",
@@ -117,7 +120,7 @@ function ModalInput({ label, C, ...props }) {
     <div style={{ marginBottom: 14 }}>
       {label && <label style={{ display: "block", fontSize: 11, fontFamily: "JetBrains Mono, monospace", textTransform: "uppercase", letterSpacing: "0.08em", color: C.t3, marginBottom: 6 }}>{label}</label>}
       <input style={{
-        width: "100%", padding: "10px 14px", borderRadius: 10,
+        width: "100%", padding: "10px 14px", clipPath: "polygon(0 0, calc(100% - 6px) 0, 100% 6px, 100% 100%, 0 100%)",
         background: C.bgSub, border: `1px solid ${C.border}`,
         color: C.t1, fontSize: 14, outline: "none",
         fontFamily: "Plus Jakarta Sans, sans-serif", boxSizing: "border-box",
@@ -131,7 +134,7 @@ function ModalTextarea({ label, C, ...props }) {
     <div style={{ marginBottom: 14 }}>
       {label && <label style={{ display: "block", fontSize: 11, fontFamily: "JetBrains Mono, monospace", textTransform: "uppercase", letterSpacing: "0.08em", color: C.t3, marginBottom: 6 }}>{label}</label>}
       <textarea style={{
-        width: "100%", padding: "10px 14px", borderRadius: 10,
+        width: "100%", padding: "10px 14px", clipPath: "polygon(0 0, calc(100% - 6px) 0, 100% 6px, 100% 100%, 0 100%)",
         background: C.bgSub, border: `1px solid ${C.border}`,
         color: C.t1, fontSize: 14, outline: "none", resize: "none",
         fontFamily: "Plus Jakarta Sans, sans-serif", boxSizing: "border-box",
@@ -161,7 +164,8 @@ function Btn({ onClick, disabled, loading, children, variant = "primary", C }) {
       style={{
         ...styles[variant],
         display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 7,
-        padding: "10px 20px", borderRadius: 10,
+        padding: "10px 20px",
+        clipPath: "polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 0 100%)",
         fontSize: 14, fontWeight: 700, cursor: disabled || loading ? "default" : "pointer",
         opacity: disabled || loading ? 0.6 : 1,
         fontFamily: "Plus Jakarta Sans, sans-serif", transition: "all 0.15s",
@@ -189,7 +193,7 @@ function ProjectModal({ mode, project, onClose, onSave, C }) {
   return (
     <Modal onClose={onClose} C={C}>
       <h2 style={{ fontSize: 20, fontWeight: 800, color: C.t1, marginBottom: 20 }}>{mode === "create" ? "New Project" : "Edit Project"}</h2>
-      {error && <div style={{ marginBottom: 12, padding: "8px 12px", borderRadius: 8, background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.2)", color: "#fca5a5", fontSize: 13 }}>{error}</div>}
+      {error && <div style={{ marginBottom: 12, padding: "8px 12px", background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.2)", color: "#fca5a5", fontSize: 13 }}>{error}</div>}
       <ModalInput label="Name" autoFocus placeholder="e.g. Customer Support" value={name} onChange={e => setName(e.target.value)} C={C} />
       <ModalTextarea label="Description" placeholder="Optional" rows={2} value={desc} onChange={e => setDesc(e.target.value)} C={C} />
       <div style={{ display: "flex", gap: 10, marginTop: 24 }}>
@@ -215,7 +219,7 @@ function NewAppModal({ projectId, onClose, onCreated, C }) {
   return (
     <Modal onClose={onClose} C={C} wide>
       <div style={{ display: "flex", gap: 12, alignItems: "center", marginBottom: 16 }}>
-        <div style={{ width: 40, height: 40, borderRadius: 12, background: C.accentBg, border: `1px solid ${C.borderHi}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <div style={{ width: 40, height: 40, clipPath: "polygon(0 0, calc(100% - 7px) 0, 100% 7px, 100% 100%, 0 100%)", background: C.accentBg, border: `1px solid ${C.borderHi}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
           <Bot size={17} color={C.accentLt} />
         </div>
         <div>
@@ -223,7 +227,7 @@ function NewAppModal({ projectId, onClose, onCreated, C }) {
           <p style={{ fontSize: 13, color: C.t3, marginTop: 2 }}>Describe what the assistant should do.</p>
         </div>
       </div>
-      {error && <div style={{ marginBottom: 12, padding: "8px 12px", borderRadius: 8, background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.2)", color: "#fca5a5", fontSize: 13 }}>{error}</div>}
+      {error && <div style={{ marginBottom: 12, padding: "8px 12px", background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.2)", color: "#fca5a5", fontSize: 13 }}>{error}</div>}
       <ModalTextarea label="Purpose" autoFocus placeholder="e.g. A technical support assistant that answers questions from maintenance manuals..." rows={4} value={description} onChange={e => setDescription(e.target.value)} C={C} />
       <div style={{ display: "flex", gap: 10, marginTop: 24 }}>
         <Btn variant="ghost" onClick={onClose} C={C}>Cancel</Btn>
@@ -246,7 +250,7 @@ function DeleteAppModal({ app, onClose, onConfirm, C }) {
   return (
     <Modal onClose={onClose} C={C}>
       <div style={{ display: "flex", gap: 12, alignItems: "center", marginBottom: 16 }}>
-        <div style={{ width: 40, height: 40, borderRadius: 12, background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.25)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+        <div style={{ width: 40, height: 40, clipPath: "polygon(0 0, calc(100% - 7px) 0, 100% 7px, 100% 100%, 0 100%)", background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.25)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
           <AlertTriangle size={17} color="#ef4444" />
         </div>
         <h2 style={{ fontSize: 20, fontWeight: 800, color: C.t1 }}>Delete Application?</h2>
@@ -255,7 +259,7 @@ function DeleteAppModal({ app, onClose, onConfirm, C }) {
         <strong style={{ color: C.t1 }}>"{app.title}"</strong> will be permanently deleted.
       </p>
       <p style={{ fontSize: 13, color: C.t3, lineHeight: 1.6, marginBottom: 20 }}>All documents, indexed chunks, chat history, and deployment data will be removed.</p>
-      {error && <div style={{ marginBottom: 12, padding: "8px 12px", borderRadius: 8, background: "rgba(239,68,68,0.08)", color: "#fca5a5", fontSize: 13 }}>{error}</div>}
+      {error && <div style={{ marginBottom: 12, padding: "8px 12px", background: "rgba(239,68,68,0.08)", color: "#fca5a5", fontSize: 13 }}>{error}</div>}
       <div style={{ display: "flex", gap: 10 }}>
         <Btn variant="ghost" onClick={onClose} disabled={loading} C={C}>Cancel</Btn>
         <Btn variant="danger" onClick={confirm} loading={loading} C={C}>Delete Permanently</Btn>
@@ -270,13 +274,33 @@ function StatCard({ value, label, desc, icon, iconBg, iconColor, C }) {
   return (
     <div style={{
       flex: 1, minWidth: 0,
-      background: C.surface, border: `1px solid ${C.border}`,
-      borderRadius: 14, padding: "20px 22px",
-      boxShadow: C.shadowCard,
+      background: C.surface,
+      // Clipped top-right corner — the signature shape
+      clipPath: "polygon(0 0, calc(100% - 18px) 0, 100% 18px, 100% 100%, 0 100%)",
+      padding: "20px 22px",
+      boxShadow: `${C.shadowCard}, inset 0 0 0 1px ${C.border}`,
       display: "flex", alignItems: "center", gap: 16,
       animation: "vFadeUp 0.3s ease both",
+      position: "relative", overflow: "hidden",
     }}>
-      <div style={{ width: 44, height: 44, borderRadius: 12, background: iconBg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+      {/* Noise texture overlay */}
+      <div style={{
+        position: "absolute", inset: 0, pointerEvents: "none", opacity: 0.025,
+        backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")`,
+        backgroundSize: "200px 200px",
+      }} />
+      {/* Top-right corner accent line */}
+      <div style={{
+        position: "absolute", top: 0, right: 18,
+        width: 26, height: 1,
+        background: `linear-gradient(90deg, transparent, ${iconColor})`,
+        transform: "rotate(-45deg) translate(10px,-6px)",
+        transformOrigin: "right", opacity: 0.6,
+      }} />
+      <div style={{ width: 44, height: 44, flexShrink: 0,
+        background: iconBg,
+        clipPath: "polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 0 100%)",
+        display: "flex", alignItems: "center", justifyContent: "center" }}>
         {React.cloneElement(icon, { size: 20, color: iconColor })}
       </div>
       <div>
@@ -310,15 +334,40 @@ function AppCard({ app, onArchitect, onEdit, onDeploy, onDelete, index, C }) {
     >
       <div style={{
         background: hover ? C.surfaceHi : C.surface,
-        border: `1px solid ${hover ? C.borderHi : C.border}`,
-        borderLeft: `3px solid ${statusColor}`,
-        borderRadius: 14,
+        // Clipped top-right + bottom-left corners for asymmetric feel
+        clipPath: "polygon(0 0, calc(100% - 16px) 0, 100% 16px, 100% 100%, 16px 100%, 0 calc(100% - 16px))",
         padding: "18px 18px 16px",
-        boxShadow: hover ? C.shadowCard : C.shadow,
+        boxShadow: hover
+          ? `${C.shadowCard}, inset 0 0 0 1px ${C.borderHi}, 0 0 0 1px ${C.borderHi}`
+          : `${C.shadow}, inset 0 0 0 1px ${C.border}`,
         display: "flex", flexDirection: "column",
         transition: "all 0.2s ease",
-        position: "relative", cursor: "default",
+        position: "relative", cursor: "default", overflow: "hidden",
       }}>
+        {/* Noise texture overlay */}
+        <div style={{
+          position: "absolute", inset: 0, pointerEvents: "none",
+          opacity: hover ? 0.04 : 0.02,
+          transition: "opacity 0.2s",
+          backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")`,
+          backgroundSize: "200px 200px",
+        }} />
+        {/* Gradient accent on top edge when hovered */}
+        <div style={{
+          position: "absolute", top: 0, left: 0, right: 0, height: 2,
+          background: hover
+            ? `linear-gradient(90deg, ${statusColor}, transparent 60%)`
+            : "transparent",
+          transition: "background 0.2s",
+        }} />
+        {/* Corner cut accent line (top-right) */}
+        <div style={{
+          position: "absolute", top: 0, right: 16,
+          width: 22, height: 1,
+          background: hover ? `linear-gradient(90deg, transparent, ${C.accentLt})` : "transparent",
+          transform: "rotate(-45deg) translate(9px,-5px)",
+          transformOrigin: "right", transition: "background 0.2s",
+        }} />
         {/* Top row */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
           <span style={{
@@ -326,7 +375,8 @@ function AppCard({ app, onArchitect, onEdit, onDeploy, onDelete, index, C }) {
             color: statusColor,
             fontSize: 11, fontWeight: 700, fontFamily: "JetBrains Mono, monospace",
             letterSpacing: "0.08em", textTransform: "uppercase",
-            padding: "2px 9px", borderRadius: 6,
+            padding: "2px 9px",
+            clipPath: "polygon(0 0, calc(100% - 4px) 0, 100% 4px, 100% 100%, 0 100%)",
           }}>
             {app.status || "draft"}
           </span>
@@ -334,7 +384,7 @@ function AppCard({ app, onArchitect, onEdit, onDeploy, onDelete, index, C }) {
           <div style={{ position: "relative" }}>
             <button
               onClick={() => setMenu(o => !o)}
-              style={{ width: 28, height: 28, borderRadius: 7, border: `1px solid ${menu ? C.borderHi : C.border}`, background: menu ? C.accentBg : "transparent", color: C.t3, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.15s" }}
+              style={{ width: 28, height: 28, clipPath: "polygon(0 0, calc(100% - 5px) 0, 100% 5px, 100% 100%, 0 100%)", border: `1px solid ${menu ? C.borderHi : C.border}`, background: menu ? C.accentBg : "transparent", color: C.t3, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.15s" }}
             >
               <MoreHorizontal size={14} />
             </button>
@@ -342,7 +392,8 @@ function AppCard({ app, onArchitect, onEdit, onDeploy, onDelete, index, C }) {
               <div style={{
                 position: "absolute", right: 0, top: 32, zIndex: 20,
                 background: C.surface, border: `1px solid ${C.borderHi}`,
-                borderRadius: 12, boxShadow: C.shadowCard, minWidth: 152, padding: "5px 0",
+                clipPath: "polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 0 100%)",
+                boxShadow: C.shadowCard, minWidth: 152, padding: "5px 0",
                 animation: "vFadeUp 0.15s ease both",
               }}>
                 {[
@@ -400,7 +451,8 @@ function AppCard({ app, onArchitect, onEdit, onDeploy, onDelete, index, C }) {
           <button
             onClick={() => onArchitect(app)}
             style={{
-              flex: 1, padding: "9px 0", borderRadius: 9,
+              flex: 1, padding: "9px 0",
+              clipPath: "polygon(0 0, calc(100% - 6px) 0, 100% 6px, 100% 100%, 0 100%)",
               background: C.accentBg, border: `1px solid ${C.borderHi}`,
               color: C.accentLt, fontSize: 13, fontWeight: 700, cursor: "pointer",
               display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
@@ -414,7 +466,8 @@ function AppCard({ app, onArchitect, onEdit, onDeploy, onDelete, index, C }) {
           <button
             onClick={() => onEdit(app)}
             style={{
-              flex: 1, padding: "9px 0", borderRadius: 9,
+              flex: 1, padding: "9px 0",
+              clipPath: "polygon(0 0, calc(100% - 6px) 0, 100% 6px, 100% 100%, 0 100%)",
               background: C.amberBg, border: `1px solid ${C.amber}40`,
               color: C.amber, fontSize: 13, fontWeight: 700, cursor: "pointer",
               display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
@@ -429,7 +482,8 @@ function AppCard({ app, onArchitect, onEdit, onDeploy, onDelete, index, C }) {
             <button
               onClick={() => onDeploy(app)}
               style={{
-                flex: 1, padding: "9px 0", borderRadius: 9,
+                flex: 1, padding: "9px 0",
+                clipPath: "polygon(0 0, calc(100% - 6px) 0, 100% 6px, 100% 100%, 0 100%)",
                 background: C.greenBg, border: `1px solid ${C.green}40`,
                 color: C.green, fontSize: 13, fontWeight: 700, cursor: "pointer",
                 display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
@@ -593,7 +647,7 @@ export default function Dashboard() {
 
         {/* Logo */}
         <div style={{ padding: collapsed ? "18px 0" : "18px 16px", borderBottom: `1px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: collapsed ? "center" : "flex-start", gap: 10 }}>
-          <div style={{ width: 34, height: 34, flexShrink: 0, borderRadius: 10, background: `linear-gradient(135deg, ${C.accent}, #6d28d9)`, display: "flex", alignItems: "center", justifyContent: "center", boxShadow: `0 0 20px ${C.accentBg}` }}>
+          <div style={{ width: 34, height: 34, flexShrink: 0, clipPath: "polygon(0 0, calc(100% - 7px) 0, 100% 7px, 100% 100%, 0 100%)", background: `linear-gradient(135deg, ${C.accent}, #6d28d9)`, display: "flex", alignItems: "center", justifyContent: "center", boxShadow: `0 0 20px ${C.accentBg}` }}>
             <Sparkles size={15} color="#fff" />
           </div>
           {!collapsed && (
@@ -609,7 +663,7 @@ export default function Dashboard() {
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 14px", marginBottom: 8 }}>
               <span style={{ fontFamily: "JetBrains Mono, monospace", fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: C.t3 }}>Projects</span>
               <button onClick={() => setModal("createProject")} title="New project"
-                style={{ width: 22, height: 22, borderRadius: 6, border: `1px solid ${C.border}`, background: "transparent", color: C.t3, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.15s" }}
+                style={{ width: 22, height: 22, clipPath: "polygon(0 0, calc(100% - 4px) 0, 100% 4px, 100% 100%, 0 100%)", border: `1px solid ${C.border}`, background: "transparent", color: C.t3, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.15s" }}
                 onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.color = C.accent; }}
                 onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.t3; }}
               >
@@ -649,7 +703,7 @@ export default function Dashboard() {
                 onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = "transparent"; }}
               >
                 {/* Project color dot */}
-                <div style={{ width: 28, height: 28, flexShrink: 0, borderRadius: 8, background: isActive ? C.accentBg : C.border, border: `1px solid ${isActive ? C.borderHi : C.border}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <div style={{ width: 28, height: 28, flexShrink: 0, clipPath: "polygon(0 0, calc(100% - 6px) 0, 100% 6px, 100% 100%, 0 100%)", background: isActive ? C.accentBg : C.border, border: `1px solid ${isActive ? C.borderHi : C.border}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
                   {isActive
                     ? <FolderOpen size={13} color={C.accentLt} />
                     : <Folder size={13} color={C.t3} />}
@@ -682,7 +736,7 @@ export default function Dashboard() {
             </div>
           ) : (
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <div style={{ width: 30, height: 30, flexShrink: 0, borderRadius: 9, background: C.accentBg, border: `1px solid ${C.borderHi}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <div style={{ width: 30, height: 30, flexShrink: 0, clipPath: "polygon(0 0, calc(100% - 6px) 0, 100% 6px, 100% 100%, 0 100%)", background: C.accentBg, border: `1px solid ${C.borderHi}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
                 <span style={{ fontFamily: "JetBrains Mono, monospace", fontSize: 12, color: C.accentLt, fontWeight: 800 }}>{user?.email?.[0]?.toUpperCase() || "?"}</span>
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
@@ -739,14 +793,14 @@ export default function Dashboard() {
                 {selectedProject && (
                   <>
                     <button onClick={() => { setEditTarget(selectedProject); setModal("editProject"); }}
-                      style={{ padding: "9px 11px", borderRadius: 10, border: `1px solid ${C.border}`, background: "transparent", color: C.t2, cursor: "pointer", display: "flex", alignItems: "center", transition: "all 0.15s" }}
+                      style={{ padding: "9px 11px", clipPath: "polygon(0 0, calc(100% - 6px) 0, 100% 6px, 100% 100%, 0 100%)", border: `1px solid ${C.border}`, background: "transparent", color: C.t2, cursor: "pointer", display: "flex", alignItems: "center", transition: "all 0.15s" }}
                       onMouseEnter={e => { e.currentTarget.style.borderColor = C.borderHi; e.currentTarget.style.color = C.t1; }}
                       onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.t2; }}
                     >
                       <Edit3 size={14} />
                     </button>
                     <button onClick={() => handleDeleteProject(selectedProject)}
-                      style={{ padding: "9px 11px", borderRadius: 10, border: "1px solid rgba(239,68,68,0.2)", background: "transparent", color: C.t3, cursor: "pointer", display: "flex", alignItems: "center", transition: "all 0.15s" }}
+                      style={{ padding: "9px 11px", clipPath: "polygon(0 0, calc(100% - 6px) 0, 100% 6px, 100% 100%, 0 100%)", border: "1px solid rgba(239,68,68,0.2)", background: "transparent", color: C.t3, cursor: "pointer", display: "flex", alignItems: "center", transition: "all 0.15s" }}
                       onMouseEnter={e => { e.currentTarget.style.color = "#f87171"; e.currentTarget.style.borderColor = "rgba(239,68,68,0.45)"; }}
                       onMouseLeave={e => { e.currentTarget.style.color = C.t3; e.currentTarget.style.borderColor = "rgba(239,68,68,0.2)"; }}
                     >
@@ -758,7 +812,8 @@ export default function Dashboard() {
                   onClick={() => selectedProject ? setModal("newApp") : setModal("createProject")}
                   style={{
                     display: "inline-flex", alignItems: "center", gap: 7,
-                    padding: "9px 20px", borderRadius: 10,
+                    padding: "9px 20px",
+                    clipPath: "polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 0 100%)",
                     background: `linear-gradient(135deg, ${C.accent}, #6d28d9)`,
                     border: "none", color: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer",
                     boxShadow: `0 4px 18px ${C.accentBg}`,
@@ -773,7 +828,7 @@ export default function Dashboard() {
 
           {/* Delete error */}
           {deleteError && (
-            <div style={{ marginBottom: 20, padding: "10px 16px", borderRadius: 10, background: C.amberBg, border: `1px solid ${C.amber}40`, color: C.amber, fontSize: 13, fontWeight: 600, display: "flex", justifyContent: "space-between" }}>
+            <div style={{ marginBottom: 20, padding: "10px 16px", clipPath: "polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 0 100%)", background: C.amberBg, border: `1px solid ${C.amber}40`, color: C.amber, fontSize: 13, fontWeight: 600, display: "flex", justifyContent: "space-between" }}>
               {deleteError}
               <button onClick={() => setDeleteError("")} style={{ background: "none", border: "none", color: C.amber, cursor: "pointer" }}>✕</button>
             </div>
@@ -791,7 +846,7 @@ export default function Dashboard() {
           {/* Search + view toggle */}
           {selectedProject && allApps.length > 0 && (
             <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 24, animation: "vFadeUp 0.32s ease both" }}>
-              <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 10, background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: "9px 14px", boxShadow: C.shadow }}>
+              <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 10, background: C.surface, border: `1px solid ${C.border}`, clipPath: "polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 0 100%)", padding: "9px 14px", boxShadow: C.shadow }}>
                 <Search size={14} color={C.t3} />
                 <input
                   value={search}
@@ -800,10 +855,10 @@ export default function Dashboard() {
                   style={{ flex: 1, background: "transparent", border: "none", color: C.t1, fontSize: 14, outline: "none", fontFamily: "Plus Jakarta Sans, sans-serif" }}
                 />
               </div>
-              <div style={{ display: "flex", gap: 4, background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: 4 }}>
+              <div style={{ display: "flex", gap: 4, background: C.surface, border: `1px solid ${C.border}`, clipPath: "polygon(0 0, calc(100% - 6px) 0, 100% 6px, 100% 100%, 0 100%)", padding: 4 }}>
                 {[["grid", <LayoutGrid size={14} />], ["list", <List size={14} />]].map(([mode, icon]) => (
                   <button key={mode} onClick={() => setViewMode(mode)}
-                    style={{ width: 32, height: 32, borderRadius: 7, border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", background: viewMode === mode ? C.accentBg : "transparent", color: viewMode === mode ? C.accentLt : C.t3, transition: "all 0.15s" }}
+                    style={{ width: 32, height: 32, border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", background: viewMode === mode ? C.accentBg : "transparent", color: viewMode === mode ? C.accentLt : C.t3, transition: "all 0.15s" }}
                   >{icon}</button>
                 ))}
               </div>
@@ -813,8 +868,8 @@ export default function Dashboard() {
           {/* Apps */}
           {selectedProject ? (
             filteredApps.length === 0 ? (
-              <div style={{ border: `1px dashed ${C.border}`, borderRadius: 16, padding: "64px 24px", textAlign: "center", background: C.accentBg }}>
-                <div style={{ width: 50, height: 50, borderRadius: 14, background: C.accentBg, border: `1px solid ${C.borderHi}`, margin: "0 auto 16px", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <div style={{ border: `1px dashed ${C.border}`, clipPath: "polygon(0 0, calc(100% - 20px) 0, 100% 20px, 100% 100%, 0 100%)", padding: "64px 24px", textAlign: "center", background: C.accentBg }}>
+                <div style={{ width: 50, height: 50, clipPath: "polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 0 100%)", background: C.accentBg, border: `1px solid ${C.borderHi}`, margin: "0 auto 16px", display: "flex", alignItems: "center", justifyContent: "center" }}>
                   <Bot size={22} color={C.accentLt} />
                 </div>
                 <p style={{ fontSize: 15, color: C.t2, marginBottom: 18, fontWeight: 600 }}>
@@ -822,7 +877,7 @@ export default function Dashboard() {
                 </p>
                 {!search && (
                   <button onClick={() => setModal("newApp")}
-                    style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "9px 20px", borderRadius: 10, background: C.accentBg, border: `1px solid ${C.borderHi}`, color: C.accentLt, fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "Plus Jakarta Sans, sans-serif" }}
+                    style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "9px 20px", clipPath: "polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 0 100%)", background: C.accentBg, border: `1px solid ${C.borderHi}`, color: C.accentLt, fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "Plus Jakarta Sans, sans-serif" }}
                   >
                     <Plus size={14} /> Create your first app
                   </button>
@@ -847,10 +902,10 @@ export default function Dashboard() {
               </div>
             )
           ) : (
-            <div style={{ border: `1px dashed ${C.border}`, borderRadius: 16, padding: "64px 24px", textAlign: "center" }}>
+            <div style={{ border: `1px dashed ${C.border}`, clipPath: "polygon(0 0, calc(100% - 20px) 0, 100% 20px, 100% 100%, 0 100%)", padding: "64px 24px", textAlign: "center" }}>
               <p style={{ fontSize: 15, color: C.t3, marginBottom: 18 }}>No projects yet.</p>
               <button onClick={() => setModal("createProject")}
-                style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "9px 20px", borderRadius: 10, background: `linear-gradient(135deg, ${C.accent}, #6d28d9)`, border: "none", color: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "Plus Jakarta Sans, sans-serif" }}
+                style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "9px 20px", clipPath: "polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 0 100%)", background: `linear-gradient(135deg, ${C.accent}, #6d28d9)`, border: "none", color: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "Plus Jakarta Sans, sans-serif" }}
               >
                 <Plus size={14} /> Create Project
               </button>
