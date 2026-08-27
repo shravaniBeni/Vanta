@@ -1,585 +1,860 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+/**
+ * Dashboard.jsx — Vanta v3
+ * Reference: deep navy/purple dark, large stat cards with icons,
+ * search bar, card with left accent border, two-tone action buttons,
+ * resizable sidebar, light/dark toggle.
+ */
+
+import React, { useState, useEffect, useRef, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import {
-  Sparkles, Plus, Folder, FolderOpen, Zap, Edit3, Trash2,
-  LogOut, Clock, Rocket, Cpu, AlertTriangle,
-} from 'lucide-react';
-import { useAuth } from '@/lib/AuthContext';
-import { projectsApi, chatbotsApi } from '@/api/apiClient';
-import { createPageUrl } from '@/utils';
+  Sparkles, Plus, Folder, FolderOpen, Edit3, Trash2,
+  LogOut, Clock, Rocket, Cpu, MoreHorizontal, Bot,
+  Sun, Moon, Search, Package, CheckCircle, Timer,
+  Settings, ChevronLeft, ChevronRight, GripVertical,
+  LayoutGrid, List, Copy, AlertTriangle,
+} from "lucide-react";
+import { useAuth } from "@/lib/AuthContext";
+import { projectsApi, chatbotsApi } from "@/api/apiClient";
+import { createPageUrl } from "@/utils";
+
+// ─── Theme ────────────────────────────────────────────────────────────────────
+
+function useTheme() {
+  const [dark, setDark] = useState(() => {
+    const s = localStorage.getItem("vanta-theme");
+    return s ? s === "dark" : true; // default dark
+  });
+  useEffect(() => {
+    document.documentElement.classList.toggle("dark", dark);
+    localStorage.setItem("vanta-theme", dark ? "dark" : "light");
+  }, [dark]);
+  return [dark, () => setDark(d => !d)];
+}
+
+// ─── CSS vars (applied via inline style on root div, override per theme) ──────
+
+const DARK = {
+  bg:        "#0e0e1a",
+  bgSub:     "#13132b",
+  surface:   "#181830",
+  surfaceHi: "#1e1e38",
+  border:    "rgba(255,255,255,0.07)",
+  borderHi:  "rgba(139,92,246,0.5)",
+  t1:        "#f0efff",
+  t2:        "#9d9bb8",
+  t3:        "#4d4b6b",
+  accent:    "#7c3aed",
+  accentLt:  "#a78bfa",
+  accentBg:  "rgba(124,58,237,0.12)",
+  amber:     "#f59e0b",
+  amberBg:   "rgba(245,158,11,0.12)",
+  green:     "#10b981",
+  greenBg:   "rgba(16,185,129,0.12)",
+  shadow:    "0 4px 24px rgba(0,0,0,0.5)",
+  shadowCard:"0 8px 32px rgba(0,0,0,0.4), 0 2px 8px rgba(0,0,0,0.3)",
+};
+
+const LIGHT = {
+  bg:        "#f5f4ff",
+  bgSub:     "#ebe9ff",
+  surface:   "#ffffff",
+  surfaceHi: "#f9f8ff",
+  border:    "rgba(0,0,0,0.09)",
+  borderHi:  "rgba(124,58,237,0.4)",
+  t1:        "#1a1730",
+  t2:        "#5a567a",
+  t3:        "#b0adc8",
+  accent:    "#7c3aed",
+  accentLt:  "#7c3aed",
+  accentBg:  "rgba(124,58,237,0.07)",
+  amber:     "#d97706",
+  amberBg:   "rgba(217,119,6,0.08)",
+  green:     "#059669",
+  greenBg:   "rgba(5,150,105,0.08)",
+  shadow:    "0 2px 16px rgba(0,0,0,0.08)",
+  shadowCard:"0 6px 24px rgba(0,0,0,0.1), 0 1px 4px rgba(0,0,0,0.06)",
+};
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function timeAgo(dateStr) {
-  const diff = Date.now() - new Date(dateStr).getTime();
-  const m = Math.floor(diff / 60000);
-  if (m < 1)  return 'just now';
+function timeAgo(d) {
+  const m = Math.floor((Date.now() - new Date(d)) / 60000);
+  if (m < 1) return "just now";
   if (m < 60) return `${m}m ago`;
   const h = Math.floor(m / 60);
   if (h < 24) return `${h}h ago`;
   return `${Math.floor(h / 24)}d ago`;
 }
 
-const STATUS_COLORS = {
-  deployed: { dot: '#22c55e', label: 'deployed', glow: '#22c55e' },
-  draft:    { dot: '#f59e0b', label: 'draft',    glow: '#f59e0b' },
-  archived: { dot: '#64748b', label: 'archived', glow: '#64748b' },
-};
+// ─── Modal ────────────────────────────────────────────────────────────────────
 
-// ─── Inline modal for project CRUD ────────────────────────────────────────────
+function Modal({ onClose, children, C, wide }) {
+  return (
+    <div
+      onClick={e => e.target === e.currentTarget && onClose()}
+      style={{
+        position: "fixed", inset: 0, zIndex: 100,
+        display: "flex", alignItems: "center", justifyContent: "center",
+        background: "rgba(0,0,0,0.65)", backdropFilter: "blur(8px)",
+      }}
+    >
+      <div style={{
+        background: C.surface, border: `1px solid ${C.borderHi}`,
+        borderRadius: 16, boxShadow: C.shadowCard,
+        width: "100%", maxWidth: wide ? 560 : 460,
+        padding: 32, animation: "vFadeUp 0.22s ease both",
+        fontFamily: "Plus Jakarta Sans, sans-serif",
+      }}>
+        {children}
+      </div>
+    </div>
+  );
+}
 
-function ProjectModal({ mode, project, onClose, onSave }) {
-  const [name, setName]       = useState(project?.name        || '');
-  const [desc, setDesc]       = useState(project?.description || '');
+function ModalInput({ label, C, ...props }) {
+  return (
+    <div style={{ marginBottom: 14 }}>
+      {label && <label style={{ display: "block", fontSize: 11, fontFamily: "JetBrains Mono, monospace", textTransform: "uppercase", letterSpacing: "0.08em", color: C.t3, marginBottom: 6 }}>{label}</label>}
+      <input style={{
+        width: "100%", padding: "10px 14px", borderRadius: 10,
+        background: C.bgSub, border: `1px solid ${C.border}`,
+        color: C.t1, fontSize: 14, outline: "none",
+        fontFamily: "Plus Jakarta Sans, sans-serif", boxSizing: "border-box",
+      }} {...props} />
+    </div>
+  );
+}
+
+function ModalTextarea({ label, C, ...props }) {
+  return (
+    <div style={{ marginBottom: 14 }}>
+      {label && <label style={{ display: "block", fontSize: 11, fontFamily: "JetBrains Mono, monospace", textTransform: "uppercase", letterSpacing: "0.08em", color: C.t3, marginBottom: 6 }}>{label}</label>}
+      <textarea style={{
+        width: "100%", padding: "10px 14px", borderRadius: 10,
+        background: C.bgSub, border: `1px solid ${C.border}`,
+        color: C.t1, fontSize: 14, outline: "none", resize: "none",
+        fontFamily: "Plus Jakarta Sans, sans-serif", boxSizing: "border-box",
+      }} {...props} />
+    </div>
+  );
+}
+
+function Btn({ onClick, disabled, loading, children, variant = "primary", C }) {
+  const styles = {
+    primary: {
+      background: `linear-gradient(135deg, ${C.accent}, #6d28d9)`,
+      color: "#fff", border: "none",
+      boxShadow: `0 4px 16px ${C.accentBg}`,
+    },
+    ghost: {
+      background: C.accentBg, border: `1px solid ${C.border}`, color: C.t2,
+    },
+    danger: {
+      background: "rgba(239,68,68,0.9)", color: "#fff", border: "none",
+    },
+  };
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled || loading}
+      style={{
+        ...styles[variant],
+        display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 7,
+        padding: "10px 20px", borderRadius: 10,
+        fontSize: 14, fontWeight: 700, cursor: disabled || loading ? "default" : "pointer",
+        opacity: disabled || loading ? 0.6 : 1,
+        fontFamily: "Plus Jakarta Sans, sans-serif", transition: "all 0.15s",
+      }}
+    >
+      {loading && <span style={{ width: 13, height: 13, border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "#fff", borderRadius: "50%", animation: "vSpin 0.7s linear infinite", display: "inline-block" }} />}
+      {children}
+    </button>
+  );
+}
+
+// ─── Project Modal ─────────────────────────────────────────────────────────────
+
+function ProjectModal({ mode, project, onClose, onSave, C }) {
+  const [name, setName] = useState(project?.name || "");
+  const [desc, setDesc] = useState(project?.description || "");
   const [loading, setLoading] = useState(false);
-  const [error, setError]     = useState('');
-
-  const handleSave = async () => {
-    if (!name.trim()) { setError('Name is required'); return; }
-    setLoading(true);
-    setError('');
-    try {
-      await onSave({ name: name.trim(), description: desc.trim() });
-      onClose();
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
+  const [error, setError] = useState("");
+  const save = async () => {
+    if (!name.trim()) { setError("Name required"); return; }
+    setLoading(true); setError("");
+    try { await onSave({ name: name.trim(), description: desc.trim() }); onClose(); }
+    catch (e) { setError(e.message); } finally { setLoading(false); }
   };
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-      <div className="neon-border rounded-2xl bg-[#0d1117] w-full max-w-md p-6">
-        <h2 className="text-lg font-bold text-white mb-4">
-          {mode === 'create' ? 'New Project' : 'Edit Project'}
-        </h2>
-        {error && (
-          <div className="mb-4 px-4 py-2 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-sm">
-            {error}
-          </div>
-        )}
-        <div className="space-y-3">
-          <input
-            autoFocus
-            placeholder="Project name"
-            value={name}
-            onChange={e => setName(e.target.value)}
-            className="w-full px-4 py-2.5 bg-[#060a10] border border-slate-700/50 rounded-xl text-slate-200 text-sm focus:border-indigo-500/60 focus:outline-none"
-          />
-          <textarea
-            placeholder="Description (optional)"
-            value={desc}
-            onChange={e => setDesc(e.target.value)}
-            rows={2}
-            className="w-full px-4 py-2.5 bg-[#060a10] border border-slate-700/50 rounded-xl text-slate-200 text-sm focus:border-indigo-500/60 focus:outline-none resize-none"
-          />
-        </div>
-        <div className="flex gap-3 mt-5">
-          <button
-            onClick={onClose}
-            className="flex-1 py-2.5 rounded-xl border border-slate-700/50 text-slate-400 text-sm hover:border-slate-600 transition-colors"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleSave}
-            disabled={loading}
-            className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-sm font-semibold disabled:opacity-50"
-          >
-            {loading ? 'Saving...' : 'Save'}
-          </button>
-        </div>
+    <Modal onClose={onClose} C={C}>
+      <h2 style={{ fontSize: 20, fontWeight: 800, color: C.t1, marginBottom: 20 }}>{mode === "create" ? "New Project" : "Edit Project"}</h2>
+      {error && <div style={{ marginBottom: 12, padding: "8px 12px", borderRadius: 8, background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.2)", color: "#fca5a5", fontSize: 13 }}>{error}</div>}
+      <ModalInput label="Name" autoFocus placeholder="e.g. Customer Support" value={name} onChange={e => setName(e.target.value)} C={C} />
+      <ModalTextarea label="Description" placeholder="Optional" rows={2} value={desc} onChange={e => setDesc(e.target.value)} C={C} />
+      <div style={{ display: "flex", gap: 10, marginTop: 24 }}>
+        <Btn variant="ghost" onClick={onClose} C={C}>Cancel</Btn>
+        <Btn onClick={save} loading={loading} C={C}>{mode === "create" ? "Create Project" : "Save"}</Btn>
       </div>
-    </div>
+    </Modal>
   );
 }
 
-// ─── Inline modal for new RAG app ─────────────────────────────────────────────
-// Creates a minimal draft rag_app then navigates directly to Architect onboarding.
-// No LLM workflow generation at creation time.
+// ─── New App Modal ─────────────────────────────────────────────────────────────
 
-function NewAppModal({ projectId, onClose, onCreated }) {
-  const [description, setDescription] = useState('');
-  const [loading, setLoading]         = useState(false);
-  const [error, setError]             = useState('');
-
-  const handleCreate = async () => {
-    if (!description.trim()) { setError('Description is required'); return; }
-    setLoading(true);
-    setError('');
-    try {
-      const app = await chatbotsApi.createDraft(description.trim(), projectId);
-      onCreated(app);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-      <div className="neon-border rounded-2xl bg-[#0d1117] w-full max-w-lg p-6">
-        <h2 className="text-lg font-bold text-white mb-1">New RAG Application</h2>
-        <p className="text-slate-500 text-sm mb-4">
-          Describe what this assistant should do. You'll upload knowledge sources and configure
-          the architecture on the next screen.
-        </p>
-        {error && (
-          <div className="mb-4 px-4 py-2 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-sm">
-            {error}
-          </div>
-        )}
-        <textarea
-          autoFocus
-          placeholder="e.g. A technical support assistant for field engineers that answers questions strictly from our maintenance manuals and safety procedures."
-          value={description}
-          onChange={e => setDescription(e.target.value)}
-          rows={4}
-          className="w-full px-4 py-3 bg-[#060a10] border border-slate-700/50 rounded-xl text-slate-200 text-sm font-mono focus:border-indigo-500/60 focus:outline-none resize-none placeholder:text-slate-600"
-        />
-        <div className="flex gap-3 mt-4">
-          <button
-            onClick={onClose}
-            className="flex-1 py-2.5 rounded-xl border border-slate-700/50 text-slate-400 text-sm hover:border-slate-600 transition-colors"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleCreate}
-            disabled={loading || !description.trim()}
-            className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-sm font-semibold disabled:opacity-50 flex items-center justify-center gap-2"
-          >
-            {loading ? (
-              <>
-                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                Creating...
-              </>
-            ) : (
-              <><Cpu size={14} /> Create & Configure</>
-            )}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ─── Delete confirmation modal ─────────────────────────────────────────────────
-
-function DeleteAppModal({ app, onClose, onConfirm }) {
+function NewAppModal({ projectId, onClose, onCreated, C }) {
+  const [description, setDescription] = useState("");
   const [loading, setLoading] = useState(false);
-  const [error, setError]     = useState('');
-
-  const handleConfirm = async () => {
-    setLoading(true);
-    setError('');
-    try {
-      await onConfirm(app);
-      onClose();
-    } catch (err) {
-      setError(err.message);
-      setLoading(false);
-    }
+  const [error, setError] = useState("");
+  const create = async () => {
+    if (!description.trim()) { setError("Description required"); return; }
+    setLoading(true); setError("");
+    try { const app = await chatbotsApi.createDraft(description.trim(), projectId); onCreated(app); }
+    catch (e) { setError(e.message); } finally { setLoading(false); }
   };
+  return (
+    <Modal onClose={onClose} C={C} wide>
+      <div style={{ display: "flex", gap: 12, alignItems: "center", marginBottom: 16 }}>
+        <div style={{ width: 40, height: 40, borderRadius: 12, background: C.accentBg, border: `1px solid ${C.borderHi}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <Bot size={17} color={C.accentLt} />
+        </div>
+        <div>
+          <h2 style={{ fontSize: 20, fontWeight: 800, color: C.t1 }}>New RAG Application</h2>
+          <p style={{ fontSize: 13, color: C.t3, marginTop: 2 }}>Describe what the assistant should do.</p>
+        </div>
+      </div>
+      {error && <div style={{ marginBottom: 12, padding: "8px 12px", borderRadius: 8, background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.2)", color: "#fca5a5", fontSize: 13 }}>{error}</div>}
+      <ModalTextarea label="Purpose" autoFocus placeholder="e.g. A technical support assistant that answers questions from maintenance manuals..." rows={4} value={description} onChange={e => setDescription(e.target.value)} C={C} />
+      <div style={{ display: "flex", gap: 10, marginTop: 24 }}>
+        <Btn variant="ghost" onClick={onClose} C={C}>Cancel</Btn>
+        <Btn onClick={create} loading={loading} disabled={!description.trim()} C={C}><Cpu size={14} /> Create & Configure</Btn>
+      </div>
+    </Modal>
+  );
+}
+
+// ─── Delete App Modal ──────────────────────────────────────────────────────────
+
+function DeleteAppModal({ app, onClose, onConfirm, C }) {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const confirm = async () => {
+    setLoading(true); setError("");
+    try { await onConfirm(app); onClose(); }
+    catch (e) { setError(e.message); setLoading(false); }
+  };
+  return (
+    <Modal onClose={onClose} C={C}>
+      <div style={{ display: "flex", gap: 12, alignItems: "center", marginBottom: 16 }}>
+        <div style={{ width: 40, height: 40, borderRadius: 12, background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.25)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+          <AlertTriangle size={17} color="#ef4444" />
+        </div>
+        <h2 style={{ fontSize: 20, fontWeight: 800, color: C.t1 }}>Delete Application?</h2>
+      </div>
+      <p style={{ fontSize: 14, color: C.t2, lineHeight: 1.6, marginBottom: 8 }}>
+        <strong style={{ color: C.t1 }}>"{app.title}"</strong> will be permanently deleted.
+      </p>
+      <p style={{ fontSize: 13, color: C.t3, lineHeight: 1.6, marginBottom: 20 }}>All documents, indexed chunks, chat history, and deployment data will be removed.</p>
+      {error && <div style={{ marginBottom: 12, padding: "8px 12px", borderRadius: 8, background: "rgba(239,68,68,0.08)", color: "#fca5a5", fontSize: 13 }}>{error}</div>}
+      <div style={{ display: "flex", gap: 10 }}>
+        <Btn variant="ghost" onClick={onClose} disabled={loading} C={C}>Cancel</Btn>
+        <Btn variant="danger" onClick={confirm} loading={loading} C={C}>Delete Permanently</Btn>
+      </div>
+    </Modal>
+  );
+}
+
+// ─── Stat card (large, with icon + label like reference) ──────────────────────
+
+function StatCard({ value, label, desc, icon, iconBg, iconColor, C }) {
+  return (
+    <div style={{
+      flex: 1, minWidth: 0,
+      background: C.surface, border: `1px solid ${C.border}`,
+      borderRadius: 14, padding: "20px 22px",
+      boxShadow: C.shadowCard,
+      display: "flex", alignItems: "center", gap: 16,
+      animation: "vFadeUp 0.3s ease both",
+    }}>
+      <div style={{ width: 44, height: 44, borderRadius: 12, background: iconBg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+        {React.cloneElement(icon, { size: 20, color: iconColor })}
+      </div>
+      <div>
+        <div style={{ fontSize: 28, fontWeight: 800, color: C.t1, lineHeight: 1, fontFamily: "Plus Jakarta Sans, sans-serif" }}>{value}</div>
+        <div style={{ fontSize: 11, fontFamily: "JetBrains Mono, monospace", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: iconColor, marginTop: 3 }}>{label}</div>
+        <div style={{ fontSize: 12, color: C.t3, marginTop: 2 }}>{desc}</div>
+      </div>
+    </div>
+  );
+}
+
+// ─── App Card ─────────────────────────────────────────────────────────────────
+
+function AppCard({ app, onArchitect, onEdit, onDeploy, onDelete, index, C }) {
+  const [hover, setHover] = useState(false);
+  const [menu, setMenu] = useState(false);
+
+  const STATUS_COLOR = {
+    deployed: C.green,
+    draft:    C.amber,
+    archived: C.t3,
+  };
+  const statusColor = STATUS_COLOR[app.status] || C.amber;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-      <div className="neon-border rounded-2xl bg-[#0d1117] w-full max-w-md p-6">
-        <div className="flex items-center gap-3 mb-4">
-          <div className="w-9 h-9 rounded-xl bg-red-500/15 border border-red-500/30 flex items-center justify-center flex-shrink-0">
-            <Trash2 size={15} className="text-red-400" />
+    <div
+      className="vCardIn"
+      style={{ animationDelay: `${index * 60}ms` }}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => { setHover(false); setMenu(false); }}
+    >
+      <div style={{
+        background: hover ? C.surfaceHi : C.surface,
+        border: `1px solid ${hover ? C.borderHi : C.border}`,
+        borderLeft: `3px solid ${statusColor}`,
+        borderRadius: 14,
+        padding: "18px 18px 16px",
+        boxShadow: hover ? C.shadowCard : C.shadow,
+        display: "flex", flexDirection: "column",
+        transition: "all 0.2s ease",
+        position: "relative", cursor: "default",
+      }}>
+        {/* Top row */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+          <span style={{
+            background: `${statusColor}18`, border: `1px solid ${statusColor}40`,
+            color: statusColor,
+            fontSize: 11, fontWeight: 700, fontFamily: "JetBrains Mono, monospace",
+            letterSpacing: "0.08em", textTransform: "uppercase",
+            padding: "2px 9px", borderRadius: 6,
+          }}>
+            {app.status || "draft"}
+          </span>
+          {/* Overflow menu */}
+          <div style={{ position: "relative" }}>
+            <button
+              onClick={() => setMenu(o => !o)}
+              style={{ width: 28, height: 28, borderRadius: 7, border: `1px solid ${menu ? C.borderHi : C.border}`, background: menu ? C.accentBg : "transparent", color: C.t3, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.15s" }}
+            >
+              <MoreHorizontal size={14} />
+            </button>
+            {menu && (
+              <div style={{
+                position: "absolute", right: 0, top: 32, zIndex: 20,
+                background: C.surface, border: `1px solid ${C.borderHi}`,
+                borderRadius: 12, boxShadow: C.shadowCard, minWidth: 152, padding: "5px 0",
+                animation: "vFadeUp 0.15s ease both",
+              }}>
+                {[
+                  { icon: <Cpu size={12} />, label: "Architect", fn: () => onArchitect(app) },
+                  { icon: <Edit3 size={12} />, label: "Editor", fn: () => onEdit(app) },
+                  ...(app.status === "deployed" && app.embed_id ? [{ icon: <Rocket size={12} />, label: "View Deploy", fn: () => onDeploy(app) }] : []),
+                ].map(item => (
+                  <button key={item.label} onClick={() => { item.fn(); setMenu(false); }}
+                    style={{ width: "100%", padding: "9px 16px", background: "transparent", border: "none", color: C.t2, fontSize: 13, fontWeight: 600, cursor: "pointer", textAlign: "left", display: "flex", alignItems: "center", gap: 9, fontFamily: "Plus Jakarta Sans, sans-serif" }}
+                    onMouseEnter={e => e.currentTarget.style.background = C.accentBg}
+                    onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+                  >{item.icon} {item.label}</button>
+                ))}
+                <div style={{ height: 1, background: C.border, margin: "4px 0" }} />
+                <button onClick={() => { onDelete(app); setMenu(false); }}
+                  style={{ width: "100%", padding: "9px 16px", background: "transparent", border: "none", color: "#f87171", fontSize: 13, fontWeight: 600, cursor: "pointer", textAlign: "left", display: "flex", alignItems: "center", gap: 9, fontFamily: "Plus Jakarta Sans, sans-serif" }}
+                  onMouseEnter={e => e.currentTarget.style.background = "rgba(239,68,68,0.07)"}
+                  onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+                >
+                  <Trash2 size={12} /> Delete
+                </button>
+              </div>
+            )}
           </div>
-          <h2 className="text-lg font-bold text-white">Delete RAG Application?</h2>
         </div>
-        <p className="text-slate-400 text-sm leading-relaxed mb-2">
-          <span className="text-white font-semibold">"{app.title}"</span> will be permanently deleted.
-        </p>
-        <p className="text-slate-500 text-xs leading-relaxed mb-5">
-          This will remove the workflow configuration, all uploaded knowledge-base documents,
-          indexed chunks, chat history, and deployment data. This action cannot be undone.
-        </p>
-        {error && (
-          <div className="mb-4 px-4 py-2 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-sm">
-            {error}
+
+        {/* Arch status */}
+        {app.architect_status && app.architect_status !== "pending" && (
+          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10 }}>
+            <div style={{ width: 7, height: 7, borderRadius: "50%", background: app.architect_status === "approved" ? C.green : C.accentLt, flexShrink: 0 }} />
+            <span style={{ fontSize: 11, fontFamily: "JetBrains Mono, monospace", fontWeight: 700, color: app.architect_status === "approved" ? C.green : C.accentLt, textTransform: "uppercase", letterSpacing: "0.08em" }}>
+              Arch · {app.architect_status}
+            </span>
+            {/* Animated shimmer bar on the arch line */}
+            <div style={{ flex: 1, height: 2, background: `linear-gradient(90deg, ${app.architect_status === "approved" ? C.green : C.accentLt}40, transparent)`, borderRadius: 2 }} />
           </div>
         )}
-        <div className="flex gap-3">
+
+        <h3 style={{ fontSize: 16, fontWeight: 800, color: C.t1, marginBottom: 6, lineHeight: 1.35, fontFamily: "Plus Jakarta Sans, sans-serif", letterSpacing: "-0.01em" }}>
+          {app.title}
+        </h3>
+        {app.description && (
+          <p style={{ fontSize: 13, color: C.t3, lineHeight: 1.6, marginBottom: 14, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
+            {app.description}
+          </p>
+        )}
+
+        <div style={{ display: "flex", alignItems: "center", gap: 5, color: C.t3, fontSize: 12, fontFamily: "JetBrains Mono, monospace", marginTop: "auto", marginBottom: 14 }}>
+          <Clock size={11} />
+          <span>{timeAgo(app.updated_at || app.created_at)}</span>
+        </div>
+
+        {/* Two-tone action buttons like reference */}
+        <div style={{ display: "flex", gap: 8 }}>
           <button
-            onClick={onClose}
-            disabled={loading}
-            className="flex-1 py-2.5 rounded-xl border border-slate-700/50 text-slate-400 text-sm hover:border-slate-600 transition-colors disabled:opacity-50"
+            onClick={() => onArchitect(app)}
+            style={{
+              flex: 1, padding: "9px 0", borderRadius: 9,
+              background: C.accentBg, border: `1px solid ${C.borderHi}`,
+              color: C.accentLt, fontSize: 13, fontWeight: 700, cursor: "pointer",
+              display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+              fontFamily: "Plus Jakarta Sans, sans-serif", transition: "all 0.15s",
+            }}
+            onMouseEnter={e => e.currentTarget.style.background = `${C.accent}28`}
+            onMouseLeave={e => e.currentTarget.style.background = C.accentBg}
           >
-            Cancel
+            <Cpu size={13} /> Architect
           </button>
           <button
-            onClick={handleConfirm}
-            disabled={loading}
-            className="flex-1 py-2.5 rounded-xl bg-red-600/80 hover:bg-red-600 text-white text-sm font-semibold transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+            onClick={() => onEdit(app)}
+            style={{
+              flex: 1, padding: "9px 0", borderRadius: 9,
+              background: C.amberBg, border: `1px solid ${C.amber}40`,
+              color: C.amber, fontSize: 13, fontWeight: 700, cursor: "pointer",
+              display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+              fontFamily: "Plus Jakarta Sans, sans-serif", transition: "all 0.15s",
+            }}
+            onMouseEnter={e => e.currentTarget.style.background = `${C.amber}20`}
+            onMouseLeave={e => e.currentTarget.style.background = C.amberBg}
           >
-            {loading ? (
-              <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Deleting...</>
-            ) : (
-              <><Trash2 size={13} /> Delete Permanently</>
-            )}
+            <Edit3 size={13} /> Editor
           </button>
+          {app.status === "deployed" && app.embed_id && (
+            <button
+              onClick={() => onDeploy(app)}
+              style={{
+                flex: 1, padding: "9px 0", borderRadius: 9,
+                background: C.greenBg, border: `1px solid ${C.green}40`,
+                color: C.green, fontSize: 13, fontWeight: 700, cursor: "pointer",
+                display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+                fontFamily: "Plus Jakarta Sans, sans-serif",
+              }}
+            >
+              <Rocket size={13} /> View
+            </button>
+          )}
         </div>
       </div>
     </div>
   );
 }
 
-// ─── Main Dashboard ───────────────────────────────────────────────────────────
+// ─── Resizable sidebar ─────────────────────────────────────────────────────────
+
+const MIN_W = 56;
+const MAX_W = 320;
+const DEFAULT_W = 220;
+
+function useSidebarResize() {
+  const [width, setWidth] = useState(() => {
+    const s = localStorage.getItem("vanta-sidebar-w");
+    return s ? parseInt(s, 10) : DEFAULT_W;
+  });
+  const dragging = useRef(false);
+  const startX   = useRef(0);
+  const startW   = useRef(0);
+
+  const onMouseDown = useCallback(e => {
+    e.preventDefault();
+    dragging.current = true;
+    startX.current = e.clientX;
+    startW.current = width;
+    document.body.style.userSelect = "none";
+    document.body.style.cursor = "col-resize";
+  }, [width]);
+
+  useEffect(() => {
+    const onMove = e => {
+      if (!dragging.current) return;
+      const w = Math.max(MIN_W, Math.min(MAX_W, startW.current + e.clientX - startX.current));
+      setWidth(w);
+    };
+    const onUp = () => {
+      if (!dragging.current) return;
+      dragging.current = false;
+      document.body.style.userSelect = "";
+      document.body.style.cursor = "";
+      setWidth(w => { localStorage.setItem("vanta-sidebar-w", w); return w; });
+    };
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
+    return () => { document.removeEventListener("mousemove", onMove); document.removeEventListener("mouseup", onUp); };
+  }, []);
+
+  const collapsed = width <= MIN_W + 20;
+  return { width: collapsed ? MIN_W : width, collapsed, onMouseDown };
+}
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
 
 export default function Dashboard() {
-  const { user, signOut }       = useAuth();
-  const navigate                 = useNavigate();
-  const [projects, setProjects]  = useState([]);
-  const [apps, setApps]          = useState([]);
-  const [loading, setLoading]    = useState(true);
+  const { user, signOut } = useAuth();
+  const navigate = useNavigate();
+  const [dark, toggleTheme] = useTheme();
+  const C = dark ? DARK : LIGHT;
+
+  const [projects, setProjects]         = useState([]);
+  const [apps, setApps]                 = useState([]);
+  const [loading, setLoading]           = useState(true);
   const [activeProject, setActiveProject] = useState(null);
-  const [modal, setModal]        = useState(null); // null | 'createProject' | 'editProject' | 'newApp' | 'deleteApp'
-  const [editTarget, setEditTarget]   = useState(null);
+  const [modal, setModal]               = useState(null);
+  const [editTarget, setEditTarget]     = useState(null);
   const [deleteAppTarget, setDeleteAppTarget] = useState(null);
-  const [deleteError, setDeleteError] = useState('');
+  const [deleteError, setDeleteError]   = useState("");
+  const [search, setSearch]             = useState("");
+  const [viewMode, setViewMode]         = useState("grid"); // grid | list
+  const { width: sidebarW, collapsed, onMouseDown } = useSidebarResize();
 
   useEffect(() => { loadData(); }, []);
 
   const loadData = async () => {
     setLoading(true);
     try {
-      const [projData, appData] = await Promise.all([
-        projectsApi.list(),
-        chatbotsApi.filter(),
-      ]);
-      setProjects(projData);
-      setApps(appData);
-      if (projData.length > 0 && !activeProject) {
-        setActiveProject(projData[0].id);
-      }
-    } catch (err) {
-      console.error('Dashboard load error:', err);
-    } finally {
-      setLoading(false);
-    }
+      const [p, a] = await Promise.all([projectsApi.list(), chatbotsApi.filter()]);
+      setProjects(p); setApps(a);
+      if (p.length > 0 && !activeProject) setActiveProject(p[0].id);
+    } catch (e) { console.error(e); }
+    finally { setLoading(false); }
   };
 
-  const appsForProject = (projectId) =>
-    apps.filter(a => a.project_id === projectId);
+  const appsFor = id => apps.filter(a => a.project_id === id);
 
   const handleCreateProject = async ({ name, description }) => {
-    const created = await projectsApi.create({ name, description });
-    setProjects(prev => [created, ...prev]);
-    setActiveProject(created.id);
+    const c = await projectsApi.create({ name, description });
+    setProjects(p => [c, ...p]); setActiveProject(c.id);
   };
-
   const handleUpdateProject = async ({ name, description }) => {
-    const updated = await projectsApi.update(editTarget.id, { name, description });
-    setProjects(prev => prev.map(p => p.id === updated.id ? updated : p));
+    const u = await projectsApi.update(editTarget.id, { name, description });
+    setProjects(p => p.map(x => x.id === u.id ? u : x));
   };
-
-  const handleDeleteProject = async (project) => {
-    setDeleteError('');
+  const handleDeleteProject = async proj => {
+    setDeleteError("");
     try {
-      await projectsApi.delete(project.id);
-      setProjects(prev => prev.filter(p => p.id !== project.id));
-      if (activeProject === project.id) {
-        const remaining = projects.filter(p => p.id !== project.id);
-        setActiveProject(remaining[0]?.id || null);
-      }
-    } catch (err) {
-      if (err.message.includes('RAG applications')) {
-        setDeleteError(`"${project.name}" contains RAG apps. Delete them first.`);
-      } else {
-        setDeleteError(err.message);
-      }
+      await projectsApi.delete(proj.id);
+      setProjects(p => p.filter(x => x.id !== proj.id));
+      if (activeProject === proj.id) setActiveProject(projects.filter(x => x.id !== proj.id)[0]?.id || null);
+    } catch (e) {
+      setDeleteError(e.message.includes("RAG") ? `"${proj.name}" has apps. Delete them first.` : e.message);
     }
   };
-
-  // Called after user confirms deletion in DeleteAppModal
-  const handleDeleteAppConfirmed = async (app) => {
+  const handleDeleteAppConfirmed = async app => {
     await chatbotsApi.delete(app.id);
-    setApps(prev => prev.filter(a => a.id !== app.id));
+    setApps(a => a.filter(x => x.id !== app.id));
   };
+  const requestDeleteApp = app => { setDeleteAppTarget(app); setModal("deleteApp"); };
+  const handleAppCreated = app => { setApps(a => [app, ...a]); navigate(createPageUrl(`Architect?id=${app.id}`)); };
 
-  // Opens the confirmation modal
-  const requestDeleteApp = (app, e) => {
-    e.stopPropagation();
-    setDeleteAppTarget(app);
-    setModal('deleteApp');
-  };
-
-  // New creation flow: draft → Architect
-  const handleAppCreated = (app) => {
-    setApps(prev => [app, ...prev]);
-    navigate(createPageUrl(`Architect?id=${app.id}`));
-  };
+  const selectedProject = projects.find(p => p.id === activeProject);
+  const allApps = activeProject ? appsFor(activeProject) : [];
+  const filteredApps = search.trim()
+    ? allApps.filter(a => a.title.toLowerCase().includes(search.toLowerCase()) || a.description?.toLowerCase().includes(search.toLowerCase()))
+    : allApps;
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#080c14] flex items-center justify-center">
-        <div className="w-6 h-6 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+      <div style={{ minHeight: "100vh", background: C.bg, display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <div style={{ textAlign: "center" }}>
+          <div style={{ width: 30, height: 30, border: `3px solid ${C.border}`, borderTopColor: C.accent, borderRadius: "50%", animation: "vSpin 0.7s linear infinite", margin: "0 auto 14px" }} />
+          <p style={{ fontFamily: "JetBrains Mono, monospace", fontSize: 12, color: C.t3, textTransform: "uppercase", letterSpacing: "0.1em" }}>Loading</p>
+        </div>
       </div>
     );
   }
 
-  const selectedProject = projects.find(p => p.id === activeProject);
-  const selectedApps    = activeProject ? appsForProject(activeProject) : [];
-
   return (
-    <div className="min-h-screen bg-[#080c14] flex">
-      {/* Modals */}
-      {modal === 'createProject' && (
-        <ProjectModal
-          mode="create"
-          onClose={() => setModal(null)}
-          onSave={handleCreateProject}
-        />
-      )}
-      {modal === 'editProject' && editTarget && (
-        <ProjectModal
-          mode="edit"
-          project={editTarget}
-          onClose={() => { setModal(null); setEditTarget(null); }}
-          onSave={handleUpdateProject}
-        />
-      )}
-      {modal === 'newApp' && (
-        <NewAppModal
-          projectId={activeProject}
-          onClose={() => setModal(null)}
-          onCreated={handleAppCreated}
-        />
-      )}
-      {modal === 'deleteApp' && deleteAppTarget && (
-        <DeleteAppModal
-          app={deleteAppTarget}
-          onClose={() => { setModal(null); setDeleteAppTarget(null); }}
-          onConfirm={handleDeleteAppConfirmed}
-        />
-      )}
+    <div style={{ minHeight: "100vh", background: C.bg, display: "flex", fontFamily: "Plus Jakarta Sans, sans-serif" }}>
 
-      {/* ── Sidebar ─────────────────────────────────────────────────────── */}
-      <div style={{ width: 260, flexShrink: 0 }} className="bg-[#0a0e18] border-r border-indigo-500/15 flex flex-col">
+      {/* ── CSS animations ─────────────────────────────────────────── */}
+      <style>{`
+        @keyframes vFadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }
+        @keyframes vSpin   { to { transform:rotate(360deg); } }
+        @keyframes vCardIn { from { opacity:0; transform:translateY(16px) scale(0.97); } to { opacity:1; transform:translateY(0) scale(1); } }
+        .vCardIn { animation: vCardIn 0.35s ease both; }
+        * { box-sizing: border-box; }
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: ${C.border}; border-radius: 4px; }
+      `}</style>
+
+      {/* ── Modals ─────────────────────────────────────────────────── */}
+      {modal === "createProject" && <ProjectModal mode="create" onClose={() => setModal(null)} onSave={handleCreateProject} C={C} />}
+      {modal === "editProject"   && editTarget && <ProjectModal mode="edit" project={editTarget} onClose={() => { setModal(null); setEditTarget(null); }} onSave={handleUpdateProject} C={C} />}
+      {modal === "newApp"        && <NewAppModal projectId={activeProject} onClose={() => setModal(null)} onCreated={handleAppCreated} C={C} />}
+      {modal === "deleteApp"     && deleteAppTarget && <DeleteAppModal app={deleteAppTarget} onClose={() => { setModal(null); setDeleteAppTarget(null); }} onConfirm={handleDeleteAppConfirmed} C={C} />}
+
+      {/* ── Sidebar ────────────────────────────────────────────────── */}
+      <div style={{ width: sidebarW, flexShrink: 0, background: C.bgSub, borderRight: `1px solid ${C.border}`, display: "flex", flexDirection: "column", position: "relative", transition: "width 0.05s", overflow: "hidden" }}>
+
         {/* Logo */}
-        <div className="flex items-center gap-2 px-5 py-4 border-b border-indigo-500/10">
-          <div className="w-7 h-7 rounded-lg bg-indigo-600 flex items-center justify-center glow-indigo">
-            <Sparkles className="w-3.5 h-3.5 text-white" />
+        <div style={{ padding: collapsed ? "18px 0" : "18px 16px", borderBottom: `1px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: collapsed ? "center" : "flex-start", gap: 10 }}>
+          <div style={{ width: 34, height: 34, flexShrink: 0, borderRadius: 10, background: `linear-gradient(135deg, ${C.accent}, #6d28d9)`, display: "flex", alignItems: "center", justifyContent: "center", boxShadow: `0 0 20px ${C.accentBg}` }}>
+            <Sparkles size={15} color="#fff" />
           </div>
-          <span className="font-mono text-sm font-bold text-white tracking-widest uppercase">Vanta</span>
-        </div>
-
-        {/* Projects list */}
-        <div className="flex-1 overflow-y-auto py-3">
-          <div className="flex items-center justify-between px-4 mb-2">
-            <span className="font-mono text-xs text-slate-600 uppercase tracking-widest">Projects</span>
-            <button
-              onClick={() => setModal('createProject')}
-              className="p-1 rounded text-slate-600 hover:text-indigo-400 transition-colors"
-              title="New project"
-            >
-              <Plus size={13} />
-            </button>
-          </div>
-          {projects.length === 0 ? (
-            <p className="px-4 text-xs text-slate-600 font-mono">No projects yet</p>
-          ) : (
-            projects.map(proj => (
-              <button
-                key={proj.id}
-                onClick={() => setActiveProject(proj.id)}
-                className={`w-full flex items-center gap-2 px-4 py-2.5 text-left transition-colors ${
-                  activeProject === proj.id
-                    ? 'bg-indigo-600/10 border-r-2 border-indigo-500 text-white'
-                    : 'text-slate-400 hover:bg-white/3 hover:text-slate-200'
-                }`}
-              >
-                {activeProject === proj.id
-                  ? <FolderOpen size={14} className="text-indigo-400 flex-shrink-0" />
-                  : <Folder size={14} className="flex-shrink-0" />}
-                <span className="text-sm truncate">{proj.name}</span>
-                <span className="ml-auto text-xs text-slate-600">
-                  {appsForProject(proj.id).length}
-                </span>
-              </button>
-            ))
+          {!collapsed && (
+            <span style={{ fontFamily: "JetBrains Mono, monospace", fontSize: 15, fontWeight: 800, letterSpacing: "0.18em", textTransform: "uppercase", background: dark ? "linear-gradient(135deg, #a78bfa, #7c3aed, #38bdf8)" : `linear-gradient(135deg, ${C.accent}, #6d28d9)`, WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text", whiteSpace: "nowrap" }}>
+              Vanta
+            </span>
           )}
         </div>
 
-        {/* User + sign out */}
-        <div className="p-4 border-t border-indigo-500/10">
-          <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-full bg-indigo-600/30 border border-indigo-500/30 flex items-center justify-center flex-shrink-0">
-              <span className="font-mono text-xs text-indigo-300 font-bold">
-                {user?.email?.[0]?.toUpperCase() || '?'}
-              </span>
+        {/* Projects */}
+        <div style={{ flex: 1, overflowY: "auto", padding: collapsed ? "12px 0" : "12px 0" }}>
+          {!collapsed && (
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 14px", marginBottom: 8 }}>
+              <span style={{ fontFamily: "JetBrains Mono, monospace", fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: C.t3 }}>Projects</span>
+              <button onClick={() => setModal("createProject")} title="New project"
+                style={{ width: 22, height: 22, borderRadius: 6, border: `1px solid ${C.border}`, background: "transparent", color: C.t3, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.15s" }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.color = C.accent; }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.t3; }}
+              >
+                <Plus size={11} />
+              </button>
             </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-xs text-slate-300 truncate">{user?.email}</p>
-            </div>
-            <button
-              onClick={signOut}
-              title="Sign out"
-              className="p-1.5 rounded text-slate-600 hover:text-slate-300 transition-colors"
+          )}
+
+          {collapsed && (
+            <button onClick={() => setModal("createProject")} title="New project"
+              style={{ width: "100%", display: "flex", justifyContent: "center", padding: "10px 0", background: "transparent", border: "none", cursor: "pointer" }}
             >
-              <LogOut size={13} />
+              <Plus size={14} color={C.t3} />
             </button>
-          </div>
+          )}
+
+          {projects.map(proj => {
+            const isActive = activeProject === proj.id;
+            const count = appsFor(proj.id).length;
+            return (
+              <button
+                key={proj.id}
+                onClick={() => setActiveProject(proj.id)}
+                title={collapsed ? proj.name : undefined}
+                style={{
+                  width: "100%", display: "flex", alignItems: "center",
+                  gap: collapsed ? 0 : 9,
+                  justifyContent: collapsed ? "center" : "flex-start",
+                  padding: collapsed ? "10px 0" : "9px 14px",
+                  border: "none", cursor: "pointer",
+                  background: isActive ? C.accentBg : "transparent",
+                  borderLeft: `2px solid ${isActive ? C.accent : "transparent"}`,
+                  transition: "all 0.12s",
+                  fontFamily: "Plus Jakarta Sans, sans-serif",
+                }}
+                onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = C.accentBg; }}
+                onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = "transparent"; }}
+              >
+                {/* Project color dot */}
+                <div style={{ width: 28, height: 28, flexShrink: 0, borderRadius: 8, background: isActive ? C.accentBg : C.border, border: `1px solid ${isActive ? C.borderHi : C.border}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  {isActive
+                    ? <FolderOpen size={13} color={C.accentLt} />
+                    : <Folder size={13} color={C.t3} />}
+                </div>
+                {!collapsed && (
+                  <>
+                    <span style={{ flex: 1, fontSize: 14, fontWeight: 700, color: isActive ? C.t1 : C.t2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {proj.name}
+                    </span>
+                    <span style={{ fontFamily: "JetBrains Mono, monospace", fontSize: 11, fontWeight: 700, color: isActive ? C.accentLt : C.t3, minWidth: 18, textAlign: "right" }}>
+                      {count}
+                    </span>
+                  </>
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Footer */}
+        <div style={{ padding: collapsed ? "12px 0" : "12px 14px", borderTop: `1px solid ${C.border}` }}>
+          {collapsed ? (
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10 }}>
+              <button onClick={toggleTheme} style={{ background: "transparent", border: "none", cursor: "pointer", color: C.t3, padding: 4 }}>
+                {dark ? <Sun size={13} /> : <Moon size={13} />}
+              </button>
+              <button onClick={signOut} style={{ background: "transparent", border: "none", cursor: "pointer", color: C.t3, padding: 4 }}>
+                <LogOut size={13} />
+              </button>
+            </div>
+          ) : (
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <div style={{ width: 30, height: 30, flexShrink: 0, borderRadius: 9, background: C.accentBg, border: `1px solid ${C.borderHi}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <span style={{ fontFamily: "JetBrains Mono, monospace", fontSize: 12, color: C.accentLt, fontWeight: 800 }}>{user?.email?.[0]?.toUpperCase() || "?"}</span>
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <p style={{ fontSize: 12, color: C.t2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontWeight: 600 }}>{user?.email}</p>
+                <p style={{ fontSize: 10, color: C.t3, fontFamily: "JetBrains Mono, monospace" }}>Owner</p>
+              </div>
+              <button onClick={toggleTheme} title={dark ? "Light" : "Dark"} style={{ background: "transparent", border: "none", cursor: "pointer", color: C.t3, padding: 4, transition: "color 0.15s" }}
+                onMouseEnter={e => e.currentTarget.style.color = C.t1}
+                onMouseLeave={e => e.currentTarget.style.color = C.t3}
+              >
+                {dark ? <Sun size={13} /> : <Moon size={13} />}
+              </button>
+              <button onClick={signOut} title="Sign out" style={{ background: "transparent", border: "none", cursor: "pointer", color: C.t3, padding: 4, transition: "color 0.15s" }}
+                onMouseEnter={e => e.currentTarget.style.color = C.t1}
+                onMouseLeave={e => e.currentTarget.style.color = C.t3}
+              >
+                <LogOut size={13} />
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Drag handle */}
+        <div
+          onMouseDown={onMouseDown}
+          style={{
+            position: "absolute", top: 0, right: -4, bottom: 0, width: 8,
+            cursor: "col-resize", zIndex: 10,
+            display: "flex", alignItems: "center", justifyContent: "center",
+          }}
+        >
+          <div style={{ width: 2, height: 40, borderRadius: 2, background: C.border, transition: "background 0.15s" }}
+            onMouseEnter={e => e.currentTarget.style.background = C.accent}
+            onMouseLeave={e => e.currentTarget.style.background = C.border}
+          />
         </div>
       </div>
 
-      {/* ── Main content ─────────────────────────────────────────────────── */}
-      <div className="flex-1 overflow-y-auto">
-        <div className="max-w-5xl mx-auto px-8 py-8">
-          {/* Project header */}
-          {selectedProject ? (
-            <div className="flex items-start justify-between mb-8">
-              <div>
-                <h1 className="text-2xl font-bold text-white">{selectedProject.name}</h1>
-                {selectedProject.description && (
-                  <p className="text-slate-500 text-sm mt-1">{selectedProject.description}</p>
+      {/* ── Main ───────────────────────────────────────────────────── */}
+      <div style={{ flex: 1, overflowY: "auto" }}>
+        <div style={{ maxWidth: 1120, margin: "0 auto", padding: "36px 40px" }}>
+
+          {/* Header */}
+          <div style={{ animation: "vFadeUp 0.28s ease both" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+              <Package size={14} color={C.accent} />
+              <span style={{ fontFamily: "JetBrains Mono, monospace", fontSize: 11, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: "0.1em" }}>Project</span>
+            </div>
+            <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginBottom: 32 }}>
+              <h1 style={{ fontSize: 32, fontWeight: 800, color: C.t1, letterSpacing: "-0.03em", lineHeight: 1 }}>
+                {selectedProject?.name || "Dashboard"}
+              </h1>
+              <div style={{ display: "flex", gap: 8 }}>
+                {selectedProject && (
+                  <>
+                    <button onClick={() => { setEditTarget(selectedProject); setModal("editProject"); }}
+                      style={{ padding: "9px 11px", borderRadius: 10, border: `1px solid ${C.border}`, background: "transparent", color: C.t2, cursor: "pointer", display: "flex", alignItems: "center", transition: "all 0.15s" }}
+                      onMouseEnter={e => { e.currentTarget.style.borderColor = C.borderHi; e.currentTarget.style.color = C.t1; }}
+                      onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.t2; }}
+                    >
+                      <Edit3 size={14} />
+                    </button>
+                    <button onClick={() => handleDeleteProject(selectedProject)}
+                      style={{ padding: "9px 11px", borderRadius: 10, border: "1px solid rgba(239,68,68,0.2)", background: "transparent", color: C.t3, cursor: "pointer", display: "flex", alignItems: "center", transition: "all 0.15s" }}
+                      onMouseEnter={e => { e.currentTarget.style.color = "#f87171"; e.currentTarget.style.borderColor = "rgba(239,68,68,0.45)"; }}
+                      onMouseLeave={e => { e.currentTarget.style.color = C.t3; e.currentTarget.style.borderColor = "rgba(239,68,68,0.2)"; }}
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </>
                 )}
-              </div>
-              <div className="flex items-center gap-2">
                 <button
-                  onClick={() => { setEditTarget(selectedProject); setModal('editProject'); }}
-                  className="p-2 rounded-lg border border-indigo-500/20 text-slate-500 hover:text-white hover:border-indigo-500/40 transition-colors"
-                  title="Edit project"
+                  onClick={() => selectedProject ? setModal("newApp") : setModal("createProject")}
+                  style={{
+                    display: "inline-flex", alignItems: "center", gap: 7,
+                    padding: "9px 20px", borderRadius: 10,
+                    background: `linear-gradient(135deg, ${C.accent}, #6d28d9)`,
+                    border: "none", color: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer",
+                    boxShadow: `0 4px 18px ${C.accentBg}`,
+                    fontFamily: "Plus Jakarta Sans, sans-serif",
+                  }}
                 >
-                  <Edit3 size={14} />
-                </button>
-                <button
-                  onClick={() => handleDeleteProject(selectedProject)}
-                  className="p-2 rounded-lg border border-red-500/20 text-slate-500 hover:text-red-400 hover:border-red-500/40 transition-colors"
-                  title="Delete project"
-                >
-                  <Trash2 size={14} />
-                </button>
-                <button
-                  onClick={() => setModal('newApp')}
-                  className="flex items-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-sm font-semibold glow-indigo hover:opacity-90 transition-opacity"
-                >
-                  <Plus size={14} /> New RAG App
+                  <Plus size={14} /> {selectedProject ? "New RAG App" : "Create Project"}
                 </button>
               </div>
             </div>
+          </div>
+
+          {/* Delete error */}
+          {deleteError && (
+            <div style={{ marginBottom: 20, padding: "10px 16px", borderRadius: 10, background: C.amberBg, border: `1px solid ${C.amber}40`, color: C.amber, fontSize: 13, fontWeight: 600, display: "flex", justifyContent: "space-between" }}>
+              {deleteError}
+              <button onClick={() => setDeleteError("")} style={{ background: "none", border: "none", color: C.amber, cursor: "pointer" }}>✕</button>
+            </div>
+          )}
+
+          {/* Stat cards */}
+          {selectedProject && (
+            <div style={{ display: "flex", gap: 14, marginBottom: 28 }}>
+              <StatCard value={allApps.length} label="Total" desc="RAG Apps in this project" icon={<Package />} iconBg={C.accentBg} iconColor={C.accentLt} C={C} />
+              <StatCard value={allApps.filter(a => a.status === "deployed").length} label="Active" desc="Currently active" icon={<CheckCircle />} iconBg={C.greenBg} iconColor={C.green} C={C} />
+              <StatCard value={allApps.filter(a => a.status === "draft").length} label="Draft" desc="Work in progress" icon={<Timer />} iconBg={C.amberBg} iconColor={C.amber} C={C} />
+            </div>
+          )}
+
+          {/* Search + view toggle */}
+          {selectedProject && allApps.length > 0 && (
+            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 24, animation: "vFadeUp 0.32s ease both" }}>
+              <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 10, background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: "9px 14px", boxShadow: C.shadow }}>
+                <Search size={14} color={C.t3} />
+                <input
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                  placeholder="Search RAG Apps..."
+                  style={{ flex: 1, background: "transparent", border: "none", color: C.t1, fontSize: 14, outline: "none", fontFamily: "Plus Jakarta Sans, sans-serif" }}
+                />
+              </div>
+              <div style={{ display: "flex", gap: 4, background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: 4 }}>
+                {[["grid", <LayoutGrid size={14} />], ["list", <List size={14} />]].map(([mode, icon]) => (
+                  <button key={mode} onClick={() => setViewMode(mode)}
+                    style={{ width: 32, height: 32, borderRadius: 7, border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", background: viewMode === mode ? C.accentBg : "transparent", color: viewMode === mode ? C.accentLt : C.t3, transition: "all 0.15s" }}
+                  >{icon}</button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Apps */}
+          {selectedProject ? (
+            filteredApps.length === 0 ? (
+              <div style={{ border: `1px dashed ${C.border}`, borderRadius: 16, padding: "64px 24px", textAlign: "center", background: C.accentBg }}>
+                <div style={{ width: 50, height: 50, borderRadius: 14, background: C.accentBg, border: `1px solid ${C.borderHi}`, margin: "0 auto 16px", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <Bot size={22} color={C.accentLt} />
+                </div>
+                <p style={{ fontSize: 15, color: C.t2, marginBottom: 18, fontWeight: 600 }}>
+                  {search ? "No apps match your search." : "No RAG apps in this project."}
+                </p>
+                {!search && (
+                  <button onClick={() => setModal("newApp")}
+                    style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "9px 20px", borderRadius: 10, background: C.accentBg, border: `1px solid ${C.borderHi}`, color: C.accentLt, fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "Plus Jakarta Sans, sans-serif" }}
+                  >
+                    <Plus size={14} /> Create your first app
+                  </button>
+                )}
+              </div>
+            ) : (
+              <div style={{
+                display: viewMode === "grid" ? "grid" : "flex",
+                gridTemplateColumns: viewMode === "grid" ? "repeat(auto-fill, minmax(300px, 1fr))" : undefined,
+                flexDirection: "column",
+                gap: 14,
+              }}>
+                {filteredApps.map((app, i) => (
+                  <AppCard
+                    key={app.id} app={app} index={i} C={C}
+                    onArchitect={a => navigate(createPageUrl(`Architect?id=${a.id}`))}
+                    onEdit={a => navigate(createPageUrl(`Editor?id=${a.id}`))}
+                    onDeploy={a => navigate(createPageUrl(`Deploy?id=${a.id}`))}
+                    onDelete={requestDeleteApp}
+                  />
+                ))}
+              </div>
+            )
           ) : (
-            <div className="mb-8">
-              <h1 className="text-2xl font-bold text-white">Dashboard</h1>
-              <p className="text-slate-500 text-sm mt-1">Create a project to get started.</p>
-              <button
-                onClick={() => setModal('createProject')}
-                className="mt-4 flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-sm font-semibold"
+            <div style={{ border: `1px dashed ${C.border}`, borderRadius: 16, padding: "64px 24px", textAlign: "center" }}>
+              <p style={{ fontSize: 15, color: C.t3, marginBottom: 18 }}>No projects yet.</p>
+              <button onClick={() => setModal("createProject")}
+                style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "9px 20px", borderRadius: 10, background: `linear-gradient(135deg, ${C.accent}, #6d28d9)`, border: "none", color: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "Plus Jakarta Sans, sans-serif" }}
               >
                 <Plus size={14} /> Create Project
               </button>
             </div>
-          )}
-
-          {/* Delete error banner */}
-          {deleteError && (
-            <div className="mb-6 px-4 py-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400 text-sm flex items-center justify-between">
-              {deleteError}
-              <button onClick={() => setDeleteError('')} className="ml-4 text-amber-500 hover:text-amber-300">✕</button>
-            </div>
-          )}
-
-          {/* RAG Apps grid */}
-          {selectedProject && (
-            <>
-              {selectedApps.length === 0 ? (
-                <div className="neon-border rounded-2xl p-12 text-center">
-                  <Zap className="w-10 h-10 text-slate-700 mx-auto mb-3" />
-                  <p className="text-slate-500 text-sm">No RAG apps in this project yet.</p>
-                  <button
-                    onClick={() => setModal('newApp')}
-                    className="mt-4 px-5 py-2.5 rounded-xl bg-indigo-600/20 border border-indigo-500/30 text-indigo-400 text-sm hover:bg-indigo-600/30 transition-colors"
-                  >
-                    Create your first app
-                  </button>
-                </div>
-              ) : (
-                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {selectedApps.map(app => {
-                    const sc = STATUS_COLORS[app.status] || STATUS_COLORS.draft;
-                    return (
-                      <div
-                        key={app.id}
-                        className="group neon-border rounded-xl bg-[#0d1117]/60 p-5 hover:bg-[#0d1117]/90 transition-colors flex flex-col"
-                      >
-                        <div className="flex items-start justify-between mb-3">
-                          <div className="flex items-center gap-2">
-                            <div
-                              className="w-2 h-2 rounded-full flex-shrink-0"
-                              style={{ background: sc.dot, boxShadow: `0 0 6px ${sc.glow}` }}
-                            />
-                            <span className="font-mono text-xs" style={{ color: sc.dot }}>
-                              {sc.label}
-                            </span>
-                          </div>
-                          {/* Architect status badge */}
-                          {app.architect_status && app.architect_status !== 'pending' && (
-                            <span className={`font-mono text-xs px-1.5 py-0.5 rounded ${
-                              app.architect_status === 'approved'
-                                ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                                : app.architect_status === 'ready'
-                                ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20'
-                                : 'bg-slate-800 text-slate-500'
-                            }`}>
-                              {app.architect_status === 'approved' ? '✓ arch' : app.architect_status === 'ready' ? 'arch ready' : ''}
-                            </span>
-                          )}
-                        </div>
-
-                        <h3 className="text-white font-semibold text-sm mb-1 leading-snug">{app.title}</h3>
-                        {app.description && (
-                          <p className="text-slate-500 text-xs leading-relaxed mb-3 line-clamp-2">
-                            {app.description}
-                          </p>
-                        )}
-
-                        <div className="flex items-center gap-1 text-slate-600 text-xs mt-auto mb-3">
-                          <Clock size={10} />
-                          <span>{timeAgo(app.updated_at || app.created_at)}</span>
-                        </div>
-
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => navigate(createPageUrl(`Architect?id=${app.id}`))}
-                            className="flex-1 py-2 rounded-lg border border-purple-500/25 text-purple-400 text-xs font-semibold hover:bg-purple-600/10 transition-colors flex items-center justify-center gap-1.5"
-                            title="AI RAG Architect"
-                          >
-                            <Cpu size={11} /> Architect
-                          </button>
-                          <button
-                            onClick={() => navigate(createPageUrl(`Editor?id=${app.id}`))}
-                            className="flex-1 py-2 rounded-lg border border-indigo-500/25 text-indigo-400 text-xs font-semibold hover:bg-indigo-600/10 transition-colors flex items-center justify-center gap-1.5"
-                          >
-                            <Edit3 size={11} /> Editor
-                          </button>
-                          {app.status === 'deployed' && app.embed_id && (
-                            <button
-                              onClick={() => navigate(createPageUrl(`Deploy?id=${app.id}`))}
-                              className="flex-1 py-2 rounded-lg border border-emerald-500/25 text-emerald-400 text-xs font-semibold hover:bg-emerald-600/10 transition-colors flex items-center justify-center gap-1.5"
-                            >
-                              <Rocket size={11} /> View
-                            </button>
-                          )}
-                          <button
-                            onClick={(e) => requestDeleteApp(app, e)}
-                            className="py-2 px-2.5 rounded-lg border border-red-500/20 text-red-500/60 text-xs hover:text-red-400 hover:border-red-500/40 transition-colors"
-                            title="Delete app"
-                          >
-                            <Trash2 size={11} />
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </>
           )}
         </div>
       </div>

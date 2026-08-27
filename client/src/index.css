@@ -2,8 +2,13 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── Google Fonts ──────────────────────────────────────────────────── */
+/* Space Grotesk: display / UI headings                                 */
+/* JetBrains Mono: code, labels, badges                                 */
+
 @layer base {
   :root {
+    /* shadcn tokens (light) */
     --background: 0 0% 100%;
     --foreground: 0 0% 3.9%;
     --card: 0 0% 100%;
@@ -23,11 +28,6 @@
     --border: 0 0% 89.8%;
     --input: 0 0% 89.8%;
     --ring: 0 0% 3.9%;
-    --chart-1: 12 76% 61%;
-    --chart-2: 173 58% 39%;
-    --chart-3: 197 37% 24%;
-    --chart-4: 43 74% 66%;
-    --chart-5: 27 87% 67%;
     --radius: 0.5rem;
     --sidebar-background: 0 0% 98%;
     --sidebar-foreground: 240 5.3% 26.1%;
@@ -37,9 +37,24 @@
     --sidebar-accent-foreground: 240 5.9% 10%;
     --sidebar-border: 220 13% 91%;
     --sidebar-ring: 217.2 91.2% 59.8%;
+
+    /* Vanta design tokens — light */
+    --v-bg:        #f5f4ff;
+    --v-bg-sub:    #ebe9ff;
+    --v-surface:   #ffffff;
+    --v-border:    rgba(0,0,0,0.09);
+    --v-border-hi: rgba(124,58,237,0.4);
+    --v-text-1:    #1a1730;
+    --v-text-2:    #5a567a;
+    --v-text-3:    #b0adc8;
+    --v-accent:    #7c3aed;
+    --v-accent-bg: rgba(124,58,237,0.07);
+    --v-shadow:    0 2px 16px rgba(0,0,0,0.08);
+    --v-shadow-lg: 0 8px 32px rgba(0,0,0,0.12);
   }
 
   .dark {
+    /* shadcn tokens */
     --background: 0 0% 3.9%;
     --foreground: 0 0% 98%;
     --card: 0 0% 3.9%;
@@ -59,11 +74,6 @@
     --border: 0 0% 14.9%;
     --input: 0 0% 14.9%;
     --ring: 0 0% 83.1%;
-    --chart-1: 220 70% 50%;
-    --chart-2: 160 60% 45%;
-    --chart-3: 30 80% 55%;
-    --chart-4: 280 65% 60%;
-    --chart-5: 340 75% 55%;
     --sidebar-background: 240 5.9% 10%;
     --sidebar-foreground: 240 4.8% 95.9%;
     --sidebar-primary: 224.3 76.3% 48%;
@@ -72,17 +82,115 @@
     --sidebar-accent-foreground: 240 4.8% 95.9%;
     --sidebar-border: 240 3.7% 15.9%;
     --sidebar-ring: 217.2 91.2% 59.8%;
+
+    /* Vanta design tokens — dark */
+    --v-bg:        #0e0e1a;
+    --v-bg-sub:    #13132b;
+    --v-surface:   #181830;
+    --v-border:    rgba(255,255,255,0.07);
+    --v-border-hi: rgba(139,92,246,0.5);
+    --v-text-1:    #f0efff;
+    --v-text-2:    #9d9bb8;
+    --v-text-3:    #4d4b6b;
+    --v-accent:    #7c3aed;
+    --v-accent-bg: rgba(124,58,237,0.12);
+    --v-shadow:    0 4px 24px rgba(0,0,0,0.5);
+    --v-shadow-lg: 0 8px 40px rgba(0,0,0,0.6);
   }
-}
 
-
-
-@layer base {
   * {
     @apply border-border outline-ring/50;
+    box-sizing: border-box;
   }
 
   body {
     @apply bg-background text-foreground;
-  }
+    font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
+    font-weight: 500;
+  }}
+
+/* ── Vanta keyframes ─────────────────────────────────────────────────── */
+
+@keyframes v-fade-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes v-slide-in {
+  from { opacity: 0; transform: translateX(-8px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes v-card-in {
+  from { opacity: 0; transform: translateY(14px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes v-shimmer {
+  0%   { background-position: -200% center; }
+  100% { background-position:  200% center; }
+}
+
+@keyframes v-pulse-ring {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(99,102,241,0.4); }
+  50%       { box-shadow: 0 0 0 6px rgba(99,102,241,0); }
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ── Utility classes ─────────────────────────────────────────────────── */
+
+.v-fade-in    { animation: v-fade-in  0.3s ease both; }
+.v-slide-in   { animation: v-slide-in 0.25s ease both; }
+.v-card-in    { animation: v-card-in  0.35s ease both; }
+
+/* Shimmer loading skeleton */
+.v-shimmer {
+  background: linear-gradient(90deg,
+    var(--v-border) 25%,
+    var(--v-border-hi) 50%,
+    var(--v-border) 75%
+  );
+  background-size: 200% 100%;
+  animation: v-shimmer 1.6s infinite;
+}
+
+/* Clipped-corner card — the signature design element */
+.v-clip {
+  clip-path: polygon(0 0, calc(100% - 14px) 0, 100% 14px, 100% 100%, 0 100%);
+}
+.v-clip-sm {
+  clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 0 100%);
+}
+.v-clip-lg {
+  clip-path: polygon(0 0, calc(100% - 20px) 0, 100% 20px, 100% 100%, 0 100%);
+}
+
+/* Noise texture overlay (subtle) */
+.v-noise::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+  pointer-events: none;
+  border-radius: inherit;
+}
+
+/* Accent gradient text */
+.v-gradient-text {
+  background: linear-gradient(135deg, #6366f1 0%, #a78bfa 50%, #38bdf8 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Mono label style */
+.v-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
 }
