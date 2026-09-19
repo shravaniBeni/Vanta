@@ -74,17 +74,17 @@ export default function Chat() {
 
   if (!chatbot) {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: '#080c14', color: '#94a3b8', fontFamily: 'Inter, sans-serif', fontSize: 14 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: '#09090f', color: '#94a3b8', fontFamily: 'Inter, sans-serif', fontSize: 14 }}>
         Loading chatbot...
       </div>
     );
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: '#080c14', fontFamily: 'Inter, sans-serif' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: '#09090f', fontFamily: 'Inter, sans-serif' }}>
 
       {/* Header */}
-      <div style={{ padding: '12px 20px', background: '#0a0e18', borderBottom: '1px solid rgba(99,102,241,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+      <div style={{ padding: '12px 20px', background: '#0d0d1c', borderBottom: '1px solid rgba(124,58,237,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
         <div>
           <div style={{ fontSize: 15, fontWeight: 700, color: '#f1f5f9' }}>{chatbot.title}</div>
           <div style={{ fontSize: 11, color: '#475569', marginTop: 1 }}>{chatbot.description}</div>
@@ -93,8 +93,8 @@ export default function Chat() {
           onClick={() => setAmdLocal(p => !p)}
           style={{
             display: 'flex', alignItems: 'center', gap: 6, padding: '6px 11px',
-            background: amdLocal ? 'rgba(239,68,68,0.12)' : 'rgba(99,102,241,0.08)',
-            border: `1px solid ${amdLocal ? 'rgba(239,68,68,0.35)' : 'rgba(99,102,241,0.25)'}`,
+            background: amdLocal ? 'rgba(239,68,68,0.12)' : 'rgba(124,58,237,0.08)',
+            border: `1px solid ${amdLocal ? 'rgba(239,68,68,0.35)' : 'rgba(124,58,237,0.25)'}`,
             borderRadius: 8, cursor: 'pointer', transition: 'all 0.15s',
           }}
         >
@@ -118,8 +118,8 @@ export default function Chat() {
               <div style={{
                 maxWidth: '78%', padding: '10px 14px',
                 borderRadius: msg.role === 'user' ? '14px 4px 14px 14px' : '4px 14px 14px 14px',
-                background: msg.role === 'user' ? 'rgba(99,102,241,0.7)' : 'rgba(255,255,255,0.05)',
-                border: `1px solid ${msg.role === 'user' ? 'rgba(99,102,241,0.5)' : 'rgba(255,255,255,0.08)'}`,
+                background: msg.role === 'user' ? 'rgba(124,58,237,0.7)' : 'rgba(255,255,255,0.05)',
+                border: `1px solid ${msg.role === 'user' ? 'rgba(124,58,237,0.5)' : 'rgba(255,255,255,0.08)'}`,
                 fontSize: 13, color: msg.role === 'user' ? '#fff' : '#cbd5e1',
                 lineHeight: 1.55, whiteSpace: 'pre-wrap',
               }}>
@@ -147,7 +147,7 @@ export default function Chat() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <div style={{ padding: '10px 14px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '4px 14px 14px 14px', display: 'flex', gap: 5, alignItems: 'center' }}>
               {[0, 1, 2].map(d => (
-                <div key={d} style={{ width: 5, height: 5, borderRadius: '50%', background: '#6366f1', animation: `bounce 1s ease-in-out ${d * 0.18}s infinite` }} />
+                <div key={d} style={{ width: 5, height: 5, borderRadius: '50%', background: '#7c3aed', animation: `bounce 1s ease-in-out ${d * 0.18}s infinite` }} />
               ))}
             </div>
           </div>
@@ -156,29 +156,29 @@ export default function Chat() {
       </div>
 
       {/* Input */}
-      <div style={{ padding: '12px 20px', background: '#0a0e18', borderTop: '1px solid rgba(99,102,241,0.15)', display: 'flex', gap: 10, alignItems: 'center', flexShrink: 0 }}>
+      <div style={{ padding: '12px 20px', background: '#0d0d1c', borderTop: '1px solid rgba(124,58,237,0.15)', display: 'flex', gap: 10, alignItems: 'center', flexShrink: 0 }}>
         <input
           value={input}
           onChange={e => setInput(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && handleSend()}
           placeholder="Type your message..."
           disabled={loading}
-          style={{ flex: 1, padding: '10px 14px', background: '#060a10', border: '1px solid rgba(99,102,241,0.25)', borderRadius: 10, color: '#e2e8f0', fontSize: 13, outline: 'none', fontFamily: 'Inter, sans-serif' }}
+          style={{ flex: 1, padding: '10px 14px', background: '#0c0c1a', border: '1px solid rgba(124,58,237,0.25)', borderRadius: 10, color: '#e2e8f0', fontSize: 13, outline: 'none', fontFamily: 'Inter, sans-serif' }}
         />
         <button
           onClick={handleSend}
           disabled={loading || !input.trim()}
           style={{
             width: 38, height: 38,
-            background: input.trim() && !loading ? 'rgba(99,102,241,0.8)' : 'rgba(99,102,241,0.12)',
-            border: '1px solid rgba(99,102,241,0.3)', borderRadius: 10,
+            background: input.trim() && !loading ? 'rgba(124,58,237,0.8)' : 'rgba(124,58,237,0.12)',
+            border: '1px solid rgba(124,58,237,0.3)', borderRadius: 10,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             cursor: input.trim() && !loading ? 'pointer' : 'default',
             transition: 'all 0.15s', flexShrink: 0,
           }}
         >
           {loading
-            ? <Loader2 size={14} color="#6366f1" style={{ animation: 'spin 1s linear infinite' }} />
+            ? <Loader2 size={14} color="#7c3aed" style={{ animation: 'spin 1s linear infinite' }} />
             : <Send size={14} color={input.trim() ? '#fff' : '#334155'} />}
         </button>
       </div>
@@ -193,7 +193,7 @@ export default function Chat() {
 
 function ConfidenceBar({ value }) {
   const pct = Math.max(0, Math.min(1, value));
-  const color = pct > 0.7 ? '#22c55e' : pct > 0.45 ? '#f59e0b' : '#ef4444';
+  const color = pct > 0.7 ? '#22c55e' : pct > 0.45 ? '#a78bfa' : '#ef4444';
   return (
     <div style={{ width: 60, height: 3, background: 'rgba(255,255,255,0.1)', borderRadius: 2, overflow: 'hidden' }}>
       <div style={{ width: `${pct * 100}%`, height: '100%', background: color, borderRadius: 2, transition: 'width 0.4s' }} />

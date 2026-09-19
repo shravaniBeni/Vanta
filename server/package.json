@@ -3,8 +3,9 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "node --watch src/index.js",
+    "dev": "node src/index.js",
     "start": "node src/index.js",
+    "safe-start": "node start.js",
     "verify:embeddings": "node scripts/verify-embeddings.js",
     "verify:phase3": "node scripts/verify-phase3.js",
     "verify:phase4": "node scripts/verify-phase4.js",

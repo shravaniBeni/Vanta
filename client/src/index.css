@@ -107,7 +107,71 @@
     @apply bg-background text-foreground;
     font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
     font-weight: 500;
-  }}
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   GLOBAL PALETTE OVERRIDE
+   Maps hardcoded dark colors from all pages to the Vanta navy/violet
+   palette without modifying individual page files.
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* grid-bg: violet dot grid */
+.grid-bg {
+  background-image: radial-gradient(circle, rgba(124,58,237,0.12) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+
+/* neon-border → violet */
+.neon-border {
+  border: 1px solid rgba(124,58,237,0.2) !important;
+  box-shadow: 0 0 0 1px rgba(124,58,237,0.05), inset 0 0 0 1px rgba(255,255,255,0.02);
+}
+
+/* glow-indigo → violet */
+.glow-indigo {
+  box-shadow: 0 0 20px rgba(124,58,237,0.45), 0 0 40px rgba(124,58,237,0.15) !important;
+}
+
+/* bg overrides — hardcoded values used in Home/Login/Chat/etc */
+.bg-\[\#080c14\], [style*="background: '#080c14'"], [style*="background: \"#080c14\""] {
+  background-color: #09090f !important;
+}
+
+/* Ensure all min-h-screen page wrappers get new bg */
+body { background-color: #09090f; }
+.min-h-screen { background-color: #09090f; }
+
+/* Inline bg used in Chat/Editor pages — can't target directly,
+   but body bg ensures no white flash */
+
+/* Shadcn variable overrides for dark mode → new palette */
+:root {
+  /* HSL format: hue saturation% lightness%
+     #09090f = hsl(240 20% 6%)    → near-black navy
+     #eeeeff = hsl(240 100% 97%)  → cool near-white
+     #13131f = hsl(240 20% 10%)   → dark surface
+     #8888aa = hsl(240 14% 60%)   → muted text    */
+  --background:       240 20% 6%;
+  --foreground:       240 60% 97%;
+  --card:             240 20% 10%;
+  --card-foreground:  240 60% 97%;
+  --popover:          240 20% 10%;
+  --popover-foreground: 240 60% 97%;
+  --muted:            240 15% 16%;
+  --muted-foreground: 240 14% 60%;
+  --border:           240 15% 16%;
+  --input:            240 15% 16%;
+  --ring:             262 83% 58%;
+  --primary:          262 83% 58%;
+  --primary-foreground: 0 0% 100%;
+  --accent:           240 15% 16%;
+  --accent-foreground: 262 50% 80%;
+  --secondary:        240 15% 16%;
+  --secondary-foreground: 240 60% 97%;
+  --destructive:      0 70% 50%;
+  --destructive-foreground: 0 0% 100%;
+}
 
 /* ── Vanta keyframes ─────────────────────────────────────────────────── */
 
@@ -194,3 +258,21 @@
   letter-spacing: 0.1em;
   text-transform: uppercase;
 }
+
+/* ── Kill bright yellow/amber text globally ─────────────────────────────────
+ * Any remaining yellow/amber text classes get replaced with violet tones.
+ * These are from legacy Tailwind usage in non-dashboard pages.
+ * ─────────────────────────────────────────────────────────────────────────── */
+.text-yellow-400, .text-yellow-500, .text-yellow-300,
+.text-amber-400,  .text-amber-500,  .text-amber-300  { color: #a78bfa !important; }
+.text-yellow-600, .text-amber-600                    { color: #8b5cf6 !important; }
+.bg-yellow-500\/70, .bg-yellow-500                   { background-color: rgba(100,100,140,0.5) !important; }
+.border-yellow-500\/70                               { border-color: rgba(139,92,246,0.4) !important; }
+
+/* Emerald terminal text — softer violet tone */
+.text-emerald-400   { color: #a78bfa !important; }
+.text-emerald-400\/80 { color: rgba(167,139,250,0.8) !important; }
+.text-emerald-400\/70 { color: rgba(167,139,250,0.7) !important; }
+
+/* pulse-dot (was bright green) → violet */
+.pulse-dot { background-color: #a78bfa !important; }

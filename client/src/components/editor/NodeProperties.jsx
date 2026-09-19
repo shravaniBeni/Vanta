@@ -5,8 +5,8 @@ import { documentsApi } from '@/api/apiClient';
 const inputStyle = {
   width: '100%',
   padding: '7px 10px',
-  background: '#060a10',
-  border: '1px solid rgba(99,102,241,0.25)',
+  background: '#0c0c1a',
+  border: '1px solid rgba(124,58,237,0.25)',
   borderRadius: 7,
   color: '#e2e8f0',
   fontSize: 12,
@@ -46,14 +46,14 @@ function Toggle({ checked, onChange }) {
       onClick={() => onChange(!checked)}
       style={{
         width: 36, height: 20,
-        background: checked ? '#6366f1' : '#1e293b',
-        border: `1px solid ${checked ? '#6366f1' : 'rgba(99,102,241,0.3)'}`,
+        background: checked ? '#7c3aed' : '#1e293b',
+        border: `1px solid ${checked ? '#7c3aed' : 'rgba(124,58,237,0.3)'}`,
         borderRadius: 10,
         position: 'relative',
         cursor: 'pointer',
         transition: 'all 0.2s',
         flexShrink: 0,
-        boxShadow: checked ? '0 0 10px rgba(99,102,241,0.4)' : 'none'
+        boxShadow: checked ? '0 0 10px rgba(124,58,237,0.4)' : 'none'
       }}
     >
       <div style={{
@@ -177,8 +177,8 @@ export default function NodeProperties({ node, chatbotId, onUpdate, onClose }) {
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
                     {params.documents.map((doc, i) => {
                       const statusColor = doc.status === 'indexed' ? '#22c55e'
-                        : doc.status === 'profiled' ? '#6366f1'
-                        : doc.status === 'error' ? '#ef4444' : '#f59e0b';
+                        : doc.status === 'profiled' ? '#7c3aed'
+                        : doc.status === 'error' ? '#ef4444' : '#a78bfa';
                       return (
                         <div key={doc.id || i} style={{
                           display: 'flex', alignItems: 'center', gap: 7,
@@ -231,24 +231,24 @@ export default function NodeProperties({ node, chatbotId, onUpdate, onClose }) {
                 style={{
                   width: '100%',
                   padding: '18px 12px',
-                  background: 'rgba(99,102,241,0.05)',
-                  border: '1px dashed rgba(99,102,241,0.35)',
+                  background: 'rgba(124,58,237,0.05)',
+                  border: '1px dashed rgba(124,58,237,0.35)',
                   borderRadius: 9,
                   cursor: uploading ? 'wait' : 'pointer',
                   display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
                   transition: 'all 0.15s',
                 }}
-                onMouseEnter={e => { if (!uploading) e.currentTarget.style.background = 'rgba(99,102,241,0.1)'; }}
-                onMouseLeave={e => e.currentTarget.style.background = 'rgba(99,102,241,0.05)'}
+                onMouseEnter={e => { if (!uploading) e.currentTarget.style.background = 'rgba(124,58,237,0.1)'; }}
+                onMouseLeave={e => e.currentTarget.style.background = 'rgba(124,58,237,0.05)'}
               >
                 {uploading ? (
                   <>
-                    <div style={{ width: 18, height: 18, border: '2px solid #6366f1', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
-                    <span style={{ fontSize: 11, color: '#6366f1', fontFamily: 'JetBrains Mono, monospace' }}>Uploading...</span>
+                    <div style={{ width: 18, height: 18, border: '2px solid #7c3aed', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
+                    <span style={{ fontSize: 11, color: '#7c3aed', fontFamily: 'JetBrains Mono, monospace' }}>Uploading...</span>
                   </>
                 ) : (
                   <>
-                    <Upload size={18} color="#6366f1" />
+                    <Upload size={18} color="#7c3aed" />
                     <span style={{ fontSize: 11, color: '#94a3b8' }}>Click to upload files</span>
                     <span style={{ fontSize: 9, color: '#475569', fontFamily: 'JetBrains Mono, monospace' }}>PDF, DOCX, TXT, PPT, CSV, images...</span>
                   </>
@@ -259,7 +259,7 @@ export default function NodeProperties({ node, chatbotId, onUpdate, onClose }) {
             {/* Loading / error state */}
             {docsLoading && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 0' }}>
-                <div style={{ width: 12, height: 12, border: '2px solid #6366f1', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
+                <div style={{ width: 12, height: 12, border: '2px solid #7c3aed', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
                 <span style={{ fontSize: 10, color: '#475569', fontFamily: 'JetBrains Mono, monospace' }}>Loading documents...</span>
               </div>
             )}
@@ -277,11 +277,11 @@ export default function NodeProperties({ node, chatbotId, onUpdate, onClose }) {
                     <div key={f.id || i} style={{
                       display: 'flex', alignItems: 'center', gap: 7,
                       padding: '6px 9px',
-                      background: f.status === 'error' ? 'rgba(239,68,68,0.06)' : 'rgba(99,102,241,0.06)',
-                      border: `1px solid ${f.status === 'error' ? 'rgba(239,68,68,0.2)' : 'rgba(99,102,241,0.15)'}`,
+                      background: f.status === 'error' ? 'rgba(239,68,68,0.06)' : 'rgba(124,58,237,0.06)',
+                      border: `1px solid ${f.status === 'error' ? 'rgba(239,68,68,0.2)' : 'rgba(124,58,237,0.15)'}`,
                       borderRadius: 7,
                     }}>
-                      <FileText size={11} color={f.status === 'error' ? '#ef4444' : '#6366f1'} style={{ flexShrink: 0 }} />
+                      <FileText size={11} color={f.status === 'error' ? '#ef4444' : '#7c3aed'} style={{ flexShrink: 0 }} />
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontSize: 10, color: '#cbd5e1', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name}</div>
                         <div style={{ fontSize: 9, color: '#475569', fontFamily: 'JetBrains Mono, monospace' }}>
@@ -537,7 +537,7 @@ export default function NodeProperties({ node, chatbotId, onUpdate, onClose }) {
                   <Toggle checked={params.grounding_required || false} onChange={v => set('grounding_required', v)} />
                 </div>
               </Field>
-              <div style={{ padding: '6px 8px', background: 'rgba(99,102,241,0.06)', border: '1px solid rgba(99,102,241,0.15)', borderRadius: 7, marginTop: 4 }}>
+              <div style={{ padding: '6px 8px', background: 'rgba(124,58,237,0.06)', border: '1px solid rgba(124,58,237,0.15)', borderRadius: 7, marginTop: 4 }}>
                 <p style={{ fontSize: 9, color: '#94a3b8', fontFamily: 'JetBrains Mono, monospace', margin: 0 }}>
                   response_style and temperature are independent fields. Generated by Architect v{params.architect_version}.
                 </p>
@@ -671,8 +671,8 @@ export default function NodeProperties({ node, chatbotId, onUpdate, onClose }) {
     <div style={{
       width: 260,
       height: '100%',
-      background: '#0a0e18',
-      borderLeft: '1px solid rgba(99,102,241,0.2)',
+      background: '#0d0d1c',
+      borderLeft: '1px solid rgba(124,58,237,0.2)',
       display: 'flex',
       flexDirection: 'column',
       fontFamily: 'Inter, sans-serif',
@@ -681,16 +681,16 @@ export default function NodeProperties({ node, chatbotId, onUpdate, onClose }) {
       {/* Header */}
       <div style={{
         padding: '14px',
-        borderBottom: '1px solid rgba(99,102,241,0.15)',
+        borderBottom: '1px solid rgba(124,58,237,0.15)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
         position: 'sticky', top: 0,
-        background: '#0a0e18',
+        background: '#0d0d1c',
         zIndex: 10,
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-          <Settings size={13} color="#6366f1" />
+          <Settings size={13} color="#7c3aed" />
           <span style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', letterSpacing: '0.1em', textTransform: 'uppercase', fontFamily: 'JetBrains Mono, monospace' }}>
             Properties
           </span>
@@ -709,13 +709,13 @@ export default function NodeProperties({ node, chatbotId, onUpdate, onClose }) {
         {/* Node identity */}
         <div style={{
           padding: '10px 12px',
-          background: 'rgba(99,102,241,0.08)',
-          border: '1px solid rgba(99,102,241,0.2)',
+          background: 'rgba(124,58,237,0.08)',
+          border: '1px solid rgba(124,58,237,0.2)',
           borderRadius: 9,
           marginBottom: 16,
         }}>
           <div style={{ fontSize: 13, fontWeight: 600, color: '#e2e8f0', marginBottom: 2 }}>{node.label}</div>
-          <div style={{ fontSize: 10, color: '#6366f1', fontFamily: 'JetBrains Mono, monospace' }}>{node.type}</div>
+          <div style={{ fontSize: 10, color: '#7c3aed', fontFamily: 'JetBrains Mono, monospace' }}>{node.type}</div>
         </div>
 
         {/* Divider */}

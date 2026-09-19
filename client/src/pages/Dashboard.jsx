@@ -47,8 +47,8 @@ const DARK = {
   accent:    "#7c3aed",   // deep violet
   accentLt:  "#a78bfa",   // lighter violet for text on dark
   accentBg:  "rgba(124,58,237,0.10)",
-  amber:     "#f59e0b",
-  amberBg:   "rgba(245,158,11,0.10)",
+  amber:     "#38bdf8",
+  amberBg:   "rgba(56,189,248,0.10)",
   green:     "#10b981",
   greenBg:   "rgba(16,185,129,0.10)",
   cyan:      "#22d3ee",   // split accent for variety
@@ -646,11 +646,12 @@ export default function Dashboard() {
       <div style={{ width: sidebarW, flexShrink: 0, background: C.bgSub, borderRight: `1px solid ${C.border}`, display: "flex", flexDirection: "column", position: "relative", transition: "width 0.05s", overflow: "hidden" }}>
 
         {/* Logo */}
-        <div style={{ padding: collapsed ? "18px 0" : "18px 16px", borderBottom: `1px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: collapsed ? "center" : "flex-start", gap: 10 }}>
-          <div style={{ width: 34, height: 34, flexShrink: 0, clipPath: "polygon(0 0, calc(100% - 7px) 0, 100% 7px, 100% 100%, 0 100%)", background: `linear-gradient(135deg, ${C.accent}, #6d28d9)`, display: "flex", alignItems: "center", justifyContent: "center", boxShadow: `0 0 20px ${C.accentBg}` }}>
-            <Sparkles size={15} color="#fff" />
-          </div>
-          {!collapsed && (
+        <div style={{ padding: collapsed ? "40px 0" : "18px 16px", borderBottom: `1px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: collapsed ? "center" : "flex-start", gap: 10 }}>
+          <img
+            src="/logo.png"
+            alt="Vanta"
+            style={{ width: 48, height: 48, flexShrink: 0, objectFit: "contain", filter: `drop-shadow(0 0 12px ${C.accentBg})` }}
+          />          {!collapsed && (
             <span style={{ fontFamily: "JetBrains Mono, monospace", fontSize: 15, fontWeight: 800, letterSpacing: "0.18em", textTransform: "uppercase", background: dark ? "linear-gradient(135deg, #a78bfa, #7c3aed, #38bdf8)" : `linear-gradient(135deg, ${C.accent}, #6d28d9)`, WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text", whiteSpace: "nowrap" }}>
               Vanta
             </span>

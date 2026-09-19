@@ -52,7 +52,7 @@ function ProposalDisplay({ proposal, proposalStatus, onContinue, onApprove, appr
   const isActivating   = proposalStatus === 'activating' || approving;
   const isError        = proposalStatus === 'activation_error';
   const isBlocked      = !proposal.executable;
-  const executableColor = proposal.executable ? '#22c55e' : '#f59e0b';
+  const executableColor = proposal.executable ? '#22c55e' : '#a78bfa';
 
   // Progress steps shown during/after activation
   const steps = [
@@ -69,14 +69,14 @@ function ProposalDisplay({ proposal, proposalStatus, onContinue, onApprove, appr
       padding: '12px',
       background: isActivated
         ? 'rgba(34,197,94,0.06)'
-        : 'rgba(99,102,241,0.06)',
-      border: `1px solid ${isActivated ? 'rgba(34,197,94,0.25)' : 'rgba(99,102,241,0.2)'}`,
+        : 'rgba(124,58,237,0.06)',
+      border: `1px solid ${isActivated ? 'rgba(34,197,94,0.25)' : 'rgba(124,58,237,0.2)'}`,
       borderRadius: 10,
       fontSize: 11,
     }}>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
-        <Cpu size={12} color={isActivated ? '#22c55e' : '#6366f1'} />
+        <Cpu size={12} color={isActivated ? '#22c55e' : '#7c3aed'} />
         <span style={{ color: '#e2e8f0', fontWeight: 700, fontSize: 12 }}>
           {isActivated ? 'Architecture Activated' : 'Architecture Proposal'}
         </span>
@@ -100,13 +100,13 @@ function ProposalDisplay({ proposal, proposalStatus, onContinue, onApprove, appr
       {isBlocked && !isActivated && (
         <div style={{
           display: 'flex', alignItems: 'flex-start', gap: 6, padding: '6px 8px',
-          background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.25)',
+          background: 'rgba(167,139,250,0.08)', border: '1px solid rgba(167,139,250,0.25)',
           borderRadius: 6, marginBottom: 8,
         }}>
-          <AlertTriangle size={11} color="#f59e0b" style={{ flexShrink: 0, marginTop: 1 }} />
+          <AlertTriangle size={11} color="#a78bfa" style={{ flexShrink: 0, marginTop: 1 }} />
           <div>
-            <span style={{ fontSize: 10, color: '#fbbf24', fontWeight: 600 }}>Cannot activate: </span>
-            <span style={{ fontSize: 10, color: '#fbbf24' }}>
+            <span style={{ fontSize: 10, color: '#a78bfa', fontWeight: 600 }}>Cannot activate: </span>
+            <span style={{ fontSize: 10, color: '#a78bfa' }}>
               {proposal.unsupported_capabilities?.join(', ')} not available in current runtime.
               This proposal is saved for future review when these capabilities become available.
             </span>
@@ -118,11 +118,11 @@ function ProposalDisplay({ proposal, proposalStatus, onContinue, onApprove, appr
       {!isBlocked && proposal.unsupported_capabilities?.length > 0 && !isActivated && (
         <div style={{
           display: 'flex', alignItems: 'flex-start', gap: 6, padding: '6px 8px',
-          background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.25)',
+          background: 'rgba(167,139,250,0.08)', border: '1px solid rgba(167,139,250,0.25)',
           borderRadius: 6, marginBottom: 8,
         }}>
-          <AlertTriangle size={11} color="#f59e0b" style={{ flexShrink: 0, marginTop: 1 }} />
-          <span style={{ fontSize: 10, color: '#fbbf24' }}>
+          <AlertTriangle size={11} color="#a78bfa" style={{ flexShrink: 0, marginTop: 1 }} />
+          <span style={{ fontSize: 10, color: '#a78bfa' }}>
             {proposal.unsupported_capabilities.join(', ')} will not be active in production.
           </span>
         </div>
@@ -147,7 +147,7 @@ function ProposalDisplay({ proposal, proposalStatus, onContinue, onApprove, appr
           ))}
           {proposal.recommended_changes.reconfigure_nodes?.map((n, i) => (
             <div key={i} style={{ display: 'flex', gap: 5, marginBottom: 3 }}>
-              <span style={{ color: '#6366f1', fontSize: 10 }}>~</span>
+              <span style={{ color: '#7c3aed', fontSize: 10 }}>~</span>
               <span style={{ color: '#cbd5e1', fontSize: 10 }}>{n.type}: {n.reason}</span>
             </div>
           ))}
@@ -171,7 +171,7 @@ function ProposalDisplay({ proposal, proposalStatus, onContinue, onApprove, appr
       {/* Re-index notice */}
       {proposal.requires_reindex && !isActivated && (
         <div style={{
-          fontSize: 9, color: '#f59e0b', fontFamily: 'JetBrains Mono, monospace', marginTop: 6,
+          fontSize: 9, color: '#a78bfa', fontFamily: 'JetBrains Mono, monospace', marginTop: 6,
         }}>
           ⚠ Activation will re-index all knowledge documents.
         </div>
@@ -181,8 +181,8 @@ function ProposalDisplay({ proposal, proposalStatus, onContinue, onApprove, appr
       {isActivating && (
         <div style={{
           marginTop: 8, padding: '8px 10px',
-          background: 'rgba(99,102,241,0.08)', borderRadius: 7,
-          border: '1px solid rgba(99,102,241,0.2)',
+          background: 'rgba(124,58,237,0.08)', borderRadius: 7,
+          border: '1px solid rgba(124,58,237,0.2)',
         }}>
           {steps.map((step, i) => (
             <div key={i} style={{
@@ -191,7 +191,7 @@ function ProposalDisplay({ proposal, proposalStatus, onContinue, onApprove, appr
             }}>
               <div style={{
                 width: 12, height: 12, borderRadius: '50%',
-                border: '2px solid #6366f1', borderTopColor: 'transparent',
+                border: '2px solid #7c3aed', borderTopColor: 'transparent',
                 animation: 'spin 0.7s linear infinite', flexShrink: 0,
               }} />
               <span style={{ fontSize: 10, color: '#818cf8', fontFamily: 'JetBrains Mono, monospace' }}>
@@ -236,7 +236,7 @@ function ProposalDisplay({ proposal, proposalStatus, onContinue, onApprove, appr
             disabled={isActivating}
             style={{
               flex: 1, padding: '6px 10px', borderRadius: 7,
-              border: '1px solid rgba(99,102,241,0.3)',
+              border: '1px solid rgba(124,58,237,0.3)',
               background: 'transparent', color: isActivating ? '#334155' : '#818cf8',
               fontSize: 11, fontWeight: 600, cursor: isActivating ? 'default' : 'pointer',
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
@@ -258,9 +258,9 @@ function ProposalDisplay({ proposal, proposalStatus, onContinue, onApprove, appr
               background: isBlocked
                 ? 'rgba(71,85,105,0.15)'
                 : isActivating
-                  ? 'rgba(99,102,241,0.2)'
-                  : 'rgba(99,102,241,0.85)',
-              border: `1px solid ${isBlocked ? 'rgba(71,85,105,0.3)' : 'rgba(99,102,241,0.5)'}`,
+                  ? 'rgba(124,58,237,0.2)'
+                  : 'rgba(124,58,237,0.85)',
+              border: `1px solid ${isBlocked ? 'rgba(71,85,105,0.3)' : 'rgba(124,58,237,0.5)'}`,
               color: isBlocked ? '#475569' : '#fff',
               fontSize: 11, fontWeight: 700,
               cursor: isBlocked || isActivating ? 'default' : 'pointer',
@@ -269,11 +269,11 @@ function ProposalDisplay({ proposal, proposalStatus, onContinue, onApprove, appr
             }}
             onMouseEnter={e => {
               if (!isBlocked && !isActivating)
-                e.currentTarget.style.background = 'rgba(99,102,241,0.95)';
+                e.currentTarget.style.background = 'rgba(124,58,237,0.95)';
             }}
             onMouseLeave={e => {
               if (!isBlocked && !isActivating)
-                e.currentTarget.style.background = 'rgba(99,102,241,0.85)';
+                e.currentTarget.style.background = 'rgba(124,58,237,0.85)';
             }}
           >
             {isActivating
@@ -301,18 +301,18 @@ function MessageBubble({ msg }) {
     }}>
       <div style={{
         width: 24, height: 24, borderRadius: '50%', flexShrink: 0,
-        background: isArchitect ? 'rgba(99,102,241,0.15)' : 'rgba(34,197,94,0.1)',
-        border: `1px solid ${isArchitect ? 'rgba(99,102,241,0.4)' : 'rgba(34,197,94,0.3)'}`,
+        background: isArchitect ? 'rgba(124,58,237,0.15)' : 'rgba(34,197,94,0.1)',
+        border: `1px solid ${isArchitect ? 'rgba(124,58,237,0.4)' : 'rgba(34,197,94,0.3)'}`,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
       }}>
-        {isArchitect ? <Bot size={11} color="#6366f1" /> : <User size={11} color="#22c55e" />}
+        {isArchitect ? <Bot size={11} color="#7c3aed" /> : <User size={11} color="#22c55e" />}
       </div>
       <div style={{
         maxWidth: '80%',
         padding: '8px 11px',
         borderRadius: isArchitect ? '4px 12px 12px 12px' : '12px 4px 12px 12px',
-        background: isArchitect ? 'rgba(99,102,241,0.08)' : 'rgba(255,255,255,0.04)',
-        border: `1px solid ${isArchitect ? 'rgba(99,102,241,0.2)' : 'rgba(255,255,255,0.06)'}`,
+        background: isArchitect ? 'rgba(124,58,237,0.08)' : 'rgba(255,255,255,0.04)',
+        border: `1px solid ${isArchitect ? 'rgba(124,58,237,0.2)' : 'rgba(255,255,255,0.06)'}`,
         fontSize: 12, color: '#cbd5e1', lineHeight: 1.55,
         whiteSpace: 'pre-wrap',
       }}>
@@ -494,8 +494,8 @@ export default function ArchitectChatPanel({ chatbotId, hasDraft, onClose, onAct
   return (
     <div style={{
       width: 320, height: '100%',
-      background: '#0a0e18',
-      borderLeft: '1px solid rgba(99,102,241,0.2)',
+      background: '#0d0d1c',
+      borderLeft: '1px solid rgba(124,58,237,0.2)',
       display: 'flex', flexDirection: 'column',
       fontFamily: 'Inter, sans-serif',
       flexShrink: 0,
@@ -503,17 +503,17 @@ export default function ArchitectChatPanel({ chatbotId, hasDraft, onClose, onAct
       {/* Header */}
       <div style={{
         padding: '12px 14px',
-        borderBottom: '1px solid rgba(99,102,241,0.15)',
+        borderBottom: '1px solid rgba(124,58,237,0.15)',
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        background: '#0a0e18', flexShrink: 0,
+        background: '#0d0d1c', flexShrink: 0,
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <div style={{
             width: 28, height: 28, borderRadius: 8,
-            background: 'rgba(99,102,241,0.15)', border: '1px solid rgba(99,102,241,0.3)',
+            background: 'rgba(124,58,237,0.15)', border: '1px solid rgba(124,58,237,0.3)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}>
-            <Cpu size={13} color="#6366f1" />
+            <Cpu size={13} color="#7c3aed" />
           </div>
           <div>
             <div style={{ fontSize: 12, fontWeight: 700, color: '#f1f5f9' }}>Architect Chat</div>
@@ -523,12 +523,12 @@ export default function ArchitectChatPanel({ chatbotId, hasDraft, onClose, onAct
                 background:
                   chatStatus === 'activated'        ? '#22c55e' :
                   chatStatus === 'ready_for_review' ? '#818cf8' :
-                  chatStatus === 'activating'       ? '#f59e0b' :
+                  chatStatus === 'activating'       ? '#a78bfa' :
                   chatStatus === 'activation_error' ? '#ef4444' :
-                  chatStatus === 'clarifying'       ? '#f59e0b' : '#475569',
+                  chatStatus === 'clarifying'       ? '#a78bfa' : '#475569',
                 boxShadow:
                   chatStatus === 'activated'        ? '0 0 5px #22c55e' :
-                  chatStatus === 'activating'       ? '0 0 5px #f59e0b' :
+                  chatStatus === 'activating'       ? '0 0 5px #a78bfa' :
                   chatStatus === 'ready_for_review' ? '0 0 5px #818cf8' :
                   chatStatus === 'activation_error' ? '0 0 5px #ef4444' : 'none',
               }} />
@@ -585,21 +585,21 @@ export default function ArchitectChatPanel({ chatbotId, hasDraft, onClose, onAct
 
       {/* PATH A: Review Draft button — shown when draft exists and not yet started */}
       {hasDraft && !initialized && (
-        <div style={{ padding: '10px 14px', borderBottom: '1px solid rgba(99,102,241,0.1)', flexShrink: 0 }}>
+        <div style={{ padding: '10px 14px', borderBottom: '1px solid rgba(124,58,237,0.1)', flexShrink: 0 }}>
           <button
             onClick={handleReviewDraft}
             disabled={loading}
             style={{
               width: '100%', padding: '8px 12px', borderRadius: 8,
-              background: 'rgba(99,102,241,0.15)', border: '1px solid rgba(99,102,241,0.35)',
+              background: 'rgba(124,58,237,0.15)', border: '1px solid rgba(124,58,237,0.35)',
               color: '#818cf8', fontSize: 12, fontWeight: 600, cursor: 'pointer',
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
             }}
-            onMouseEnter={e => e.currentTarget.style.background = 'rgba(99,102,241,0.25)'}
-            onMouseLeave={e => e.currentTarget.style.background = 'rgba(99,102,241,0.15)'}
+            onMouseEnter={e => e.currentTarget.style.background = 'rgba(124,58,237,0.25)'}
+            onMouseLeave={e => e.currentTarget.style.background = 'rgba(124,58,237,0.15)'}
           >
             {loading ? (
-              <><div style={{ width: 12, height: 12, border: '2px solid #6366f1', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} /> Reviewing...</>
+              <><div style={{ width: 12, height: 12, border: '2px solid #7c3aed', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} /> Reviewing...</>
             ) : (
               <><GitBranch size={12} /> Review Draft with Architect</>
             )}
@@ -632,20 +632,20 @@ export default function ArchitectChatPanel({ chatbotId, hasDraft, onClose, onAct
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 10 }}>
             <div style={{
               width: 24, height: 24, borderRadius: '50%',
-              background: 'rgba(99,102,241,0.15)', border: '1px solid rgba(99,102,241,0.3)',
+              background: 'rgba(124,58,237,0.15)', border: '1px solid rgba(124,58,237,0.3)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
             }}>
-              <Bot size={11} color="#6366f1" />
+              <Bot size={11} color="#7c3aed" />
             </div>
             <div style={{
-              padding: '8px 12px', background: 'rgba(99,102,241,0.08)',
-              border: '1px solid rgba(99,102,241,0.15)',
+              padding: '8px 12px', background: 'rgba(124,58,237,0.08)',
+              border: '1px solid rgba(124,58,237,0.15)',
               borderRadius: '4px 12px 12px 12px',
               display: 'flex', gap: 4, alignItems: 'center',
             }}>
               {[0, 1, 2].map(d => (
                 <div key={d} style={{
-                  width: 5, height: 5, borderRadius: '50%', background: '#6366f1',
+                  width: 5, height: 5, borderRadius: '50%', background: '#7c3aed',
                   animation: `bounce 1s ease-in-out ${d * 0.15}s infinite`,
                 }} />
               ))}
@@ -669,7 +669,7 @@ export default function ArchitectChatPanel({ chatbotId, hasDraft, onClose, onAct
 
       {/* Input */}
       <div style={{
-        padding: '10px 12px', borderTop: '1px solid rgba(99,102,241,0.15)',
+        padding: '10px 12px', borderTop: '1px solid rgba(124,58,237,0.15)',
         display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0,
       }}>
         <input
@@ -680,7 +680,7 @@ export default function ArchitectChatPanel({ chatbotId, hasDraft, onClose, onAct
           disabled={loading}
           style={{
             flex: 1, padding: '8px 11px',
-            background: '#060a10', border: '1px solid rgba(99,102,241,0.25)',
+            background: '#0c0c1a', border: '1px solid rgba(124,58,237,0.25)',
             borderRadius: 8, color: '#e2e8f0', fontSize: 12, outline: 'none',
           }}
         />
@@ -689,8 +689,8 @@ export default function ArchitectChatPanel({ chatbotId, hasDraft, onClose, onAct
           disabled={loading || !input.trim()}
           style={{
             width: 32, height: 32,
-            background: input.trim() && !loading ? 'rgba(99,102,241,0.8)' : 'rgba(99,102,241,0.15)',
-            border: '1px solid rgba(99,102,241,0.3)',
+            background: input.trim() && !loading ? 'rgba(124,58,237,0.8)' : 'rgba(124,58,237,0.15)',
+            border: '1px solid rgba(124,58,237,0.3)',
             borderRadius: 8,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             cursor: input.trim() && !loading ? 'pointer' : 'default',

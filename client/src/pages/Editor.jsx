@@ -202,7 +202,7 @@ export default function Editor() {
 
   if (loading) {
     return (
-      <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#080c14', color: '#64748b', fontFamily: 'JetBrains Mono, monospace', fontSize: 13 }}>
+      <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'hsl(var(--background))', color: 'hsl(var(--muted-foreground))', fontFamily: 'JetBrains Mono, monospace', fontSize: 13 }}>
         {'> Loading workflow...'}
       </div>
     );
@@ -210,19 +210,19 @@ export default function Editor() {
 
   if (!chatbot) {
     return (
-      <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#080c14', color: '#ef4444', fontFamily: 'JetBrains Mono, monospace', fontSize: 13 }}>
+      <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'hsl(var(--background))', color: 'hsl(var(--danger))', fontFamily: 'JetBrains Mono, monospace', fontSize: 13 }}>
         {'> Chatbot not found.'}
       </div>
     );
   }
 
   return (
-    <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', background: '#080c14', fontFamily: 'Inter, sans-serif' }}>
+    <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', background: 'hsl(var(--background))', fontFamily: 'Inter, sans-serif' }}>
 
       {/* ── Header ───────────────────────────────────────────────────────────── */}
       <div style={{
-        background: '#0a0e18',
-        borderBottom: '1px solid rgba(99,102,241,0.2)',
+        background: 'hsl(var(--background))',
+        borderBottom: '1px solid rgba(124,58,237, 0.2)',
         padding: '0 20px',
         height: 56,
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -232,7 +232,7 @@ export default function Editor() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
           <button
             onClick={() => navigate(createPageUrl('Dashboard'))}
-            style={{ background: 'transparent', border: '1px solid rgba(99,102,241,0.2)', borderRadius: 8, padding: '5px 8px', cursor: 'pointer', color: '#64748b', display: 'flex', alignItems: 'center' }}
+            style={{ background: 'transparent', border: '1px solid rgba(124,58,237, 0.2)', borderRadius: 8, padding: '5px 8px', cursor: 'pointer', color: 'hsl(var(--muted-foreground))', display: 'flex', alignItems: 'center' }}
             onMouseEnter={e => e.currentTarget.style.color = '#e2e8f0'}
             onMouseLeave={e => e.currentTarget.style.color = '#64748b'}
           >
@@ -240,14 +240,14 @@ export default function Editor() {
           </button>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ fontSize: 14, fontWeight: 700, color: '#f1f5f9' }}>{chatbot.title}</span>
+              <span style={{ fontSize: 14, fontWeight: 700, color: 'hsl(var(--foreground))' }}>{chatbot.title}</span>
               {/* Draft indicator */}
               {isEditing && (
                 <span style={{
                   fontSize: 9, fontFamily: 'JetBrains Mono, monospace',
-                  color: draftDirty ? '#f59e0b' : '#6366f1',
-                  background: draftDirty ? 'rgba(245,158,11,0.1)' : 'rgba(99,102,241,0.1)',
-                  border: `1px solid ${draftDirty ? 'rgba(245,158,11,0.3)' : 'rgba(99,102,241,0.3)'}`,
+                  color: draftDirty ? '#a78bfa' : '#7c3aed',
+                  background: draftDirty ? 'rgba(167,139,250,0.1)' : 'rgba(124,58,237, 0.1)',
+                  border: `1px solid ${draftDirty ? 'rgba(167,139,250,0.3)' : 'rgba(124,58,237, 0.3)'}`,
                   padding: '2px 6px', borderRadius: 4, letterSpacing: '0.05em',
                   display: 'flex', alignItems: 'center', gap: 3,
                 }}>
@@ -256,7 +256,7 @@ export default function Editor() {
                 </span>
               )}
             </div>
-            <div style={{ fontSize: 11, color: '#475569', fontFamily: 'JetBrains Mono, monospace' }}>
+            <div style={{ fontSize: 11, color: 'hsl(var(--muted-foreground))', fontFamily: 'JetBrains Mono, monospace' }}>
               {isEditing
                 ? 'Draft changes — preview and deployed chat use the active workflow'
                 : chatbot.description?.slice(0, 55) + (chatbot.description?.length > 55 ? '...' : '')}
@@ -273,7 +273,7 @@ export default function Editor() {
               display: 'flex', alignItems: 'center', gap: 6,
               padding: '7px 12px',
               background: showPreview ? 'rgba(34,197,94,0.15)' : 'transparent',
-              border: `1px solid ${showPreview ? 'rgba(34,197,94,0.4)' : 'rgba(99,102,241,0.3)'}`,
+              border: `1px solid ${showPreview ? 'rgba(34,197,94,0.4)' : 'rgba(124,58,237, 0.3)'}`,
               borderRadius: 8, color: showPreview ? '#22c55e' : '#94a3b8',
               fontSize: 12, fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s',
             }}
@@ -289,12 +289,12 @@ export default function Editor() {
             style={{
               display: 'flex', alignItems: 'center', gap: 6,
               padding: '7px 12px',
-              background: showArchitect ? 'rgba(99,102,241,0.2)' : 'transparent',
-              border: `1px solid ${showArchitect ? 'rgba(99,102,241,0.5)' : 'rgba(99,102,241,0.3)'}`,
+              background: showArchitect ? 'rgba(124,58,237, 0.2)' : 'transparent',
+              border: `1px solid ${showArchitect ? 'rgba(124,58,237, 0.5)' : 'rgba(124,58,237, 0.3)'}`,
               borderRadius: 8, color: showArchitect ? '#818cf8' : '#94a3b8',
               fontSize: 12, fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s',
             }}
-            onMouseEnter={e => { if (!showArchitect) e.currentTarget.style.background = 'rgba(99,102,241,0.08)'; }}
+            onMouseEnter={e => { if (!showArchitect) e.currentTarget.style.background = 'rgba(124,58,237, 0.08)'; }}
             onMouseLeave={e => { if (!showArchitect) e.currentTarget.style.background = 'transparent'; }}
           >
             <MessageSquare size={13} />
@@ -332,15 +332,15 @@ export default function Editor() {
             style={{
               display: 'flex', alignItems: 'center', gap: 6,
               padding: '7px 14px',
-              background: draftDirty ? 'rgba(99,102,241,0.15)' : 'transparent',
-              border: `1px solid ${draftDirty ? 'rgba(99,102,241,0.5)' : 'rgba(99,102,241,0.2)'}`,
+              background: draftDirty ? 'rgba(124,58,237, 0.15)' : 'transparent',
+              border: `1px solid ${draftDirty ? 'rgba(124,58,237, 0.5)' : 'rgba(124,58,237, 0.2)'}`,
               borderRadius: 8, color: (savingDraft || !draftDirty) ? '#475569' : '#818cf8',
               fontSize: 12, fontWeight: 600,
               cursor: (savingDraft || !draftDirty) ? 'default' : 'pointer',
               transition: 'all 0.15s',
             }}
-            onMouseEnter={e => { if (draftDirty && !savingDraft) e.currentTarget.style.background = 'rgba(99,102,241,0.25)'; }}
-            onMouseLeave={e => e.currentTarget.style.background = draftDirty ? 'rgba(99,102,241,0.15)' : 'transparent'}
+            onMouseEnter={e => { if (draftDirty && !savingDraft) e.currentTarget.style.background = 'rgba(124,58,237, 0.25)'; }}
+            onMouseLeave={e => e.currentTarget.style.background = draftDirty ? 'rgba(124,58,237, 0.15)' : 'transparent'}
           >
             <Save size={13} />
             {savingDraft ? 'Saving...' : 'Save Draft'}
@@ -354,13 +354,13 @@ export default function Editor() {
             style={{
               display: 'flex', alignItems: 'center', gap: 6,
               padding: '7px 16px',
-              background: deploying ? 'rgba(99,102,241,0.3)' : 'linear-gradient(135deg, #6366f1, #8b5cf6)',
-              border: 'none', borderRadius: 8, color: '#fff',
+              background: deploying ? 'rgba(124,58,237, 0.3)' : 'linear-gradient(135deg, #7c3aed, #8b5cf6)',
+              border: 'none', borderRadius: 8, color: 'hsl(var(--primary-foreground))',
               fontSize: 12, fontWeight: 700, cursor: deploying ? 'wait' : 'pointer',
-              boxShadow: '0 0 20px rgba(99,102,241,0.35)', transition: 'all 0.15s',
+              boxShadow: '0 0 20px rgba(124,58,237, 0.35)', transition: 'all 0.15s',
             }}
-            onMouseEnter={e => { if (!deploying) e.currentTarget.style.boxShadow = '0 0 30px rgba(99,102,241,0.55)'; }}
-            onMouseLeave={e => e.currentTarget.style.boxShadow = '0 0 20px rgba(99,102,241,0.35)'}
+            onMouseEnter={e => { if (!deploying) e.currentTarget.style.boxShadow = '0 0 30px rgba(124,58,237, 0.55)'; }}
+            onMouseLeave={e => e.currentTarget.style.boxShadow = '0 0 20px rgba(124,58,237, 0.35)'}
           >
             <Rocket size={13} />
             {deploying ? 'Deploying...' : 'Deploy'}
@@ -375,19 +375,19 @@ export default function Editor() {
           padding: '6px 20px', display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0,
         }}>
           <AlertTriangle size={12} color="#ef4444" />
-          <span style={{ fontSize: 11, color: '#fca5a5', fontFamily: 'JetBrains Mono, monospace' }}>{draftError}</span>
-          <button onClick={() => setDraftError('')} style={{ marginLeft: 'auto', background: 'transparent', border: 'none', cursor: 'pointer', color: '#ef4444', fontSize: 11 }}>✕</button>
+          <span style={{ fontSize: 11, color: 'hsl(var(--danger) / 0.8)', fontFamily: 'JetBrains Mono, monospace' }}>{draftError}</span>
+          <button onClick={() => setDraftError('')} style={{ marginLeft: 'auto', background: 'transparent', border: 'none', cursor: 'pointer', color: 'hsl(var(--danger))', fontSize: 11 }}>✕</button>
         </div>
       )}
 
       {/* Draft-saved confirmation — shown briefly when hasDraft and not dirty */}
       {hasDraft && !draftDirty && !draftError && (
         <div style={{
-          background: 'rgba(99,102,241,0.06)', borderBottom: '1px solid rgba(99,102,241,0.12)',
+          background: 'rgba(124,58,237, 0.06)', borderBottom: '1px solid rgba(124,58,237, 0.12)',
           padding: '5px 20px', display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0,
         }}>
-          <CheckCircle size={11} color="#6366f1" />
-          <span style={{ fontSize: 10, color: '#6366f1', fontFamily: 'JetBrains Mono, monospace' }}>
+          <CheckCircle size={11} color="#7c3aed" />
+          <span style={{ fontSize: 10, color: 'hsl(var(--primary))', fontFamily: 'JetBrains Mono, monospace' }}>
             Draft saved. Preview and deployed chat still use the active workflow until Phase 9B activates this draft.
           </span>
         </div>

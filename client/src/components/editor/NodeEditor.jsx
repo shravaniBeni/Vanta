@@ -9,7 +9,7 @@ const NODE_META = {
   OCR:               { icon: ScanText,      color: '#10b981', bg: 'rgba(16,185,129,0.12)',  border: 'rgba(16,185,129,0.5)',  status: 'unavailable'  },
   VoiceRecognition:  { icon: Mic,           color: '#ec4899', bg: 'rgba(236,72,153,0.12)',  border: 'rgba(236,72,153,0.5)',  status: 'unavailable'  },
   TextSplitter:      { icon: Scissors,      color: '#22c55e', bg: 'rgba(34,197,94,0.12)',   border: 'rgba(34,197,94,0.5)',   status: 'supported'    },
-  DataFilter:        { icon: Filter,        color: '#f59e0b', bg: 'rgba(245,158,11,0.12)',  border: 'rgba(245,158,11,0.5)',  status: 'unavailable'  },
+  DataFilter:        { icon: Filter,        color: '#a78bfa', bg: 'rgba(167,139,250,0.12)',  border: 'rgba(167,139,250,0.5)',  status: 'unavailable'  },
   Translator:        { icon: Languages,     color: '#8b5cf6', bg: 'rgba(139,92,246,0.12)',  border: 'rgba(139,92,246,0.5)',  status: 'unavailable'  },
   ImageAnalysis:     { icon: Image,         color: '#f43f5e', bg: 'rgba(244,63,94,0.12)',   border: 'rgba(244,63,94,0.5)',   status: 'unavailable'  },
   Embeddings:        { icon: Sparkles,      color: '#a855f7', bg: 'rgba(168,85,247,0.12)',  border: 'rgba(168,85,247,0.5)',  status: 'supported'    },
@@ -17,7 +17,7 @@ const NODE_META = {
   LLM:               { icon: Cpu,           color: '#ef4444', bg: 'rgba(239,68,68,0.12)',   border: 'rgba(239,68,68,0.5)',   status: 'supported'    },
   APIIntegration:    { icon: Workflow,      color: '#14b8a6', bg: 'rgba(20,184,166,0.12)',  border: 'rgba(20,184,166,0.5)',  status: 'experimental' },
   CustomCode:        { icon: Code,          color: '#94a3b8', bg: 'rgba(148,163,184,0.12)', border: 'rgba(148,163,184,0.5)', status: 'unavailable'  },
-  ChatOutput:        { icon: MessageSquare, color: '#6366f1', bg: 'rgba(99,102,241,0.12)',  border: 'rgba(99,102,241,0.5)',  status: 'supported'    },
+  ChatOutput:        { icon: MessageSquare, color: '#7c3aed', bg: 'rgba(124,58,237,0.12)',  border: 'rgba(124,58,237,0.5)',  status: 'supported'    },
   DocumentProcessor: { icon: FileSearch,    color: '#0ea5e9', bg: 'rgba(14,165,233,0.12)',  border: 'rgba(14,165,233,0.5)',  status: 'experimental' },
   DataValidation:    { icon: ShieldCheck,   color: '#84cc16', bg: 'rgba(132,204,22,0.12)',  border: 'rgba(132,204,22,0.5)',  status: 'unavailable'  },
   CodeExecution:     { icon: Terminal,      color: '#fb923c', bg: 'rgba(251,146,60,0.12)',  border: 'rgba(251,146,60,0.5)',  status: 'unavailable'  },
@@ -25,7 +25,7 @@ const NODE_META = {
 
 const STATUS_DOT = {
   supported:    { color: '#22c55e', label: 'active' },
-  experimental: { color: '#f59e0b', label: 'experimental' },
+  experimental: { color: '#a78bfa', label: 'experimental' },
   unavailable:  { color: '#475569', label: 'unavailable' },
 };
 
@@ -48,7 +48,7 @@ const CustomNode = ({ data, id }) => {
       />
 
       <div style={{
-        background: `linear-gradient(135deg, #0d1117 60%, ${meta.bg})`,
+        background: `linear-gradient(135deg, #13131f 60%, ${meta.bg})`,
         border: `1px solid ${meta.border}`,
         boxShadow: `0 0 16px ${meta.color}22, inset 0 0 12px ${meta.bg}`,
         borderRadius: 12,
@@ -149,7 +149,7 @@ const toFlowEdges = (connections) =>
     source: conn.from,
     target: conn.to,
     animated: true,
-    style: { stroke: '#6366f1', strokeWidth: 2 },
+    style: { stroke: '#7c3aed', strokeWidth: 2 },
     type: 'smoothstep'
   }));
 
@@ -182,7 +182,7 @@ export default function NodeEditor({ nodes, connections, onNodesChange, onConnec
   }, [connections]);
 
   const onConnect = useCallback((params) => {
-    const newEdge = { ...params, animated: true, style: { stroke: '#6366f1', strokeWidth: 2 }, type: 'smoothstep' };
+    const newEdge = { ...params, animated: true, style: { stroke: '#7c3aed', strokeWidth: 2 }, type: 'smoothstep' };
     setEdges((eds) => addEdge(newEdge, eds));
     const updated = [...connections, { from: params.source, to: params.target }];
     prevConnectionsRef.current = updated.map(c => `${c.from}->${c.to}`).join(',');
@@ -219,10 +219,10 @@ export default function NodeEditor({ nodes, connections, onNodesChange, onConnec
   return (
     <div className="w-full h-full">
       <style>{`
-        .react-flow__controls { background: #0d1117 !important; border: 1px solid rgba(99,102,241,0.3) !important; border-radius: 10px !important; box-shadow: 0 0 20px rgba(99,102,241,0.15) !important; }
-        .react-flow__controls-button { background: #0d1117 !important; border-bottom: 1px solid rgba(99,102,241,0.15) !important; color: #94a3b8 !important; }
-        .react-flow__controls-button:hover { background: rgba(99,102,241,0.15) !important; color: #fff !important; }
-        .react-flow__minimap { background: #060a10 !important; border: 1px solid rgba(99,102,241,0.3) !important; border-radius: 10px !important; }
+        .react-flow__controls { background: #13131f !important; border: 1px solid rgba(124,58,237,0.3) !important; border-radius: 10px !important; box-shadow: 0 0 20px rgba(124,58,237,0.15) !important; }
+        .react-flow__controls-button { background: #13131f !important; border-bottom: 1px solid rgba(124,58,237,0.15) !important; color: #94a3b8 !important; }
+        .react-flow__controls-button:hover { background: rgba(124,58,237,0.15) !important; color: #fff !important; }
+        .react-flow__minimap { background: #0c0c1a !important; border: 1px solid rgba(124,58,237,0.3) !important; border-radius: 10px !important; }
         .react-flow__edge-path { stroke-width: 2 !important; }
       `}</style>
       <ReactFlow
@@ -235,11 +235,11 @@ export default function NodeEditor({ nodes, connections, onNodesChange, onConnec
         nodeTypes={nodeTypes}
         fitView
         deleteKeyCode="Delete"
-        style={{ background: '#080c14' }}
+        style={{ background: '#09090f' }}
       >
-        <Background color="rgba(99,102,241,0.08)" gap={32} size={1} />
+        <Background color="rgba(124,58,237,0.08)" gap={32} size={1} />
         <Controls />
-        <MiniMap nodeColor={(node) => NODE_META[node.data?.type]?.color || '#6366f1'} maskColor="rgba(8,12,20,0.85)" />
+        <MiniMap nodeColor={(node) => NODE_META[node.data?.type]?.color || '#7c3aed'} maskColor="rgba(8,12,20,0.85)" />
       </ReactFlow>
     </div>
   );
