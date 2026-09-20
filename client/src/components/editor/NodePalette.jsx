@@ -1,183 +1,262 @@
 /**
  * client/src/components/editor/NodePalette.jsx
  *
- * Phase 9A: Node palette with capability status badges.
- *
- * Each node shows its runtime_status from the capability registry:
- *   supported     — fully executable, no badge needed
- *   experimental  — orange "Experimental" badge, still draggable
- *   unavailable   — slate "Coming Soon" badge, still draggable for experimentation
- *
- * Unsupported nodes can be added to the canvas for visual planning, but
- * the topology validator will flag them and they cannot be activated.
+ * Redesigned: collapsible sidebar, toggleable panel, per-category fold,
+ * larger fonts, compact icon-only mode when collapsed.
  */
 
-import React from 'react';
+import React, { useState } from 'react';
 import {
   FileText, Scissors, Sparkles, Database, Cpu as CpuIcon, MessageSquare,
   ScanText, Mic, Globe, Code, Filter, Languages, Image as ImageIcon,
-  Workflow, Plus, FileSearch, ShieldCheck, Terminal
+  Workflow, Plus, FileSearch, ShieldCheck, Terminal,
+  ChevronLeft, ChevronRight, ChevronDown, ChevronUp,
 } from 'lucide-react';
 
-// Static registry matching server/src/nodeCapabilityRegistry.js
-// Used by the palette to render status badges without an API call.
 const NODE_PALETTE_DEFS = [
-  // Input
-  { type: 'DocumentUpload',   label: 'Knowledge Source', icon: FileText,    color: '#3b82f6', bg: 'rgba(59,130,246,0.12)',  category: 'Input',       status: 'supported'    },
-  { type: 'WebCrawler',       label: 'Web Crawler',      icon: Globe,        color: '#06b6d4', bg: 'rgba(6,182,212,0.12)',   category: 'Input',       status: 'unavailable'  },
-  { type: 'VoiceRecognition', label: 'Voice to Text',    icon: Mic,          color: '#ec4899', bg: 'rgba(236,72,153,0.12)', category: 'Input',       status: 'unavailable'  },
-  // Processing
-  { type: 'DocumentProcessor',label: 'Doc Processor',    icon: FileSearch,   color: '#0ea5e9', bg: 'rgba(14,165,233,0.12)', category: 'Processing',  status: 'experimental' },
-  { type: 'OCR',              label: 'OCR Layer',        icon: ScanText,     color: '#10b981', bg: 'rgba(16,185,129,0.12)', category: 'Processing',  status: 'unavailable'  },
-  { type: 'TextSplitter',     label: 'Text Splitter',    icon: Scissors,     color: '#22c55e', bg: 'rgba(34,197,94,0.12)',  category: 'Processing',  status: 'supported'    },
-  { type: 'DataFilter',       label: 'Data Filter',      icon: Filter,       color: '#a78bfa', bg: 'rgba(167,139,250,0.12)', category: 'Processing',  status: 'unavailable'  },
-  { type: 'DataValidation',   label: 'Data Validation',  icon: ShieldCheck,  color: '#84cc16', bg: 'rgba(132,204,22,0.12)', category: 'Processing',  status: 'unavailable'  },
-  { type: 'Translator',       label: 'Translator',       icon: Languages,    color: '#8b5cf6', bg: 'rgba(139,92,246,0.12)', category: 'Processing',  status: 'unavailable'  },
-  { type: 'ImageAnalysis',    label: 'Image Analysis',   icon: ImageIcon,    color: '#f43f5e', bg: 'rgba(244,63,94,0.12)',  category: 'Processing',  status: 'unavailable'  },
-  { type: 'Embeddings',       label: 'Embeddings',       icon: Sparkles,     color: '#a855f7', bg: 'rgba(168,85,247,0.12)', category: 'Processing',  status: 'supported'    },
-  // Storage
-  { type: 'VectorStore',      label: 'Vector Store',     icon: Database,     color: '#f97316', bg: 'rgba(249,115,22,0.12)', category: 'Storage',     status: 'supported'    },
-  // AI
-  { type: 'LLM',              label: 'LLM',              icon: CpuIcon,      color: '#ef4444', bg: 'rgba(239,68,68,0.12)',  category: 'AI',          status: 'supported'    },
-  // Integration
-  { type: 'APIIntegration',   label: 'API Integration',  icon: Workflow,     color: '#14b8a6', bg: 'rgba(20,184,166,0.12)', category: 'Integration', status: 'experimental' },
-  // Advanced
-  { type: 'CustomCode',       label: 'Custom Code',      icon: Code,         color: '#94a3b8', bg: 'rgba(148,163,184,0.12)',category: 'Advanced',    status: 'unavailable'  },
-  { type: 'CodeExecution',    label: 'Code Execution',   icon: Terminal,     color: '#fb923c', bg: 'rgba(251,146,60,0.12)', category: 'Advanced',    status: 'unavailable'  },
-  // Output
-  { type: 'ChatOutput',       label: 'Chat Output',      icon: MessageSquare,color: '#7c3aed', bg: 'rgba(124,58,237,0.12)', category: 'Output',      status: 'supported'    },
+  { type: 'DocumentUpload',    label: 'Knowledge Source', icon: FileText,     color: '#60a5fa', bg: 'rgba(96,165,250,0.12)',  category: 'Input',       status: 'supported'    },
+  { type: 'WebCrawler',        label: 'Web Crawler',      icon: Globe,         color: '#22d3ee', bg: 'rgba(34,211,238,0.10)',  category: 'Input',       status: 'unavailable'  },
+  { type: 'VoiceRecognition',  label: 'Voice to Text',    icon: Mic,           color: '#c084fc', bg: 'rgba(192,132,252,0.10)', category: 'Input',       status: 'unavailable'  },
+  { type: 'DocumentProcessor', label: 'Doc Processor',    icon: FileSearch,    color: '#38bdf8', bg: 'rgba(56,189,248,0.10)',  category: 'Processing',  status: 'experimental' },
+  { type: 'OCR',               label: 'OCR Layer',        icon: ScanText,      color: '#34d399', bg: 'rgba(52,211,153,0.10)',  category: 'Processing',  status: 'unavailable'  },
+  { type: 'TextSplitter',      label: 'Text Splitter',    icon: Scissors,      color: '#4ade80', bg: 'rgba(74,222,128,0.10)',  category: 'Processing',  status: 'supported'    },
+  { type: 'DataFilter',        label: 'Data Filter',      icon: Filter,        color: '#a78bfa', bg: 'rgba(167,139,250,0.10)', category: 'Processing',  status: 'unavailable'  },
+  { type: 'DataValidation',    label: 'Data Validation',  icon: ShieldCheck,   color: '#86efac', bg: 'rgba(134,239,172,0.10)', category: 'Processing',  status: 'unavailable'  },
+  { type: 'Translator',        label: 'Translator',       icon: Languages,     color: '#c4b5fd', bg: 'rgba(196,181,253,0.10)', category: 'Processing',  status: 'unavailable'  },
+  { type: 'ImageAnalysis',     label: 'Image Analysis',   icon: ImageIcon,     color: '#fb7185', bg: 'rgba(251,113,133,0.10)', category: 'Processing',  status: 'unavailable'  },
+  { type: 'Embeddings',        label: 'Embeddings',       icon: Sparkles,      color: '#e879f9', bg: 'rgba(232,121,249,0.10)', category: 'Processing',  status: 'supported'    },
+  { type: 'VectorStore',       label: 'Vector Store',     icon: Database,      color: '#fb923c', bg: 'rgba(251,146,60,0.10)',  category: 'Storage',     status: 'supported'    },
+  { type: 'LLM',               label: 'LLM',              icon: CpuIcon,       color: '#f87171', bg: 'rgba(248,113,113,0.10)', category: 'AI',          status: 'supported'    },
+  { type: 'APIIntegration',    label: 'API Integration',  icon: Workflow,      color: '#2dd4bf', bg: 'rgba(45,212,191,0.10)',  category: 'Integration', status: 'experimental' },
+  { type: 'CustomCode',        label: 'Custom Code',      icon: Code,          color: '#94a3b8', bg: 'rgba(148,163,184,0.08)', category: 'Advanced',    status: 'unavailable'  },
+  { type: 'CodeExecution',     label: 'Code Execution',   icon: Terminal,      color: '#fdba74', bg: 'rgba(253,186,116,0.10)', category: 'Advanced',    status: 'unavailable'  },
+  { type: 'ChatOutput',        label: 'Chat Output',      icon: MessageSquare, color: '#a78bfa', bg: 'rgba(167,139,250,0.12)', category: 'Output',      status: 'supported'    },
 ];
 
 const STATUS_BADGE = {
-  experimental: { text: 'Experimental', color: '#a78bfa', bg: 'rgba(167,139,250,0.12)' },
-  unavailable:  { text: 'Coming Soon',  color: '#64748b', bg: 'rgba(100,116,139,0.10)' },
+  experimental: { text: 'Beta',        color: '#a78bfa', bg: 'rgba(167,139,250,0.12)' },
+  unavailable:  { text: 'Soon',        color: '#475569', bg: 'rgba(71,85,105,0.12)'   },
 };
 
-const CATEGORY_COLORS = {
-  Input:       '#3b82f6',
-  Processing:  '#a855f7',
-  Storage:     '#f97316',
-  AI:          '#ef4444',
-  Integration: '#14b8a6',
+const CATEGORIES = ['Input', 'Processing', 'Storage', 'AI', 'Integration', 'Advanced', 'Output'];
+
+const CATEGORY_COLOR = {
+  Input:       '#60a5fa',
+  Processing:  '#c084fc',
+  Storage:     '#fb923c',
+  AI:          '#f87171',
+  Integration: '#2dd4bf',
   Advanced:    '#94a3b8',
-  Output:      '#7c3aed',
+  Output:      '#a78bfa',
 };
 
-const grouped = NODE_PALETTE_DEFS.reduce((acc, node) => {
-  if (!acc[node.category]) acc[node.category] = [];
-  acc[node.category].push(node);
+const grouped = NODE_PALETTE_DEFS.reduce((acc, n) => {
+  if (!acc[n.category]) acc[n.category] = [];
+  acc[n.category].push(n);
   return acc;
 }, {});
 
 export default function NodePalette({ onAddNode }) {
+  const [collapsed, setCollapsed] = useState(false);
+  const [openCats, setOpenCats]   = useState(() =>
+    Object.fromEntries(CATEGORIES.map(c => [c, true]))
+  );
+
+  const toggleCat = cat =>
+    setOpenCats(prev => ({ ...prev, [cat]: !prev[cat] }));
+
+  const W = collapsed ? 48 : 220;
+
   return (
     <div style={{
-      width: 230,
-      height: '100%',
-      background: '#0d0d1c',
-      borderRight: '1px solid rgba(124,58,237,0.2)',
-      display: 'flex',
-      flexDirection: 'column',
-      fontFamily: 'Inter, sans-serif',
-      overflowY: 'auto',
+      width: W, flexShrink: 0, height: '100%',
+      background: '#0b0b18',
+      borderRight: '1px solid rgba(124,58,237,0.15)',
+      display: 'flex', flexDirection: 'column',
+      fontFamily: "'Plus Jakarta Sans', sans-serif",
+      transition: 'width 0.2s ease',
+      overflow: 'hidden',
+      position: 'relative',
     }}>
-      {/* Header */}
+
+      {/* ── Header ──────────────────────────────────────────────────────── */}
       <div style={{
-        padding: '14px 14px 10px',
-        borderBottom: '1px solid rgba(124,58,237,0.15)',
-        position: 'sticky', top: 0,
+        height: 48, flexShrink: 0,
+        display: 'flex', alignItems: 'center',
+        justifyContent: collapsed ? 'center' : 'space-between',
+        padding: collapsed ? 0 : '0 12px 0 14px',
+        borderBottom: '1px solid rgba(124,58,237,0.12)',
         background: '#0d0d1c',
-        zIndex: 10,
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-          <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#7c3aed', boxShadow: '0 0 6px #7c3aed' }} />
-          <span style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', letterSpacing: '0.1em', textTransform: 'uppercase', fontFamily: 'JetBrains Mono, monospace' }}>
-            Node Palette
+        {!collapsed && (
+          <span style={{
+            fontSize: 11, fontWeight: 700, color: '#6d6d8a',
+            letterSpacing: '0.1em', textTransform: 'uppercase',
+            fontFamily: 'JetBrains Mono, monospace',
+            whiteSpace: 'nowrap',
+          }}>
+            Nodes
           </span>
-        </div>
-        <p style={{ fontSize: 9, color: '#334155', fontFamily: 'JetBrains Mono, monospace', marginTop: 4, marginBottom: 0 }}>
-          Unsupported nodes are visual only.
-        </p>
+        )}
+        <button
+          onClick={() => setCollapsed(c => !c)}
+          title={collapsed ? 'Expand palette' : 'Collapse palette'}
+          style={{
+            width: 28, height: 28, borderRadius: 7,
+            border: '1px solid rgba(124,58,237,0.2)',
+            background: 'transparent', cursor: 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            color: '#6d6d8a', transition: 'all 0.15s', flexShrink: 0,
+          }}
+          onMouseEnter={e => { e.currentTarget.style.background = 'rgba(124,58,237,0.12)'; e.currentTarget.style.color = '#a78bfa'; }}
+          onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#6d6d8a'; }}
+        >
+          {collapsed ? <ChevronRight size={13} /> : <ChevronLeft size={13} />}
+        </button>
       </div>
 
-      {/* Categories */}
-      <div style={{ padding: '10px 10px', flex: 1 }}>
-        {Object.entries(grouped).map(([category, nodes]) => (
-          <div key={category} style={{ marginBottom: 14 }}>
-            <div style={{
-              fontSize: 9, fontWeight: 700,
-              color: CATEGORY_COLORS[category] || '#64748b',
-              letterSpacing: '0.12em', textTransform: 'uppercase',
-              marginBottom: 5, paddingLeft: 4,
-              fontFamily: 'JetBrains Mono, monospace'
-            }}>
-              {category}
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-              {nodes.map(node => {
-                const Icon  = node.icon;
-                const badge = STATUS_BADGE[node.status];
-                const isSupported = node.status === 'supported';
+      {/* ── Node list ───────────────────────────────────────────────────── */}
+      <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', padding: collapsed ? '8px 0' : '8px 0 16px' }}>
 
-                return (
-                  <button
-                    key={node.type}
-                    onClick={() => onAddNode(node.type)}
-                    title={isSupported ? node.label : `${node.label} — ${badge?.text}`}
-                    style={{
-                      display: 'flex', alignItems: 'center', gap: 8,
-                      padding: '7px 9px',
-                      background: 'transparent',
-                      border: '1px solid transparent',
-                      borderRadius: 8,
-                      cursor: 'pointer',
-                      textAlign: 'left',
-                      transition: 'all 0.15s',
-                      width: '100%',
-                      opacity: isSupported ? 1 : 0.7,
-                    }}
-                    onMouseEnter={e => {
-                      e.currentTarget.style.background = node.bg;
-                      e.currentTarget.style.borderColor = `${node.color}44`;
-                    }}
-                    onMouseLeave={e => {
-                      e.currentTarget.style.background = 'transparent';
-                      e.currentTarget.style.borderColor = 'transparent';
-                    }}
-                  >
-                    <div style={{
-                      width: 24, height: 24, borderRadius: 6,
-                      background: node.bg, border: `1px solid ${node.color}44`,
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      flexShrink: 0,
-                    }}>
-                      <Icon size={12} color={node.color} />
-                    </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <span style={{ fontSize: 11, color: '#cbd5e1', fontWeight: 500, display: 'block' }}>
-                        {node.label}
-                      </span>
-                      {badge && (
-                        <span style={{
-                          fontSize: 8, fontFamily: 'JetBrains Mono, monospace',
-                          color: badge.color,
-                          background: badge.bg,
-                          padding: '1px 4px', borderRadius: 3,
-                          display: 'inline-block', marginTop: 1,
-                          letterSpacing: '0.05em',
-                        }}>
-                          {badge.text}
-                        </span>
-                      )}
-                    </div>
-                    <Plus size={10} color="#334155" style={{ flexShrink: 0 }} />
-                  </button>
-                );
-              })}
-            </div>
+        {collapsed ? (
+          /* ── Icon-only mode ─────────────────────────────────────────── */
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, padding: '0 6px' }}>
+            {NODE_PALETTE_DEFS.map(node => {
+              const Icon = node.icon;
+              return (
+                <button
+                  key={node.type}
+                  onClick={() => onAddNode(node.type)}
+                  title={node.label + (node.status !== 'supported' ? ` (${STATUS_BADGE[node.status]?.text})` : '')}
+                  style={{
+                    width: 36, height: 36, borderRadius: 9,
+                    background: node.bg,
+                    border: `1px solid ${node.color}33`,
+                    cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    opacity: node.status === 'supported' ? 1 : 0.55,
+                    transition: 'all 0.15s', flexShrink: 0,
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.borderColor = node.color + '88'; }}
+                  onMouseLeave={e => { e.currentTarget.style.opacity = node.status === 'supported' ? '1' : '0.55'; e.currentTarget.style.borderColor = node.color + '33'; }}
+                >
+                  <Icon size={14} color={node.color} />
+                </button>
+              );
+            })}
           </div>
-        ))}
+        ) : (
+          /* ── Expanded mode ──────────────────────────────────────────── */
+          CATEGORIES.map(cat => {
+            const nodes = grouped[cat];
+            if (!nodes?.length) return null;
+            const open = openCats[cat];
+            const catColor = CATEGORY_COLOR[cat];
+
+            return (
+              <div key={cat}>
+                {/* Category header */}
+                <button
+                  onClick={() => toggleCat(cat)}
+                  style={{
+                    width: '100%', display: 'flex', alignItems: 'center',
+                    gap: 6, padding: '6px 12px 5px 14px',
+                    background: 'transparent', border: 'none', cursor: 'pointer',
+                    textAlign: 'left',
+                  }}
+                >
+                  <div style={{ width: 3, height: 12, borderRadius: 2, background: catColor, flexShrink: 0 }} />
+                  <span style={{
+                    flex: 1, fontSize: 10, fontWeight: 700,
+                    color: catColor, letterSpacing: '0.1em',
+                    textTransform: 'uppercase',
+                    fontFamily: 'JetBrains Mono, monospace',
+                  }}>
+                    {cat}
+                  </span>
+                  {open
+                    ? <ChevronUp size={10} color="#475569" />
+                    : <ChevronDown size={10} color="#475569" />}
+                </button>
+
+                {/* Nodes in this category */}
+                {open && (
+                  <div style={{ paddingBottom: 6 }}>
+                    {nodes.map(node => {
+                      const Icon  = node.icon;
+                      const badge = STATUS_BADGE[node.status];
+                      return (
+                        <button
+                          key={node.type}
+                          onClick={() => onAddNode(node.type)}
+                          title={node.label}
+                          style={{
+                            width: '100%', display: 'flex', alignItems: 'center',
+                            gap: 9, padding: '7px 12px 7px 16px',
+                            background: 'transparent', border: 'none',
+                            cursor: 'pointer', textAlign: 'left',
+                            opacity: node.status === 'supported' ? 1 : 0.65,
+                            transition: 'all 0.12s',
+                          }}
+                          onMouseEnter={e => {
+                            e.currentTarget.style.background = node.bg;
+                            e.currentTarget.style.opacity = '1';
+                          }}
+                          onMouseLeave={e => {
+                            e.currentTarget.style.background = 'transparent';
+                            e.currentTarget.style.opacity = node.status === 'supported' ? '1' : '0.65';
+                          }}
+                        >
+                          {/* Icon box */}
+                          <div style={{
+                            width: 26, height: 26, borderRadius: 7, flexShrink: 0,
+                            background: node.bg,
+                            border: `1px solid ${node.color}33`,
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          }}>
+                            <Icon size={12} color={node.color} />
+                          </div>
+
+                          {/* Label + badge */}
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{
+                              fontSize: 12, fontWeight: 600, color: '#d4d4f0',
+                              whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                              lineHeight: 1.3,
+                            }}>
+                              {node.label}
+                            </div>
+                            {badge && (
+                              <span style={{
+                                fontSize: 9, fontFamily: 'JetBrains Mono, monospace',
+                                fontWeight: 700, color: badge.color,
+                                background: badge.bg, letterSpacing: '0.05em',
+                                padding: '1px 5px', borderRadius: 3,
+                                display: 'inline-block', marginTop: 2,
+                              }}>
+                                {badge.text}
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Add indicator */}
+                          <Plus size={11} color="#334155" style={{ flexShrink: 0, opacity: 0.7 }} />
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })
+        )}
       </div>
+
+      <style>{`
+        ::-webkit-scrollbar { width: 3px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(124,58,237,0.2); border-radius: 3px; }
+      `}</style>
     </div>
   );
 }
