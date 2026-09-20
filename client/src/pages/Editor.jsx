@@ -224,7 +224,7 @@ export default function Editor() {
         background: '#0d0d1c',
         borderBottom: '1px solid rgba(124,58,237,0.18)',
         padding: '0 24px',
-        height: 60,
+        height: 64,
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         flexShrink: 0,
         boxShadow: '0 1px 0 rgba(124,58,237,0.08)',
@@ -233,11 +233,11 @@ export default function Editor() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
           <button
             onClick={() => navigate(createPageUrl('Dashboard'))}
-            style={{ background: 'transparent', border: '1px solid rgba(124,58,237, 0.2)', borderRadius: 8, padding: '5px 8px', cursor: 'pointer', color: '#8888aa', display: 'flex', alignItems: 'center' }}
+            style={{ background: 'transparent', border: '1px solid rgba(124,58,237, 0.2)', borderRadius: 8, padding: '7px 10px', cursor: 'pointer', color: '#8888aa', display: 'flex', alignItems: 'center' }}
             onMouseEnter={e => e.currentTarget.style.color = '#e2e8f0'}
             onMouseLeave={e => e.currentTarget.style.color = '#64748b'}
           >
-            <ArrowLeft size={15} />
+            <ArrowLeft size={16} />
           </button>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -252,7 +252,7 @@ export default function Editor() {
                   padding: '2px 6px', borderRadius: 4, letterSpacing: '0.05em',
                   display: 'flex', alignItems: 'center', gap: 3,
                 }}>
-                  <GitBranch size={8} />
+                  <GitBranch size={9} />
                   {draftDirty ? 'UNSAVED DRAFT' : 'DRAFT'}
                 </span>
               )}
@@ -272,14 +272,14 @@ export default function Editor() {
             onClick={() => setShowPreview(p => !p)}
             style={{
               display: 'flex', alignItems: 'center', gap: 6,
-              padding: '7px 12px',
+              padding: '9px 16px',
               background: showPreview ? 'rgba(34,197,94,0.15)' : 'transparent',
               border: `1px solid ${showPreview ? 'rgba(34,197,94,0.4)' : 'rgba(124,58,237, 0.3)'}`,
               borderRadius: 8, color: showPreview ? '#22c55e' : '#94a3b8',
-              fontSize: 12, fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s',
+              fontSize: 13, fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s',
             }}
           >
-            {showPreview ? <EyeOff size={13} /> : <Eye size={13} />}
+            {showPreview ? <EyeOff size={14} /> : <Eye size={14} />}
             {showPreview ? 'Hide Preview' : 'Preview'}
           </button>
 
@@ -289,16 +289,16 @@ export default function Editor() {
             title="Chat with Architect (advisory only)"
             style={{
               display: 'flex', alignItems: 'center', gap: 6,
-              padding: '7px 12px',
+              padding: '9px 16px',
               background: showArchitect ? 'rgba(124,58,237, 0.2)' : 'transparent',
               border: `1px solid ${showArchitect ? 'rgba(124,58,237, 0.5)' : 'rgba(124,58,237, 0.3)'}`,
               borderRadius: 8, color: showArchitect ? '#818cf8' : '#94a3b8',
-              fontSize: 12, fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s',
+              fontSize: 13, fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s',
             }}
             onMouseEnter={e => { if (!showArchitect) e.currentTarget.style.background = 'rgba(124,58,237, 0.08)'; }}
             onMouseLeave={e => { if (!showArchitect) e.currentTarget.style.background = 'transparent'; }}
           >
-            <MessageSquare size={13} />
+            <MessageSquare size={14} />
             Architect
           </button>
 
@@ -310,17 +310,17 @@ export default function Editor() {
               title="Discard draft and restore active workflow"
               style={{
                 display: 'flex', alignItems: 'center', gap: 6,
-                padding: '7px 12px',
+                padding: '9px 16px',
                 background: 'transparent',
                 border: '1px solid rgba(239,68,68,0.3)',
                 borderRadius: 8, color: discarding ? '#475569' : '#f87171',
-                fontSize: 12, fontWeight: 600, cursor: discarding ? 'wait' : 'pointer',
+                fontSize: 13, fontWeight: 600, cursor: discarding ? 'wait' : 'pointer',
                 transition: 'all 0.15s',
               }}
               onMouseEnter={e => { if (!discarding) e.currentTarget.style.background = 'rgba(239,68,68,0.08)'; }}
               onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
             >
-              <Trash2 size={13} />
+              <Trash2 size={14} />
               {discarding ? 'Discarding...' : 'Discard Draft'}
             </button>
           )}
@@ -332,18 +332,18 @@ export default function Editor() {
             title={draftDirty ? 'Save draft changes' : 'No unsaved changes'}
             style={{
               display: 'flex', alignItems: 'center', gap: 6,
-              padding: '7px 14px',
+              padding: '9px 18px',
               background: draftDirty ? 'rgba(124,58,237, 0.15)' : 'transparent',
               border: `1px solid ${draftDirty ? 'rgba(124,58,237, 0.5)' : 'rgba(124,58,237, 0.2)'}`,
               borderRadius: 8, color: (savingDraft || !draftDirty) ? '#475569' : '#818cf8',
-              fontSize: 12, fontWeight: 600,
+              fontSize: 13, fontWeight: 600,
               cursor: (savingDraft || !draftDirty) ? 'default' : 'pointer',
               transition: 'all 0.15s',
             }}
             onMouseEnter={e => { if (draftDirty && !savingDraft) e.currentTarget.style.background = 'rgba(124,58,237, 0.25)'; }}
             onMouseLeave={e => e.currentTarget.style.background = draftDirty ? 'rgba(124,58,237, 0.15)' : 'transparent'}
           >
-            <Save size={13} />
+            <Save size={14} />
             {savingDraft ? 'Saving...' : 'Save Draft'}
           </button>
 
@@ -354,16 +354,16 @@ export default function Editor() {
             title="Deploy active workflow (not draft)"
             style={{
               display: 'flex', alignItems: 'center', gap: 6,
-              padding: '7px 16px',
+              padding: '9px 20px',
               background: deploying ? 'rgba(124,58,237, 0.3)' : 'linear-gradient(135deg, #7c3aed, #8b5cf6)',
               border: 'none', borderRadius: 8, color: '#fff',
-              fontSize: 12, fontWeight: 700, cursor: deploying ? 'wait' : 'pointer',
+              fontSize: 13, fontWeight: 700, cursor: deploying ? 'wait' : 'pointer',
               boxShadow: '0 0 20px rgba(124,58,237, 0.35)', transition: 'all 0.15s',
             }}
             onMouseEnter={e => { if (!deploying) e.currentTarget.style.boxShadow = '0 0 30px rgba(124,58,237, 0.55)'; }}
             onMouseLeave={e => e.currentTarget.style.boxShadow = '0 0 20px rgba(124,58,237, 0.35)'}
           >
-            <Rocket size={13} />
+            <Rocket size={14} />
             {deploying ? 'Deploying...' : 'Deploy'}
           </button>
         </div>

@@ -65,7 +65,7 @@ export default function NodePalette({ onAddNode }) {
   const toggleCat = cat =>
     setOpenCats(prev => ({ ...prev, [cat]: !prev[cat] }));
 
-  const W = collapsed ? 48 : 220;
+  const W = collapsed ? 52 : 280;
 
   return (
     <div style={{
@@ -102,7 +102,7 @@ export default function NodePalette({ onAddNode }) {
           onClick={() => setCollapsed(c => !c)}
           title={collapsed ? 'Expand palette' : 'Collapse palette'}
           style={{
-            width: 28, height: 28, borderRadius: 7,
+            width: 30, height: 30, borderRadius: 8,
             border: '1px solid rgba(124,58,237,0.2)',
             background: 'transparent', cursor: 'pointer',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -129,7 +129,7 @@ export default function NodePalette({ onAddNode }) {
                   onClick={() => onAddNode(node.type)}
                   title={node.label + (node.status !== 'supported' ? ` (${STATUS_BADGE[node.status]?.text})` : '')}
                   style={{
-                    width: 36, height: 36, borderRadius: 9,
+                    width: 40, height: 40, borderRadius: 10,
                     background: node.bg,
                     border: `1px solid ${node.color}33`,
                     cursor: 'pointer',
@@ -140,7 +140,7 @@ export default function NodePalette({ onAddNode }) {
                   onMouseEnter={e => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.borderColor = node.color + '88'; }}
                   onMouseLeave={e => { e.currentTarget.style.opacity = node.status === 'supported' ? '1' : '0.55'; e.currentTarget.style.borderColor = node.color + '33'; }}
                 >
-                  <Icon size={14} color={node.color} />
+                  <Icon size={16} color={node.color} />
                 </button>
               );
             })}
@@ -160,7 +160,7 @@ export default function NodePalette({ onAddNode }) {
                   onClick={() => toggleCat(cat)}
                   style={{
                     width: '100%', display: 'flex', alignItems: 'center',
-                    gap: 6, padding: '6px 12px 5px 14px',
+                    gap: 7, padding: '7px 12px 6px 16px',
                     background: 'transparent', border: 'none', cursor: 'pointer',
                     textAlign: 'left',
                   }}
@@ -192,7 +192,7 @@ export default function NodePalette({ onAddNode }) {
                           title={node.label}
                           style={{
                             width: '100%', display: 'flex', alignItems: 'center',
-                            gap: 9, padding: '7px 12px 7px 16px',
+                            gap: 10, padding: '9px 12px 9px 18px',
                             background: 'transparent', border: 'none',
                             cursor: 'pointer', textAlign: 'left',
                             opacity: node.status === 'supported' ? 1 : 0.65,
@@ -209,18 +209,18 @@ export default function NodePalette({ onAddNode }) {
                         >
                           {/* Icon box */}
                           <div style={{
-                            width: 26, height: 26, borderRadius: 7, flexShrink: 0,
+                            width: 32, height: 32, borderRadius: 9, flexShrink: 0,
                             background: node.bg,
                             border: `1px solid ${node.color}33`,
                             display: 'flex', alignItems: 'center', justifyContent: 'center',
                           }}>
-                            <Icon size={12} color={node.color} />
+                            <Icon size={15} color={node.color} />
                           </div>
 
                           {/* Label + badge */}
                           <div style={{ flex: 1, minWidth: 0 }}>
                             <div style={{
-                              fontSize: 12, fontWeight: 600, color: '#d4d4f0',
+                              fontSize: 13, fontWeight: 600, color: '#d4d4f0',
                               whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
                               lineHeight: 1.3,
                             }}>
@@ -231,7 +231,7 @@ export default function NodePalette({ onAddNode }) {
                                 fontSize: 9, fontFamily: 'JetBrains Mono, monospace',
                                 fontWeight: 700, color: badge.color,
                                 background: badge.bg, letterSpacing: '0.05em',
-                                padding: '1px 5px', borderRadius: 3,
+                                padding: '1px 6px', borderRadius: 4,
                                 display: 'inline-block', marginTop: 2,
                               }}>
                                 {badge.text}
@@ -240,7 +240,7 @@ export default function NodePalette({ onAddNode }) {
                           </div>
 
                           {/* Add indicator */}
-                          <Plus size={11} color="#334155" style={{ flexShrink: 0, opacity: 0.7 }} />
+                          <Plus size={12} color="#3d3d5c" style={{ flexShrink: 0 }} />
                         </button>
                       );
                     })}
