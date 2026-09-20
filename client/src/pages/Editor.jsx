@@ -202,7 +202,7 @@ export default function Editor() {
 
   if (loading) {
     return (
-      <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'hsl(var(--background))', color: 'hsl(var(--muted-foreground))', fontFamily: 'JetBrains Mono, monospace', fontSize: 13 }}>
+      <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#09090f', color: '#8888aa', fontFamily: 'JetBrains Mono, monospace', fontSize: 13 }}>
         {'> Loading workflow...'}
       </div>
     );
@@ -210,29 +210,30 @@ export default function Editor() {
 
   if (!chatbot) {
     return (
-      <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'hsl(var(--background))', color: 'hsl(var(--danger))', fontFamily: 'JetBrains Mono, monospace', fontSize: 13 }}>
+      <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#09090f', color: '#ef4444', fontFamily: 'JetBrains Mono, monospace', fontSize: 13 }}>
         {'> Chatbot not found.'}
       </div>
     );
   }
 
   return (
-    <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', background: 'hsl(var(--background))', fontFamily: 'Inter, sans-serif' }}>
+    <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', background: '#09090f', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
 
       {/* ── Header ───────────────────────────────────────────────────────────── */}
       <div style={{
-        background: 'hsl(var(--background))',
-        borderBottom: '1px solid rgba(124,58,237, 0.2)',
-        padding: '0 20px',
-        height: 56,
+        background: '#0d0d1c',
+        borderBottom: '1px solid rgba(124,58,237,0.18)',
+        padding: '0 24px',
+        height: 60,
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         flexShrink: 0,
+        boxShadow: '0 1px 0 rgba(124,58,237,0.08)',
       }}>
         {/* Left: back + title */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
           <button
             onClick={() => navigate(createPageUrl('Dashboard'))}
-            style={{ background: 'transparent', border: '1px solid rgba(124,58,237, 0.2)', borderRadius: 8, padding: '5px 8px', cursor: 'pointer', color: 'hsl(var(--muted-foreground))', display: 'flex', alignItems: 'center' }}
+            style={{ background: 'transparent', border: '1px solid rgba(124,58,237, 0.2)', borderRadius: 8, padding: '5px 8px', cursor: 'pointer', color: '#8888aa', display: 'flex', alignItems: 'center' }}
             onMouseEnter={e => e.currentTarget.style.color = '#e2e8f0'}
             onMouseLeave={e => e.currentTarget.style.color = '#64748b'}
           >
@@ -240,7 +241,7 @@ export default function Editor() {
           </button>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ fontSize: 14, fontWeight: 700, color: 'hsl(var(--foreground))' }}>{chatbot.title}</span>
+              <span style={{ fontSize: 15, fontWeight: 700, color: '#f0f0ff', letterSpacing: '-0.01em' }}>{chatbot.title}</span>
               {/* Draft indicator */}
               {isEditing && (
                 <span style={{
@@ -256,7 +257,7 @@ export default function Editor() {
                 </span>
               )}
             </div>
-            <div style={{ fontSize: 11, color: 'hsl(var(--muted-foreground))', fontFamily: 'JetBrains Mono, monospace' }}>
+            <div style={{ fontSize: 12, color: '#8888aa', fontFamily: 'JetBrains Mono, monospace' }}>
               {isEditing
                 ? 'Draft changes — preview and deployed chat use the active workflow'
                 : chatbot.description?.slice(0, 55) + (chatbot.description?.length > 55 ? '...' : '')}
@@ -355,7 +356,7 @@ export default function Editor() {
               display: 'flex', alignItems: 'center', gap: 6,
               padding: '7px 16px',
               background: deploying ? 'rgba(124,58,237, 0.3)' : 'linear-gradient(135deg, #7c3aed, #8b5cf6)',
-              border: 'none', borderRadius: 8, color: 'hsl(var(--primary-foreground))',
+              border: 'none', borderRadius: 8, color: '#fff',
               fontSize: 12, fontWeight: 700, cursor: deploying ? 'wait' : 'pointer',
               boxShadow: '0 0 20px rgba(124,58,237, 0.35)', transition: 'all 0.15s',
             }}
@@ -375,8 +376,8 @@ export default function Editor() {
           padding: '6px 20px', display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0,
         }}>
           <AlertTriangle size={12} color="#ef4444" />
-          <span style={{ fontSize: 11, color: 'hsl(var(--danger) / 0.8)', fontFamily: 'JetBrains Mono, monospace' }}>{draftError}</span>
-          <button onClick={() => setDraftError('')} style={{ marginLeft: 'auto', background: 'transparent', border: 'none', cursor: 'pointer', color: 'hsl(var(--danger))', fontSize: 11 }}>✕</button>
+          <span style={{ fontSize: 11, color: '#fca5a5', fontFamily: 'JetBrains Mono, monospace' }}>{draftError}</span>
+          <button onClick={() => setDraftError('')} style={{ marginLeft: 'auto', background: 'transparent', border: 'none', cursor: 'pointer', color: '#ef4444', fontSize: 11 }}>✕</button>
         </div>
       )}
 
@@ -387,7 +388,7 @@ export default function Editor() {
           padding: '5px 20px', display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0,
         }}>
           <CheckCircle size={11} color="#7c3aed" />
-          <span style={{ fontSize: 10, color: 'hsl(var(--primary))', fontFamily: 'JetBrains Mono, monospace' }}>
+          <span style={{ fontSize: 10, color: '#a78bfa', fontFamily: 'JetBrains Mono, monospace' }}>
             Draft saved. Preview and deployed chat still use the active workflow until Phase 9B activates this draft.
           </span>
         </div>

@@ -46,7 +46,7 @@ function PlanSection({ icon: Icon, color, title, children, defaultOpen = true })
       >
         <div className="flex items-center gap-2">
           <Icon size={14} style={{ color }} />
-          <span className="text-sm font-semibold text-slate-100">{title}</span>
+          <span className="text-sm font-semibold text-slate-100 tracking-tight">{title}</span>
         </div>
         {open
           ? <ChevronUp size={13} className="text-slate-400" />
@@ -60,7 +60,7 @@ function PlanSection({ icon: Icon, color, title, children, defaultOpen = true })
 function Val({ label, value }) {
   return (
     <div className="flex items-start justify-between gap-4 py-1.5 border-b border-slate-800/50 last:border-0">
-      <span className="text-xs text-slate-400 font-mono uppercase tracking-wide flex-shrink-0">{label}</span>
+      <span className="text-xs text-slate-500 font-mono uppercase tracking-widest flex-shrink-0">{label}</span>
       <span className="text-xs text-slate-100 text-right font-mono">{String(value)}</span>
     </div>
   );
@@ -87,11 +87,11 @@ function PlanDisplay({ plan, planVersion, statusLabel, statusColor }) {
                 v{planVersion} · {statusLabel}
               </span>
             </div>
-            <h2 className="text-lg font-bold text-slate-100">{plan.domain}</h2>
+            <h2 className="text-xl font-bold text-slate-100 tracking-tight">{plan.domain}</h2>
             <p className="text-slate-400 text-sm mt-1">{plan.use_case}</p>
           </div>
           <div className="w-10 h-10 rounded-xl bg-violet-600/20 border border-violet-500/30 flex items-center justify-center flex-shrink-0 ml-4">
-            <Cpu size={16} className="text-primary" />
+            <Cpu size={16} className="text-violet-300" />
           </div>
         </div>
         <p className="mt-4 text-slate-400 text-sm leading-relaxed border-l-2 border-violet-500/40 pl-3">
@@ -411,16 +411,16 @@ export default function Architect() {
   // ─────────────────────────────────────────────────────────────────────────────
 
   return (
-    <div className="min-h-screen bg-[#09090f] grid-bg">
+    <div className="min-h-screen bg-[#09090f]">
       <div className="absolute top-0 left-1/4 w-96 h-96 bg-violet-600/8 rounded-full blur-[120px] pointer-events-none" />
       <div className="absolute bottom-0 right-1/3 w-80 h-80 bg-purple-600/8 rounded-full blur-[100px] pointer-events-none" />
 
-      <div className="relative z-10 max-w-3xl mx-auto px-4 py-10">
+      <div className="relative z-10 max-w-3xl mx-auto px-4 py-10" style={{ fontFamily: "Plus Jakarta Sans, sans-serif" }}>
 
         {/* Back nav */}
         <button
           onClick={() => navigate(createPageUrl('Dashboard'))}
-          className="flex items-center gap-2 text-slate-400 hover:text-slate-100 text-sm mb-8 transition-colors"
+          className="flex items-center gap-2 text-slate-500 hover:text-slate-200 text-sm mb-8 transition-colors font-medium"
         >
           <ArrowLeft size={14} /> Dashboard
         </button>
@@ -431,14 +431,14 @@ export default function Architect() {
             <Cpu size={18} className="text-slate-100" />
           </div>
           <div>
-            <h1 className="text-xl font-bold text-slate-100">AI RAG Architect</h1>
-            <p className="text-slate-400 text-sm">Design your optimal RAG pipeline</p>
+            <h1 className="text-2xl font-bold text-slate-100 tracking-tight">AI RAG Architect</h1>
+            <p className="text-slate-500 text-sm mt-0.5">Design your optimal RAG pipeline</p>
           </div>
         </div>
 
         {/* Error banner */}
         {error && (
-          <div className="mb-6 px-4 py-3 rounded-xl bg-red-500/10/10 border border-red-500/30/30 text-red-400 text-sm flex items-center gap-2">
+          <div className="mb-6 px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-sm flex items-center gap-2">
             <AlertCircle size={14} className="flex-shrink-0" />
             {error}
             <button onClick={() => setError('')} className="ml-auto text-red-500 hover:text-red-300">✕</button>
@@ -450,7 +450,7 @@ export default function Architect() {
           <div className="space-y-6">
             {/* Show previous approved plan as reminder when creating a new version */}
             {plan && planStatus === 'approved' && (
-              <div className="px-4 py-3 rounded-xl bg-emerald-500/10/8 border border-emerald-500/30/20 text-emerald-400 text-xs flex items-center gap-2">
+              <div className="px-4 py-3 rounded-xl bg-emerald-500/8 border border-emerald-500/20 text-emerald-400 text-xs flex items-center gap-2">
                 <CheckCircle size={13} className="flex-shrink-0" />
                 <span>Creating new version. Current approved plan is v{planVersion} — it will only be replaced after a successful generation.</span>
               </div>
@@ -458,7 +458,7 @@ export default function Architect() {
 
             <div className="neon-border rounded-2xl bg-[#13131f]/80 overflow-hidden">
               <div className="flex items-center gap-2 px-5 py-3 border-b border-violet-500/10 bg-violet-950/20">
-                <div className="w-3 h-3 rounded-full bg-red-500/10/70" />
+                <div className="w-3 h-3 rounded-full bg-red-500/70" />
                 <div className="w-3 h-3 rounded-full bg-slate-500/50" />
                 <div className="w-3 h-3 rounded-full bg-green-500/70" />
                 <span className="font-mono text-xs text-slate-400 ml-2">requirement.describe</span>
@@ -473,7 +473,7 @@ export default function Architect() {
                     onChange={e => { setRequirement(e.target.value); setCharCount(e.target.value.length); }}
                     placeholder="e.g. A customer support chatbot for my saree e-commerce store that answers questions about products, shipping, returns, and policies. Accuracy is more important than speed."
                     rows={5}
-                    className="w-full px-4 py-3 bg-slate-900/60 border border-violet-500/15 50 rounded-xl text-slate-100 text-sm font-mono focus:border-violet-500/50 focus:outline-none resize-none placeholder:text-slate-400 leading-relaxed"
+                    className="w-full px-4 py-3 bg-slate-900/60 border border-violet-500/15 rounded-xl text-slate-100 text-sm font-mono focus:border-violet-500/50 focus:outline-none resize-none placeholder:text-slate-500 leading-relaxed"
                   />
                   <span className="absolute bottom-3 right-3 font-mono text-xs text-slate-400">{charCount}</span>
                 </div>
@@ -483,7 +483,7 @@ export default function Architect() {
             {/* Knowledge sources */}
             <div className="neon-border rounded-2xl bg-[#13131f]/80 overflow-hidden">
               <div className="px-6 py-4 border-b border-violet-500/10">
-                <h2 className="text-sm font-semibold text-slate-100">Knowledge Sources</h2>
+                <h2 className="text-sm font-semibold text-slate-200">Knowledge Sources</h2>
                 <p className="text-slate-400 text-xs mt-0.5">Upload documents for the Architect to analyze (optional but recommended)</p>
               </div>
               <div className="p-6">
@@ -498,16 +498,16 @@ export default function Architect() {
                 <button
                   onClick={() => fileInputRef.current?.click()}
                   disabled={uploading}
-                  className="w-full py-6 rounded-xl border border-dashed border-violet-500/35 bg-primary 5 hover:bg-primary 10 transition-colors flex flex-col items-center gap-2 cursor-pointer"
+                  className="w-full py-6 rounded-xl border border-dashed border-violet-500/35 bg-violet-600/5 hover:bg-violet-600/10 transition-colors flex flex-col items-center gap-2 cursor-pointer"
                 >
                   {uploading ? (
                     <>
-                      <div className="w-5 h-5 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
-                      <span className="text-xs text-primary font-mono">Uploading & profiling...</span>
+                      <div className="w-5 h-5 border-2 border-violet-500 border-t-transparent rounded-full animate-spin" />
+                      <span className="text-xs text-violet-300 font-mono">Uploading & profiling...</span>
                     </>
                   ) : (
                     <>
-                      <Upload size={20} className="text-primary" />
+                      <Upload size={20} className="text-violet-300" />
                       <span className="text-sm text-slate-400">Click to upload files</span>
                       <span className="text-xs text-slate-400 font-mono">PDF, DOCX, TXT, CSV</span>
                     </>
@@ -518,13 +518,13 @@ export default function Architect() {
                   <div className="mt-4 space-y-2">
                     {uploadedDocs.map(doc => {
                       const statusLabel = {
-                        profiled:  { text: 'profiled', color: 'text-primary' },
+                        profiled:  { text: 'profiled', color: 'text-violet-300' },
                         indexing:  { text: 'indexing...', color: 'text-violet-400' },
                         indexed:   { text: 'indexed', color: 'text-emerald-400' },
                       }[doc.status] || { text: doc.status, color: 'text-slate-400' };
                       return (
-                        <div key={doc.id} className="flex items-center gap-3 px-3 py-2 bg-slate-900/60/60 border border-violet-500/15 rounded-lg">
-                          <FileText size={12} className="text-primary flex-shrink-0" />
+                        <div key={doc.id} className="flex items-center gap-3 px-3 py-2 bg-slate-900/60 border border-violet-500/15 rounded-lg">
+                          <FileText size={12} className="text-violet-300 flex-shrink-0" />
                           <div className="flex-1 min-w-0">
                             <p className="text-xs text-slate-100 truncate">{doc.file_name}</p>
                             <p className="text-xs text-slate-400 font-mono">
@@ -571,8 +571,8 @@ export default function Architect() {
           <div className="space-y-6">
             <div className="neon-border rounded-2xl bg-[#13131f]/80 p-6">
               <div className="flex items-center gap-2 mb-4">
-                <MessageSquare size={15} className="text-primary" />
-                <h2 className="text-sm font-semibold text-slate-100">A few clarifying questions</h2>
+                <MessageSquare size={15} className="text-violet-300" />
+                <h2 className="text-sm font-semibold text-slate-200">A few clarifying questions</h2>
                 <span className="ml-auto font-mono text-xs text-slate-400">
                   {questions.length} question{questions.length !== 1 ? 's' : ''}
                 </span>
@@ -584,7 +584,7 @@ export default function Architect() {
                 {questions.map((q, i) => (
                   <div key={q.id}>
                     <label className="block text-sm text-slate-100 mb-3">
-                      <span className="font-mono text-primary mr-2">{i + 1}.</span>{q.question}
+                      <span className="font-mono text-violet-300 mr-2">{i + 1}.</span>{q.question}
                     </label>
                     {q.type === 'single_choice' && q.options?.length > 0 ? (
                       <div className="space-y-2">
@@ -595,7 +595,7 @@ export default function Architect() {
                             className={`w-full text-left px-4 py-2.5 rounded-lg border text-sm transition-colors ${
                               answers[q.id] === opt
                                 ? 'border-violet-500/50 bg-violet-600/15 text-violet-200'
-                                : 'border-violet-500/15 50 bg-slate-900/60 text-slate-400 hover:border-violet-500/15'
+                                : 'border-violet-500/15 bg-slate-900/60 text-slate-400 hover:border-violet-500/30'
                             }`}
                           >
                             {opt}
@@ -608,7 +608,7 @@ export default function Architect() {
                         value={answers[q.id] || ''}
                         onChange={e => setAnswers(a => ({ ...a, [q.id]: e.target.value }))}
                         placeholder="Your answer..."
-                        className="w-full px-4 py-2.5 bg-slate-900/60 border border-violet-500/15 50 rounded-lg text-slate-100 text-sm focus:border-violet-500/50 focus:outline-none"
+                        className="w-full px-4 py-2.5 bg-slate-900/60 border border-violet-500/15 rounded-lg text-slate-100 text-sm focus:border-violet-500/50 focus:outline-none"
                       />
                     )}
                   </div>
@@ -619,7 +619,7 @@ export default function Architect() {
             <div className="flex gap-3">
               <button
                 onClick={handleEditRequirements}
-                className="py-3 px-5 rounded-xl border border-violet-500/15 50 text-slate-400 text-sm hover:border-violet-500/15 transition-colors"
+                className="py-3 px-5 rounded-xl border border-violet-500/15 text-slate-400 text-sm hover:border-violet-500/30 transition-colors"
               >
                 <ArrowLeft size={13} className="inline mr-1" /> Back
               </button>
@@ -640,7 +640,7 @@ export default function Architect() {
         {step === STEPS.GENERATING && (
           <div className="neon-border rounded-2xl bg-[#13131f]/80 p-12 text-center">
             <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-violet-600/30 to-violet-700/30 border border-violet-500/30 flex items-center justify-center mx-auto mb-6">
-              <Cpu size={28} className="text-primary animate-pulse" />
+              <Cpu size={28} className="text-violet-300 animate-pulse" />
             </div>
             <h2 className="text-lg font-bold text-slate-100 mb-2">Generating Architecture Plan</h2>
             <p className="text-slate-400 text-sm mb-6">Analyzing your requirements and knowledge base...</p>
@@ -671,14 +671,14 @@ export default function Architect() {
             <div className="flex gap-3 pt-2">
               <button
                 onClick={handleEditRequirements}
-                className="py-3 px-4 rounded-xl border border-violet-500/15 50 text-slate-400 text-sm hover:border-violet-500/15 transition-colors flex items-center gap-1.5"
+                className="py-3 px-4 rounded-xl border border-violet-500/15 text-slate-400 text-sm hover:border-violet-500/30 transition-colors flex items-center gap-1.5"
               >
                 <Edit3 size={13} /> Edit Requirements
               </button>
               <button
                 onClick={handleRegenerate}
                 disabled={generateLoading}
-                className="py-3 px-4 rounded-xl border border-violet-500/30 text-primary text-sm hover:bg-violet-600/10 transition-colors flex items-center gap-1.5 disabled:opacity-50"
+                className="py-3 px-4 rounded-xl border border-violet-500/30 text-violet-300 text-sm hover:bg-violet-600/10 transition-colors flex items-center gap-1.5 disabled:opacity-50"
               >
                 <RefreshCw size={13} className={generateLoading ? 'animate-spin' : ''} />
                 Regenerate
@@ -686,7 +686,7 @@ export default function Architect() {
               <button
                 onClick={handleApprove}
                 disabled={approveLoading}
-                className="flex-1 py-3 rounded-xl bg-emerald-500/10 text-slate-100 text-sm font-bold flex items-center justify-center gap-2 hover:opacity-90 transition-opacity disabled:opacity-50"
+                className="flex-1 py-3 rounded-xl bg-emerald-600 text-white text-sm font-bold flex items-center justify-center gap-2 hover:bg-emerald-500 transition-colors disabled:opacity-50"
               >
                 {approveLoading
                   ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Approving...</>
@@ -700,10 +700,10 @@ export default function Architect() {
         {step === STEPS.APPROVED && plan && (
           <div className="space-y-4">
             {/* Approval status banner */}
-            <div className="neon-border rounded-xl bg-emerald-900/10 border-emerald-500/30/25 overflow-hidden">
-              <div className="flex items-center gap-3 px-5 py-3 bg-emerald-900/20">
-                <div className="w-7 h-7 rounded-lg bg-emerald-500/10/20 border border-emerald-500/30/30 flex items-center justify-center flex-shrink-0">
-                  <Lock size={13} className="text-emerald-400" />
+            <div className="neon-border rounded-xl bg-emerald-900/10 border-emerald-500/25 overflow-hidden">
+              <div className="flex items-center gap-3 px-5 py-3 bg-emerald-900/10">
+                <div className="w-7 h-7 rounded-lg bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center flex-shrink-0">
+                  <Lock size={13} className="text-emerald-300" />
                 </div>
                 <div className="flex-1">
                   <p className="text-sm font-semibold text-emerald-300">Approved Architect Plan — v{planVersion}</p>
@@ -716,16 +716,16 @@ export default function Architect() {
 
             {/* Build progress banner — shown while building */}
             {buildPipelineLoading && (
-              <div className="neon-border rounded-xl bg-indigo-900/10 border-violet-500/25 p-4 flex items-center gap-3">
-                <div className="w-5 h-5 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin flex-shrink-0" />
+              <div className="neon-border rounded-xl bg-violet-900/10 border-violet-500/25 p-4 flex items-center gap-3">
+                <div className="w-5 h-5 border-2 border-violet-500 border-t-transparent rounded-full animate-spin flex-shrink-0" />
                 <div>
-                  <p className="text-sm font-semibold text-primary">
+                  <p className="text-sm font-semibold text-violet-300">
                     {buildStage === 'workflow'  && 'Building workflow...'}
                     {buildStage === 'indexing'  && 'Indexing knowledge...'}
                     {buildStage === 'opening'   && 'Opening editor...'}
                     {!buildStage && 'Building pipeline...'}
                   </p>
-                  <p className="text-xs text-indigo-500 mt-0.5 font-mono">
+                  <p className="text-xs text-violet-400 mt-0.5 font-mono">
                     {buildStage === 'workflow'  && 'Generating nodes from approved plan'}
                     {buildStage === 'indexing'  && 'Chunking + embedding documents with approved config'}
                     {buildStage === 'opening'   && 'Pipeline ready — navigating to editor'}
@@ -754,7 +754,7 @@ export default function Architect() {
                 <div className="flex gap-3">
                   <button
                     onClick={() => setShowNewVersionConfirm(false)}
-                    className="flex-1 py-2.5 rounded-lg border border-violet-500/15 50 text-slate-400 text-sm hover:border-violet-500/15 transition-colors"
+                    className="flex-1 py-2.5 rounded-lg border border-violet-500/15 text-slate-400 text-sm hover:border-violet-500/30 transition-colors"
                   >
                     Cancel
                   </button>
@@ -770,7 +770,7 @@ export default function Architect() {
               <div className="flex gap-3 pt-2">
                 <button
                   onClick={() => navigate(createPageUrl('Dashboard'))}
-                  className="py-3 px-5 rounded-xl border border-violet-500/15 50 text-slate-400 text-sm hover:border-violet-500/15 transition-colors"
+                  className="py-3 px-5 rounded-xl border border-violet-500/15 text-slate-400 text-sm hover:border-violet-500/30 transition-colors"
                   disabled={buildPipelineLoading}
                 >
                   Dashboard
