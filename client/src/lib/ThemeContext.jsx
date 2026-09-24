@@ -44,27 +44,27 @@ export const LIGHT = {
   bgSub:      '#ebe9ff',
   surface:    '#ffffff',
   surfaceHi:  '#f9f8ff',
-  border:     'rgba(0,0,0,0.09)',
-  borderHi:   'rgba(124,58,237,0.4)',
-  t1:         '#1a1730',
-  t2:         '#5a567a',
-  t3:         '#b0adc8',
-  accent:     '#7c3aed',
-  accentLt:   '#7c3aed',
-  accentBg:   'rgba(124,58,237,0.07)',
-  amber:      '#d97706',
-  amberBg:    'rgba(217,119,6,0.08)',
-  green:      '#059669',
-  greenBg:    'rgba(5,150,105,0.08)',
-  cyan:       '#0891b2',
+  border:     'rgba(0,0,0,0.10)',
+  borderHi:   'rgba(109,40,217,0.45)',
+  t1:         '#1a1730',   // near-black — headings, primary text
+  t2:         '#3d3960',   // dark purple-grey — body text (was #5a567a, too light)
+  t3:         '#7269a0',   // mid-purple — secondary labels (was #b0adc8, invisible)
+  accent:     '#6d28d9',   // slightly darker violet for light bg contrast
+  accentLt:   '#6d28d9',
+  accentBg:   'rgba(109,40,217,0.08)',
+  amber:      '#b45309',   // darker amber for light bg
+  amberBg:    'rgba(180,83,9,0.08)',
+  green:      '#047857',   // darker green for light bg
+  greenBg:    'rgba(4,120,87,0.08)',
+  cyan:       '#0369a1',   // darker cyan for light bg
   shadow:     '0 2px 16px rgba(0,0,0,0.08)',
-  shadowCard: '0 6px 24px rgba(0,0,0,0.1), 0 1px 4px rgba(0,0,0,0.06)',
+  shadowCard: '0 6px 24px rgba(0,0,0,0.10), 0 1px 4px rgba(0,0,0,0.06)',
   // Panel / component backgrounds
-  panel:      '#f0eeff',
-  panelBorder:'rgba(124,58,237,0.18)',
-  input:      '#ffffff',
-  inputBorder:'rgba(124,58,237,0.3)',
-  nodePalette:'#f7f5ff',
+  panel:      '#edeaff',   // slightly deeper than bg for visible panels
+  panelBorder:'rgba(109,40,217,0.20)',
+  input:      '#faf9ff',   // near-white input, slightly tinted
+  inputBorder:'rgba(109,40,217,0.28)',
+  nodePalette:'#f0eeff',
 };
 
 // ─── Context ──────────────────────────────────────────────────────────────────

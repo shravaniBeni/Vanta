@@ -1,59 +1,66 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { X, Settings, Upload, FileText, Trash2, AlertCircle } from 'lucide-react';
 import { documentsApi } from '@/api/apiClient';
+import { useAppTheme } from '@/lib/ThemeContext';
 
-const inputStyle = {
-  width: '100%',
-  padding: '7px 10px',
-  background: '#0c0c1a',
-  border: '1px solid rgba(124,58,237,0.25)',
-  borderRadius: 7,
-  color: '#e2e8f0',
-  fontSize: 12,
-  fontFamily: 'JetBrains Mono, monospace',
-  outline: 'none',
-  boxSizing: 'border-box',
-};
+// inputStyle / labelStyle / selectStyle are now functions of C, called inside the component
+function makeStyles(C) {
+  const inputStyle = {
+    width: '100%',
+    padding: '7px 10px',
+    background: C.input,
+    border: `1px solid ${C.inputBorder}`,
+    borderRadius: 7,
+    color: C.t1,
+    fontSize: 12,
+    fontFamily: 'JetBrains Mono, monospace',
+    outline: 'none',
+    boxSizing: 'border-box' as const,
+  };
+  const labelStyle = {
+    fontSize: 10,
+    fontWeight: 600,
+    color: C.t2,
+    textTransform: 'uppercase',
+    letterSpacing: '0.08em',
+    marginBottom: 5,
+    display: 'block',
+    fontFamily: 'JetBrains Mono, monospace',
+  };
+  const selectStyle = { ...inputStyle, cursor: 'pointer' };
+  return { inputStyle, labelStyle, selectStyle };
+}
 
-const labelStyle = {
-  fontSize: 10,
-  fontWeight: 600,
-  color: '#64748b',
-  textTransform: 'uppercase',
-  letterSpacing: '0.08em',
-  marginBottom: 5,
-  display: 'block',
-  fontFamily: 'JetBrains Mono, monospace',
-};
-
-const selectStyle = {
-  ...inputStyle,
-  cursor: 'pointer',
-};
-
-function Field({ label, children }) {
+function Field({ label, children, C }) {
+  const labelSt = {
+    fontSize: 10, fontWeight: 600,
+    color: C ? C.t2 : '#64748b',
+    textTransform: 'uppercase', letterSpacing: '0.08em',
+    marginBottom: 5, display: 'block',
+    fontFamily: 'JetBrains Mono, monospace',
+  };
   return (
     <div style={{ marginBottom: 14 }}>
-      <span style={labelStyle}>{label}</span>
+      <span style={labelSt}>{label}</span>
       {children}
     </div>
   );
 }
 
-function Toggle({ checked, onChange }) {
+function Toggle({ checked, onChange, C }) {
   return (
     <button
       onClick={() => onChange(!checked)}
       style={{
         width: 36, height: 20,
-        background: checked ? '#7c3aed' : '#1e293b',
-        border: `1px solid ${checked ? '#7c3aed' : 'rgba(124,58,237,0.3)'}`,
+        background: checked ? C.accent : C.bgSub,
+        border: `1px solid ${checked ? C.accent : C.panelBorder}`,
         borderRadius: 10,
         position: 'relative',
         cursor: 'pointer',
         transition: 'all 0.2s',
         flexShrink: 0,
-        boxShadow: checked ? '0 0 10px rgba(124,58,237,0.4)' : 'none'
+        boxShadow: checked ? `0 0 10px ${C.accentBg}` : 'none'
       }}
     >
       <div style={{
@@ -75,6 +82,8 @@ export default function NodeProperties({ node, chatbotId, onUpdate, onClose }) {
   const [docsLoading, setDocsLoading] = useState(false);
   const [docsError, setDocsError] = useState('');
   const fileInputRef = useRef(null);
+  const { C } = useAppTheme();
+  const { inputStyle, labelStyle, selectStyle } = makeStyles(C);
 
   // Rehydrate document list from backend when DocumentUpload node opens
   useEffect(() => {
@@ -163,36 +172,36 @@ export default function NodeProperties({ node, chatbotId, onUpdate, onClose }) {
         if (params.architect_version !== undefined && Array.isArray(params.documents)) {
           return (
             <>
-              <Field label="Knowledge Source">
+              <Field C={C} label="Knowledge Source">
                 <div style={{ ...inputStyle, color: '#3b82f6' }}>
                   RAG App Knowledge Base
                 </div>
               </Field>
-              <Field label={`Documents (${params.documents.length})`}>
+              <Field C={C} label={`Documents (${params.documents.length})`}>
                 {params.documents.length === 0 ? (
-                  <p style={{ fontSize: 10, color: '#334155', fontFamily: 'JetBrains Mono, monospace', margin: 0 }}>
+                  <p style={{ fontSize: 10, color: C.t3, fontFamily: 'JetBrains Mono, monospace', margin: 0 }}>
                     // No documents indexed
                   </p>
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
                     {params.documents.map((doc, i) => {
                       const statusColor = doc.status === 'indexed' ? '#22c55e'
-                        : doc.status === 'profiled' ? '#7c3aed'
-                        : doc.status === 'error' ? '#ef4444' : '#a78bfa';
+                        : doc.status === 'profiled' ? C.accent
+                        : doc.status === 'error' ? '#ef4444' : C.accentLt;
                       return (
                         <div key={doc.id || i} style={{
                           display: 'flex', alignItems: 'center', gap: 7,
                           padding: '6px 9px',
                           background: 'rgba(59,130,246,0.06)',
-                          border: '1px solid rgba(59,130,246,0.15)',
+                          border: '1px solid rgba(59,130,246,0.2)',
                           borderRadius: 7,
                         }}>
                           <FileText size={11} color="#3b82f6" style={{ flexShrink: 0 }} />
                           <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ fontSize: 10, color: '#cbd5e1', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <div style={{ fontSize: 10, color: C.t1, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                               {doc.file_name}
                             </div>
-                            <div style={{ fontSize: 9, color: '#475569', fontFamily: 'JetBrains Mono, monospace' }}>
+                            <div style={{ fontSize: 9, color: C.t3, fontFamily: 'JetBrains Mono, monospace' }}>
                               {doc.status}
                               {doc.chunk_count > 0 ? ` · ${doc.chunk_count} chunks` : ''}
                             </div>
@@ -205,7 +214,7 @@ export default function NodeProperties({ node, chatbotId, onUpdate, onClose }) {
                 )}
               </Field>
               <div style={{ padding: '6px 8px', background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.15)', borderRadius: 7, marginTop: 4 }}>
-                <p style={{ fontSize: 9, color: '#94a3b8', fontFamily: 'JetBrains Mono, monospace', margin: 0 }}>
+                <p style={{ fontSize: 9, color: C.t2, fontFamily: 'JetBrains Mono, monospace', margin: 0 }}>
                   Architect v{params.architect_version} · {params.document_count || 0} document(s). Manage knowledge in the Architect onboarding screen.
                 </p>
               </div>
@@ -216,7 +225,7 @@ export default function NodeProperties({ node, chatbotId, onUpdate, onClose }) {
         // Legacy / non-architect DocumentUpload — original upload UI
         return (
           <>
-            <Field label="Upload Documents">
+            <Field C={C} label="Upload Documents">
               <input
                 ref={fileInputRef}
                 type="file"
@@ -229,38 +238,35 @@ export default function NodeProperties({ node, chatbotId, onUpdate, onClose }) {
                 onClick={() => fileInputRef.current?.click()}
                 disabled={uploading}
                 style={{
-                  width: '100%',
-                  padding: '18px 12px',
-                  background: 'rgba(124,58,237,0.05)',
-                  border: '1px dashed rgba(124,58,237,0.35)',
-                  borderRadius: 9,
-                  cursor: uploading ? 'wait' : 'pointer',
+                  width: '100%', padding: '18px 12px',
+                  background: C.accentBg,
+                  border: `1px dashed ${C.borderHi}`,
+                  borderRadius: 9, cursor: uploading ? 'wait' : 'pointer',
                   display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
                   transition: 'all 0.15s',
                 }}
-                onMouseEnter={e => { if (!uploading) e.currentTarget.style.background = 'rgba(124,58,237,0.1)'; }}
-                onMouseLeave={e => e.currentTarget.style.background = 'rgba(124,58,237,0.05)'}
+                onMouseEnter={e => { if (!uploading) e.currentTarget.style.background = `rgba(109,40,217,0.14)`; }}
+                onMouseLeave={e => e.currentTarget.style.background = C.accentBg}
               >
                 {uploading ? (
                   <>
-                    <div style={{ width: 18, height: 18, border: '2px solid #7c3aed', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
-                    <span style={{ fontSize: 11, color: '#7c3aed', fontFamily: 'JetBrains Mono, monospace' }}>Uploading...</span>
+                    <div style={{ width: 18, height: 18, border: `2px solid ${C.accent}`, borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
+                    <span style={{ fontSize: 11, color: C.accent, fontFamily: 'JetBrains Mono, monospace' }}>Uploading...</span>
                   </>
                 ) : (
                   <>
-                    <Upload size={18} color="#7c3aed" />
-                    <span style={{ fontSize: 11, color: '#94a3b8' }}>Click to upload files</span>
-                    <span style={{ fontSize: 9, color: '#475569', fontFamily: 'JetBrains Mono, monospace' }}>PDF, DOCX, TXT, PPT, CSV, images...</span>
+                    <Upload size={18} color={C.accent} />
+                    <span style={{ fontSize: 11, color: C.t2 }}>Click to upload files</span>
+                    <span style={{ fontSize: 9, color: C.t3, fontFamily: 'JetBrains Mono, monospace' }}>PDF, DOCX, TXT, PPT, CSV, images...</span>
                   </>
                 )}
               </button>
             </Field>
 
-            {/* Loading / error state */}
             {docsLoading && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 0' }}>
-                <div style={{ width: 12, height: 12, border: '2px solid #7c3aed', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
-                <span style={{ fontSize: 10, color: '#475569', fontFamily: 'JetBrains Mono, monospace' }}>Loading documents...</span>
+                <div style={{ width: 12, height: 12, border: `2px solid ${C.accent}`, borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
+                <span style={{ fontSize: 10, color: C.t3, fontFamily: 'JetBrains Mono, monospace' }}>Loading documents...</span>
               </div>
             )}
             {docsError && !docsLoading && (
@@ -271,29 +277,29 @@ export default function NodeProperties({ node, chatbotId, onUpdate, onClose }) {
             )}
 
             {(params.uploaded_files || []).length > 0 && (
-              <Field label={`Files (${params.uploaded_files.length})`}>
+              <Field C={C} label={`Files (${params.uploaded_files.length})`}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
                   {params.uploaded_files.map((f, i) => (
                     <div key={f.id || i} style={{
                       display: 'flex', alignItems: 'center', gap: 7,
                       padding: '6px 9px',
-                      background: f.status === 'error' ? 'rgba(239,68,68,0.06)' : 'rgba(124,58,237,0.06)',
-                      border: `1px solid ${f.status === 'error' ? 'rgba(239,68,68,0.2)' : 'rgba(124,58,237,0.15)'}`,
+                      background: f.status === 'error' ? 'rgba(239,68,68,0.06)' : C.accentBg,
+                      border: `1px solid ${f.status === 'error' ? 'rgba(239,68,68,0.2)' : C.panelBorder}`,
                       borderRadius: 7,
                     }}>
-                      <FileText size={11} color={f.status === 'error' ? '#ef4444' : '#7c3aed'} style={{ flexShrink: 0 }} />
+                      <FileText size={11} color={f.status === 'error' ? '#ef4444' : C.accent} style={{ flexShrink: 0 }} />
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 10, color: '#cbd5e1', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name}</div>
-                        <div style={{ fontSize: 9, color: '#475569', fontFamily: 'JetBrains Mono, monospace' }}>
+                        <div style={{ fontSize: 10, color: C.t1, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name}</div>
+                        <div style={{ fontSize: 9, color: C.t3, fontFamily: 'JetBrains Mono, monospace' }}>
                           {formatSize(f.size)}
                           {f.status === 'indexed' && f.chunks ? ` · ${f.chunks} chunks` : ''}
                           {f.status === 'processing' ? ' · indexing...' : ''}
                           {f.status === 'error' ? ` · error` : ''}
                         </div>
                       </div>
-                      <button onClick={() => removeFile(i)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#475569', padding: 0, flexShrink: 0 }}
+                      <button onClick={() => removeFile(i)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: C.t3, padding: 0, flexShrink: 0 }}
                         onMouseEnter={e => e.currentTarget.style.color = '#ef4444'}
-                        onMouseLeave={e => e.currentTarget.style.color = '#475569'}
+                        onMouseLeave={e => e.currentTarget.style.color = C.t3}
                       >
                         <Trash2 size={11} />
                       </button>
@@ -304,7 +310,7 @@ export default function NodeProperties({ node, chatbotId, onUpdate, onClose }) {
             )}
 
             {!docsLoading && (params.uploaded_files || []).length === 0 && !docsError && (
-              <p style={{ fontSize: 10, color: '#334155', fontFamily: 'JetBrains Mono, monospace', textAlign: 'center', marginTop: 4 }}>
+              <p style={{ fontSize: 10, color: C.t3, fontFamily: 'JetBrains Mono, monospace', textAlign: 'center', marginTop: 4 }}>
                 // No documents yet
               </p>
             )}
@@ -315,16 +321,16 @@ export default function NodeProperties({ node, chatbotId, onUpdate, onClose }) {
 
       case 'OCR':
         return (
-          <Field label="AMD Ryzen AI NPU">
+          <Field C={C} label="AMD Ryzen AI NPU">
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <span style={{ fontSize: 11, color: '#94a3b8' }}>Enable NPU acceleration</span>
-              <Toggle checked={params.amd_npu || false} onChange={v => set('amd_npu', v)} />
+              <span style={{ fontSize: 11, color: C.t2 }}>Enable NPU acceleration</span>
+              <Toggle C={C} checked={params.amd_npu || false} onChange={v => set('amd_npu', v)} />
             </div>
           </Field>
         );
       case 'VoiceRecognition':
         return (
-          <Field label="Language">
+          <Field C={C} label="Language">
             <select style={selectStyle} value={params.language || 'en-US'} onChange={e => set('language', e.target.value)}>
               <option value="en-US">English (US)</option>
               <option value="es-ES">Spanish</option>
@@ -336,17 +342,17 @@ export default function NodeProperties({ node, chatbotId, onUpdate, onClose }) {
       case 'WebCrawler':
         return (
           <>
-            <Field label="Max Pages">
+            <Field C={C} label="Max Pages">
               <input type="number" style={inputStyle} value={params.max_pages || 10} onChange={e => set('max_pages', parseInt(e.target.value))} />
             </Field>
-            <Field label="Depth Limit">
+            <Field C={C} label="Depth Limit">
               <input type="number" style={inputStyle} value={params.depth || 2} onChange={e => set('depth', parseInt(e.target.value))} />
             </Field>
           </>
         );
       case 'Translator':
         return (
-          <Field label="Target Language">
+          <Field C={C} label="Target Language">
             <select style={selectStyle} value={params.target_language || 'en'} onChange={e => set('target_language', e.target.value)}>
               <option value="en">English</option>
               <option value="es">Spanish</option>
@@ -358,26 +364,26 @@ export default function NodeProperties({ node, chatbotId, onUpdate, onClose }) {
         );
       case 'ImageAnalysis':
         return (
-          <Field label="Object Detection">
+          <Field C={C} label="Object Detection">
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <span style={{ fontSize: 11, color: '#94a3b8' }}>Enable object detection</span>
-              <Toggle checked={params.object_detection || false} onChange={v => set('object_detection', v)} />
+              <span style={{ fontSize: 11, color: C.t2 }}>Enable object detection</span>
+              <Toggle C={C} checked={params.object_detection || false} onChange={v => set('object_detection', v)} />
             </div>
           </Field>
         );
       case 'DataFilter':
         return (
-          <Field label="Filter Condition">
+          <Field C={C} label="Filter Condition">
             <input style={inputStyle} placeholder="e.g., length > 100" value={params.condition || ''} onChange={e => set('condition', e.target.value)} />
           </Field>
         );
       case 'APIIntegration':
         return (
           <>
-            <Field label="API Endpoint">
+            <Field C={C} label="API Endpoint">
               <input style={inputStyle} placeholder="https://api.example.com" value={params.endpoint || ''} onChange={e => set('endpoint', e.target.value)} />
             </Field>
-            <Field label="Method">
+            <Field C={C} label="Method">
               <select style={selectStyle} value={params.method || 'GET'} onChange={e => set('method', e.target.value)}>
                 <option value="GET">GET</option>
                 <option value="POST">POST</option>
@@ -388,7 +394,7 @@ export default function NodeProperties({ node, chatbotId, onUpdate, onClose }) {
         );
       case 'CustomCode':
         return (
-          <Field label="Code Snippet">
+          <Field C={C} label="Code Snippet">
             <textarea
               style={{ ...inputStyle, height: 120, resize: 'none' }}
               placeholder={"def process(data):\n    return data"}
@@ -403,25 +409,25 @@ export default function NodeProperties({ node, chatbotId, onUpdate, onClose }) {
           const SUPPORTED = ['fixed', 'recursive', 'structure-aware'];
           return (
             <>
-              <Field label="Strategy">
+              <Field C={C} label="Strategy">
                 {SUPPORTED.includes(params.strategy) ? (
                   <div style={{ ...inputStyle, color: '#a855f7', display: 'flex', alignItems: 'center', gap: 6 }}>
                     <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#a855f7', boxShadow: '0 0 6px #a855f7' }} />
                     {params.strategy}
-                    <span style={{ marginLeft: 'auto', fontSize: 9, color: '#475569' }}>read-only</span>
+                    <span style={{ marginLeft: 'auto', fontSize: 9, color: C.t3 }}>read-only</span>
                   </div>
                 ) : (
                   <input style={inputStyle} value={params.strategy || ''} readOnly />
                 )}
               </Field>
-              <Field label="Chunk Size">
+              <Field C={C} label="Chunk Size">
                 <input type="number" style={inputStyle} value={params.chunk_size || 1000} onChange={e => set('chunk_size', parseInt(e.target.value))} />
               </Field>
-              <Field label="Overlap">
+              <Field C={C} label="Overlap">
                 <input type="number" style={inputStyle} value={params.overlap ?? params.chunk_overlap ?? 200} onChange={e => { set('overlap', parseInt(e.target.value)); set('chunk_overlap', parseInt(e.target.value)); }} />
               </Field>
               <div style={{ padding: '6px 8px', background: 'rgba(168,85,247,0.06)', border: '1px solid rgba(168,85,247,0.15)', borderRadius: 7, marginTop: 4 }}>
-                <p style={{ fontSize: 9, color: '#94a3b8', fontFamily: 'JetBrains Mono, monospace', margin: 0 }}>
+                <p style={{ fontSize: 9, color: C.t2, fontFamily: 'JetBrains Mono, monospace', margin: 0 }}>
                   Generated by Architect v{params.architect_version}. Changing chunk_size or overlap here does not re-index documents. Use "Build RAG Pipeline" after editing.
                 </p>
               </div>
@@ -431,10 +437,10 @@ export default function NodeProperties({ node, chatbotId, onUpdate, onClose }) {
         // Legacy workflow — original editable UI
         return (
           <>
-            <Field label="Chunk Size">
+            <Field C={C} label="Chunk Size">
               <input type="number" style={inputStyle} value={params.chunk_size || 1000} onChange={e => set('chunk_size', parseInt(e.target.value))} />
             </Field>
-            <Field label="Overlap">
+            <Field C={C} label="Overlap">
               <input type="number" style={inputStyle} value={params.overlap || 200} onChange={e => set('overlap', parseInt(e.target.value))} />
             </Field>
           </>
@@ -444,20 +450,20 @@ export default function NodeProperties({ node, chatbotId, onUpdate, onClose }) {
         if (params.architect_version !== undefined || params.provider === 'local') {
           return (
             <>
-              <Field label="Provider">
+              <Field C={C} label="Provider">
                 <div style={{ ...inputStyle, color: '#a855f7' }}>Local · @huggingface/transformers.js</div>
               </Field>
-              <Field label="Model">
+              <Field C={C} label="Model">
                 <div style={{ ...inputStyle, color: '#a855f7' }}>{params.model || 'Xenova/bge-small-en-v1.5'}</div>
               </Field>
-              <Field label="Dimension">
+              <Field C={C} label="Dimension">
                 <div style={{ ...inputStyle, color: '#a855f7' }}>{params.dimension || 384}</div>
               </Field>
-              <Field label="Normalization">
+              <Field C={C} label="Normalization">
                 <div style={{ ...inputStyle, color: '#22c55e' }}>Enabled</div>
               </Field>
               <div style={{ padding: '6px 8px', background: 'rgba(168,85,247,0.06)', border: '1px solid rgba(168,85,247,0.15)', borderRadius: 7, marginTop: 4 }}>
-                <p style={{ fontSize: 9, color: '#94a3b8', fontFamily: 'JetBrains Mono, monospace', margin: 0 }}>
+                <p style={{ fontSize: 9, color: C.t2, fontFamily: 'JetBrains Mono, monospace', margin: 0 }}>
                   Embedding model is fixed at the platform runtime level. All values are read-only.
                 </p>
               </div>
@@ -466,7 +472,7 @@ export default function NodeProperties({ node, chatbotId, onUpdate, onClose }) {
         }
         // Legacy workflow — original selector (kept for backward compatibility)
         return (
-          <Field label="Model">
+          <Field C={C} label="Model">
             <select style={selectStyle} value={params.model || 'text-embedding-ada-002'} onChange={e => set('model', e.target.value)}>
               <option value="text-embedding-ada-002">text-embedding-ada-002</option>
               <option value="text-embedding-3-small">text-embedding-3-small</option>
@@ -479,26 +485,26 @@ export default function NodeProperties({ node, chatbotId, onUpdate, onClose }) {
         if (params.architect_version !== undefined || params.type === 'pgvector') {
           return (
             <>
-              <Field label="Store">
+              <Field C={C} label="Store">
                 <div style={{ ...inputStyle, color: '#f97316' }}>PostgreSQL + pgvector</div>
               </Field>
-              <Field label="Retrieval Strategy">
+              <Field C={C} label="Retrieval Strategy">
                 <div style={{ ...inputStyle, color: '#f97316' }}>similarity (exact cosine)</div>
               </Field>
-              <Field label="Similarity Metric">
+              <Field C={C} label="Similarity Metric">
                 <div style={{ ...inputStyle, color: '#f97316' }}>{params.metric || 'cosine'}</div>
               </Field>
-              <Field label="Top-K">
+              <Field C={C} label="Top-K">
                 <input type="number" style={inputStyle} min="1" max="10" value={params.top_k || 5} onChange={e => set('top_k', parseInt(e.target.value))} />
               </Field>
-              <Field label="Reranking">
-                <div style={{ ...inputStyle, color: '#64748b' }}>Disabled</div>
+              <Field C={C} label="Reranking">
+                <div style={{ ...inputStyle, color: C.t3 }}>Disabled</div>
               </Field>
-              <Field label="Vector Dimension">
+              <Field C={C} label="Vector Dimension">
                 <div style={{ ...inputStyle, color: '#f97316' }}>{params.vector_dimension || 384}</div>
               </Field>
               <div style={{ padding: '6px 8px', background: 'rgba(249,115,22,0.06)', border: '1px solid rgba(249,115,22,0.15)', borderRadius: 7, marginTop: 4 }}>
-                <p style={{ fontSize: 9, color: '#94a3b8', fontFamily: 'JetBrains Mono, monospace', margin: 0 }}>
+                <p style={{ fontSize: 9, color: C.t2, fontFamily: 'JetBrains Mono, monospace', margin: 0 }}>
                   Vanta uses Supabase pgvector with exact cosine similarity. Top-K is configurable.
                 </p>
               </div>
@@ -507,7 +513,7 @@ export default function NodeProperties({ node, chatbotId, onUpdate, onClose }) {
         }
         // Legacy workflow — original selector
         return (
-          <Field label="Store Type">
+          <Field C={C} label="Store Type">
             <select style={selectStyle} value={params.type || 'FAISS'} onChange={e => set('type', e.target.value)}>
               <option value="FAISS">FAISS</option>
               <option value="ChromaDB">ChromaDB</option>
@@ -520,25 +526,25 @@ export default function NodeProperties({ node, chatbotId, onUpdate, onClose }) {
         if (params.architect_version !== undefined) {
           return (
             <>
-              <Field label="Model">
+              <Field C={C} label="Model">
                 <input style={inputStyle} value={params.model || 'openai/gpt-4o-mini'} onChange={e => set('model', e.target.value)} />
               </Field>
-              <Field label="Temperature">
+              <Field C={C} label="Temperature">
                 <input type="number" style={inputStyle} step="0.1" min="0" max="2" value={params.temperature ?? 0.4} onChange={e => set('temperature', parseFloat(e.target.value))} />
               </Field>
-              <Field label="Response Style">
+              <Field C={C} label="Response Style">
                 <input style={{ ...inputStyle, color: '#06b6d4' }} value={params.response_style || ''} onChange={e => set('response_style', e.target.value)} />
               </Field>
-              <Field label="Grounding">
+              <Field C={C} label="Grounding">
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <span style={{ fontSize: 11, color: params.grounding_required ? '#22c55e' : '#94a3b8' }}>
                     {params.grounding_required ? 'Strict (knowledge base only)' : 'Flexible (general knowledge allowed)'}
                   </span>
-                  <Toggle checked={params.grounding_required || false} onChange={v => set('grounding_required', v)} />
+                  <Toggle C={C} checked={params.grounding_required || false} onChange={v => set('grounding_required', v)} />
                 </div>
               </Field>
               <div style={{ padding: '6px 8px', background: 'rgba(124,58,237,0.06)', border: '1px solid rgba(124,58,237,0.15)', borderRadius: 7, marginTop: 4 }}>
-                <p style={{ fontSize: 9, color: '#94a3b8', fontFamily: 'JetBrains Mono, monospace', margin: 0 }}>
+                <p style={{ fontSize: 9, color: C.t2, fontFamily: 'JetBrains Mono, monospace', margin: 0 }}>
                   response_style and temperature are independent fields. Generated by Architect v{params.architect_version}.
                 </p>
               </div>
@@ -548,20 +554,20 @@ export default function NodeProperties({ node, chatbotId, onUpdate, onClose }) {
         // Legacy workflow
         return (
           <>
-            <Field label="Model">
+            <Field C={C} label="Model">
               <select style={selectStyle} value={params.model || 'gpt-3.5-turbo'} onChange={e => set('model', e.target.value)}>
                 <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
                 <option value="gpt-4">GPT-4</option>
                 <option value="gpt-4-turbo">GPT-4 Turbo</option>
               </select>
             </Field>
-            <Field label="Temperature">
+            <Field C={C} label="Temperature">
               <input type="number" style={inputStyle} step="0.1" min="0" max="2" value={params.temperature || 0.7} onChange={e => set('temperature', parseFloat(e.target.value))} />
             </Field>
-            <Field label="AMD ROCm Acceleration">
+            <Field C={C} label="AMD ROCm Acceleration">
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <span style={{ fontSize: 11, color: '#94a3b8' }}>Enable ROCm GPU</span>
-                <Toggle checked={params.amd_enabled || false} onChange={v => set('amd_enabled', v)} />
+                <span style={{ fontSize: 11, color: C.t2 }}>Enable ROCm GPU</span>
+                <Toggle C={C} checked={params.amd_enabled || false} onChange={v => set('amd_enabled', v)} />
               </div>
             </Field>
           </>
@@ -569,11 +575,11 @@ export default function NodeProperties({ node, chatbotId, onUpdate, onClose }) {
       case 'DocumentProcessor':
         return (
           <>
-            <Field label="Supported File Types">
+            <Field C={C} label="Supported File Types">
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 {['PDF', 'DOCX', 'TXT'].map(ft => (
                   <div key={ft} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <span style={{ fontSize: 11, color: '#94a3b8' }}>{ft}</span>
+                    <span style={{ fontSize: 11, color: C.t2 }}>{ft}</span>
                     <Toggle
                       checked={params[`allow_${ft.toLowerCase()}`] !== false}
                       onChange={v => set(`allow_${ft.toLowerCase()}`, v)}
@@ -582,17 +588,17 @@ export default function NodeProperties({ node, chatbotId, onUpdate, onClose }) {
                 ))}
               </div>
             </Field>
-            <Field label="Extraction Mode">
+            <Field C={C} label="Extraction Mode">
               <select style={selectStyle} value={params.extraction_mode || 'text'} onChange={e => set('extraction_mode', e.target.value)}>
                 <option value="text">Text Only</option>
                 <option value="text_and_tables">Text + Tables</option>
                 <option value="full">Full (Text, Tables, Images)</option>
               </select>
             </Field>
-            <Field label="Preserve Formatting">
+            <Field C={C} label="Preserve Formatting">
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <span style={{ fontSize: 11, color: '#94a3b8' }}>Keep original layout</span>
-                <Toggle checked={params.preserve_formatting || false} onChange={v => set('preserve_formatting', v)} />
+                <span style={{ fontSize: 11, color: C.t2 }}>Keep original layout</span>
+                <Toggle C={C} checked={params.preserve_formatting || false} onChange={v => set('preserve_formatting', v)} />
               </div>
             </Field>
           </>
@@ -601,14 +607,14 @@ export default function NodeProperties({ node, chatbotId, onUpdate, onClose }) {
       case 'DataValidation':
         return (
           <>
-            <Field label="Schema Type">
+            <Field C={C} label="Schema Type">
               <select style={selectStyle} value={params.schema_type || 'json'} onChange={e => set('schema_type', e.target.value)}>
                 <option value="json">JSON Schema</option>
                 <option value="pydantic">Pydantic Model</option>
                 <option value="custom">Custom Rules</option>
               </select>
             </Field>
-            <Field label="Schema / Rules">
+            <Field C={C} label="Schema / Rules">
               <textarea
                 style={{ ...inputStyle, height: 100, resize: 'none' }}
                 placeholder={'{\n  "type": "object",\n  "required": ["text"]\n}'}
@@ -616,17 +622,17 @@ export default function NodeProperties({ node, chatbotId, onUpdate, onClose }) {
                 onChange={e => set('schema', e.target.value)}
               />
             </Field>
-            <Field label="On Validation Failure">
+            <Field C={C} label="On Validation Failure">
               <select style={selectStyle} value={params.on_failure || 'skip'} onChange={e => set('on_failure', e.target.value)}>
                 <option value="skip">Skip record</option>
                 <option value="raise">Raise error</option>
                 <option value="log">Log & continue</option>
               </select>
             </Field>
-            <Field label="Strict Mode">
+            <Field C={C} label="Strict Mode">
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <span style={{ fontSize: 11, color: '#94a3b8' }}>Reject extra fields</span>
-                <Toggle checked={params.strict || false} onChange={v => set('strict', v)} />
+                <span style={{ fontSize: 11, color: C.t2 }}>Reject extra fields</span>
+                <Toggle C={C} checked={params.strict || false} onChange={v => set('strict', v)} />
               </div>
             </Field>
           </>
@@ -635,7 +641,7 @@ export default function NodeProperties({ node, chatbotId, onUpdate, onClose }) {
       case 'CodeExecution':
         return (
           <>
-            <Field label="Python Script">
+            <Field C={C} label="Python Script">
               <textarea
                 style={{ ...inputStyle, height: 130, resize: 'none' }}
                 placeholder={'def run(data):\n    # data: dict with pipeline context\n    result = data[\'text\'].upper()\n    return {\'text\': result}'}
@@ -643,63 +649,57 @@ export default function NodeProperties({ node, chatbotId, onUpdate, onClose }) {
                 onChange={e => set('script', e.target.value)}
               />
             </Field>
-            <Field label="Timeout (seconds)">
+            <Field C={C} label="Timeout (seconds)">
               <input type="number" style={inputStyle} min="1" max="300" value={params.timeout || 30} onChange={e => set('timeout', parseInt(e.target.value))} />
             </Field>
-            <Field label="Python Version">
+            <Field C={C} label="Python Version">
               <select style={selectStyle} value={params.python_version || '3.11'} onChange={e => set('python_version', e.target.value)}>
                 <option value="3.10">Python 3.10</option>
                 <option value="3.11">Python 3.11</option>
                 <option value="3.12">Python 3.12</option>
               </select>
             </Field>
-            <Field label="Allow Network Access">
+            <Field C={C} label="Allow Network Access">
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <span style={{ fontSize: 11, color: '#94a3b8' }}>Enable outbound requests</span>
-                <Toggle checked={params.allow_network || false} onChange={v => set('allow_network', v)} />
+                <span style={{ fontSize: 11, color: C.t2 }}>Enable outbound requests</span>
+                <Toggle C={C} checked={params.allow_network || false} onChange={v => set('allow_network', v)} />
               </div>
             </Field>
           </>
         );
 
       default:
-        return <p style={{ fontSize: 11, color: '#475569', fontFamily: 'JetBrains Mono, monospace' }}>// No configurable parameters</p>;
+        return <p style={{ fontSize: 11, color: C.t3, fontFamily: 'JetBrains Mono, monospace' }}>// No configurable parameters</p>;
     }
   };
 
   return (
     <div style={{
-      width: 260,
-      height: '100%',
-      background: '#0d0d1c',
-      borderLeft: '1px solid rgba(124,58,237,0.2)',
-      display: 'flex',
-      flexDirection: 'column',
+      width: 260, height: '100%',
+      background: C.panel,
+      borderLeft: `1px solid ${C.panelBorder}`,
+      display: 'flex', flexDirection: 'column',
       fontFamily: 'Inter, sans-serif',
       overflowY: 'auto',
     }}>
       {/* Header */}
       <div style={{
-        padding: '14px',
-        borderBottom: '1px solid rgba(124,58,237,0.15)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
+        padding: '14px', borderBottom: `1px solid ${C.panelBorder}`,
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         position: 'sticky', top: 0,
-        background: '#0d0d1c',
-        zIndex: 10,
+        background: C.panel, zIndex: 10,
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-          <Settings size={13} color="#7c3aed" />
-          <span style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', letterSpacing: '0.1em', textTransform: 'uppercase', fontFamily: 'JetBrains Mono, monospace' }}>
+          <Settings size={13} color={C.accent} />
+          <span style={{ fontSize: 11, fontWeight: 700, color: C.t2, letterSpacing: '0.1em', textTransform: 'uppercase', fontFamily: 'JetBrains Mono, monospace' }}>
             Properties
           </span>
         </div>
         <button
           onClick={onClose}
-          style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#475569', padding: 2 }}
-          onMouseEnter={e => e.currentTarget.style.color = '#e2e8f0'}
-          onMouseLeave={e => e.currentTarget.style.color = '#475569'}
+          style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: C.t3, padding: 2 }}
+          onMouseEnter={e => e.currentTarget.style.color = C.t1}
+          onMouseLeave={e => e.currentTarget.style.color = C.t3}
         >
           <X size={14} />
         </button>
@@ -709,17 +709,16 @@ export default function NodeProperties({ node, chatbotId, onUpdate, onClose }) {
         {/* Node identity */}
         <div style={{
           padding: '10px 12px',
-          background: 'rgba(124,58,237,0.08)',
-          border: '1px solid rgba(124,58,237,0.2)',
-          borderRadius: 9,
-          marginBottom: 16,
+          background: C.accentBg,
+          border: `1px solid ${C.panelBorder}`,
+          borderRadius: 9, marginBottom: 16,
         }}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: '#e2e8f0', marginBottom: 2 }}>{node.label}</div>
-          <div style={{ fontSize: 10, color: '#7c3aed', fontFamily: 'JetBrains Mono, monospace' }}>{node.type}</div>
+          <div style={{ fontSize: 13, fontWeight: 600, color: C.t1, marginBottom: 2 }}>{node.label}</div>
+          <div style={{ fontSize: 10, color: C.accent, fontFamily: 'JetBrains Mono, monospace' }}>{node.type}</div>
         </div>
 
         {/* Divider */}
-        <div style={{ fontSize: 10, fontWeight: 700, color: '#334155', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 12, fontFamily: 'JetBrains Mono, monospace' }}>
+        <div style={{ fontSize: 10, fontWeight: 700, color: C.t3, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 12, fontFamily: 'JetBrains Mono, monospace' }}>
           // Parameters
         </div>
 

@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef } from 'react';
 import { ReactFlow, Background, Controls, MiniMap, useNodesState, useEdgesState, addEdge, Handle, Position } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { X, FileText, Scissors, Sparkles, Database, Cpu, MessageSquare, ScanText, Mic, Globe, Code, Filter, Languages, Image, Workflow, FileSearch, ShieldCheck, Terminal } from 'lucide-react';
+import { useAppTheme } from '@/lib/ThemeContext';
 
 const NODE_META = {
   DocumentUpload:    { icon: FileText,      color: '#3b82f6', bg: 'rgba(59,130,246,0.12)',  border: 'rgba(59,130,246,0.5)',  status: 'supported'    },
@@ -32,6 +33,14 @@ const STATUS_DOT = {
 const CustomNode = ({ data, id }) => {
   const meta = NODE_META[data.type] || NODE_META.ChatOutput;
   const Icon = meta.icon;
+  const { dark } = useAppTheme();
+
+  // Node card bg adapts: dark = deep surface, light = white card
+  const cardBg = dark
+    ? `linear-gradient(135deg, #13131f 60%, ${meta.bg})`
+    : `linear-gradient(135deg, #ffffff 60%, ${meta.bg})`;
+  const labelColor  = dark ? '#f1f5f9' : '#1a1730';
+  const statusColor = dark ? '#64748b' : '#6b7280';
 
   return (
     <div className="relative group" style={{ minWidth: 170 }}>
@@ -48,9 +57,11 @@ const CustomNode = ({ data, id }) => {
       />
 
       <div style={{
-        background: `linear-gradient(135deg, #13131f 60%, ${meta.bg})`,
+        background: cardBg,
         border: `1px solid ${meta.border}`,
-        boxShadow: `0 0 16px ${meta.color}22, inset 0 0 12px ${meta.bg}`,
+        boxShadow: dark
+          ? `0 0 16px ${meta.color}22, inset 0 0 12px ${meta.bg}`
+          : `0 2px 12px rgba(0,0,0,0.1), 0 0 0 1px ${meta.border}`,
         borderRadius: 12,
         padding: '10px 14px',
         fontFamily: 'Inter, sans-serif',
@@ -77,10 +88,10 @@ const CustomNode = ({ data, id }) => {
             <Icon size={14} color={meta.color} />
           </div>
           <div>
-            <div style={{ fontSize: 12, fontWeight: 600, color: '#f1f5f9', lineHeight: 1.2 }}>
+            <div style={{ fontSize: 12, fontWeight: 600, color: labelColor, lineHeight: 1.2 }}>
               {data.label}
             </div>
-            <div style={{ fontSize: 10, color: meta.color, opacity: 0.85, marginTop: 1, fontFamily: 'JetBrains Mono, monospace' }}>
+            <div style={{ fontSize: 10, color: meta.color, opacity: 0.9, marginTop: 1, fontFamily: 'JetBrains Mono, monospace' }}>
               {data.type}
             </div>
           </div>
@@ -93,7 +104,7 @@ const CustomNode = ({ data, id }) => {
             background: STATUS_DOT[meta.status]?.color || '#22c55e',
             boxShadow: `0 0 6px ${STATUS_DOT[meta.status]?.color || '#22c55e'}`
           }} />
-          <span style={{ fontSize: 9, color: '#64748b', fontFamily: 'JetBrains Mono, monospace' }}>
+          <span style={{ fontSize: 9, color: statusColor, fontFamily: 'JetBrains Mono, monospace' }}>
             {STATUS_DOT[meta.status]?.label || 'active'}
           </span>
         </div>
@@ -156,6 +167,16 @@ const toFlowEdges = (connections) =>
 export default function NodeEditor({ nodes, connections, onNodesChange, onConnectionsChange, onNodeSelect }) {
   const prevNodeIdsRef = useRef(null);
   const prevConnectionsRef = useRef(null);
+  const { dark, C } = useAppTheme();
+
+  // Canvas background and dot color adapt to theme
+  const canvasBg    = dark ? '#09090f' : '#f0eeff';
+  const bgDotColor  = dark ? 'rgba(124,58,237,0.08)' : 'rgba(124,58,237,0.12)';
+  const controlsBg  = dark ? '#13131f' : '#ffffff';
+  const controlsBrd = dark ? 'rgba(124,58,237,0.3)' : 'rgba(124,58,237,0.25)';
+  const controlsTxt = dark ? '#94a3b8' : '#5a567a';
+  const minimapBg   = dark ? '#0c0c1a' : '#f5f4ff';
+  const minimapMask = dark ? 'rgba(8,12,20,0.85)' : 'rgba(240,238,255,0.85)';
 
   const handleDeleteNode = useCallback((nodeId) => {
     onNodesChange(nodes.filter(n => n.id !== nodeId));
@@ -219,11 +240,12 @@ export default function NodeEditor({ nodes, connections, onNodesChange, onConnec
   return (
     <div className="w-full h-full">
       <style>{`
-        .react-flow__controls { background: #13131f !important; border: 1px solid rgba(124,58,237,0.3) !important; border-radius: 10px !important; box-shadow: 0 0 20px rgba(124,58,237,0.15) !important; }
-        .react-flow__controls-button { background: #13131f !important; border-bottom: 1px solid rgba(124,58,237,0.15) !important; color: #94a3b8 !important; }
-        .react-flow__controls-button:hover { background: rgba(124,58,237,0.15) !important; color: #fff !important; }
-        .react-flow__minimap { background: #0c0c1a !important; border: 1px solid rgba(124,58,237,0.3) !important; border-radius: 10px !important; }
+        .react-flow__controls { background: ${controlsBg} !important; border: 1px solid ${controlsBrd} !important; border-radius: 10px !important; box-shadow: 0 0 20px rgba(124,58,237,0.15) !important; }
+        .react-flow__controls-button { background: ${controlsBg} !important; border-bottom: 1px solid ${controlsBrd} !important; color: ${controlsTxt} !important; }
+        .react-flow__controls-button:hover { background: rgba(124,58,237,0.12) !important; color: ${dark ? '#fff' : '#1a1730'} !important; }
+        .react-flow__minimap { background: ${minimapBg} !important; border: 1px solid ${controlsBrd} !important; border-radius: 10px !important; }
         .react-flow__edge-path { stroke-width: 2 !important; }
+        .react-flow__panel { color: ${C.t2} !important; }
       `}</style>
       <ReactFlow
         nodes={flowNodes}
@@ -235,11 +257,11 @@ export default function NodeEditor({ nodes, connections, onNodesChange, onConnec
         nodeTypes={nodeTypes}
         fitView
         deleteKeyCode="Delete"
-        style={{ background: '#09090f' }}
+        style={{ background: canvasBg }}
       >
-        <Background color="rgba(124,58,237,0.08)" gap={32} size={1} />
+        <Background color={bgDotColor} gap={32} size={1} />
         <Controls />
-        <MiniMap nodeColor={(node) => NODE_META[node.data?.type]?.color || '#7c3aed'} maskColor="rgba(8,12,20,0.85)" />
+        <MiniMap nodeColor={(node) => NODE_META[node.data?.type]?.color || '#7c3aed'} maskColor={minimapMask} />
       </ReactFlow>
     </div>
   );
