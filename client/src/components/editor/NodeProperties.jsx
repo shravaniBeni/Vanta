@@ -15,7 +15,7 @@ function makeStyles(C) {
     fontSize: 12,
     fontFamily: 'JetBrains Mono, monospace',
     outline: 'none',
-    boxSizing: 'border-box' as const,
+    boxSizing: 'border-box',
   };
   const labelStyle = {
     fontSize: 10,
