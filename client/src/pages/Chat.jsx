@@ -1,8 +1,22 @@
 import React, { useState, useEffect, useRef } from 'react';
+import ReactMarkdown from 'react-markdown';
 import { Send, Loader2, Zap, ZapOff } from 'lucide-react';
 import { chatbotsApi, chatApi } from '@/api/apiClient';
 import DiagnosticPanel from '../components/diagnostic/DiagnosticPanel';
 import { runDiagnostics, buildTelemetry } from '../components/diagnostic/ragDiagnostics';
+
+
+const mdComponentsChat = {
+  p:      ({ node, ...p }) => <p style={{ margin: '0 0 5px 0', lineHeight: 1.65 }} {...p} />,
+  strong: ({ node, ...p }) => <strong style={{ fontWeight: 700 }} {...p} />,
+  em:     ({ node, ...p }) => <em style={{ fontStyle: 'italic' }} {...p} />,
+  code:   ({ node, inline, children, ...p }) => inline
+    ? <code style={{ background: 'rgba(99,102,241,0.18)', padding: '1px 5px', borderRadius: 4, fontSize: '0.88em', fontFamily: 'JetBrains Mono, monospace' }}>{children}</code>
+    : <pre style={{ background: '#060a10', borderRadius: 8, padding: '10px', marginTop: 6, overflow: 'auto' }}><code style={{ fontSize: '0.85em', fontFamily: 'JetBrains Mono, monospace' }}>{children}</code></pre>,
+  ul:     ({ node, ...p }) => <ul style={{ margin: '4px 0', paddingLeft: 20, lineHeight: 1.65 }} {...p} />,
+  ol:     ({ node, ...p }) => <ol style={{ margin: '4px 0', paddingLeft: 20, lineHeight: 1.65 }} {...p} />,
+  li:     ({ node, ...p }) => <li style={{ marginBottom: 3 }} {...p} />,
+};
 
 export default function Chat() {
   const [chatbot, setChatbot] = useState(null);
@@ -123,7 +137,9 @@ export default function Chat() {
                 fontSize: 13, color: msg.role === 'user' ? '#fff' : '#cbd5e1',
                 lineHeight: 1.55, whiteSpace: 'pre-wrap',
               }}>
-                {msg.content}
+                {msg.role === 'assistant'
+                  ? <ReactMarkdown components={mdComponentsChat}>{msg.content}</ReactMarkdown>
+                  : msg.content}
                 {msg.role === 'assistant' && msg.confidence !== undefined && (
                   <div style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
                     <ConfidenceBar value={msg.confidence} />

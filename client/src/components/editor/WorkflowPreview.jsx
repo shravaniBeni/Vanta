@@ -1,6 +1,20 @@
 import React, { useState, useRef, useEffect } from 'react';
+import ReactMarkdown from 'react-markdown';
 import { X, Send, Bot, User, MessageSquare } from 'lucide-react';
 import { chatApi } from '@/api/apiClient';
+
+
+const mdComponentsWP = {
+  p:      ({ node, ...p }) => <p style={{ margin: '0 0 6px 0', lineHeight: 1.65 }} {...p} />,
+  strong: ({ node, ...p }) => <strong style={{ color: '#f0f0ff', fontWeight: 700 }} {...p} />,
+  em:     ({ node, ...p }) => <em style={{ color: '#c4b5fd' }} {...p} />,
+  code:   ({ node, inline, children, ...p }) => inline
+    ? <code style={{ background: 'rgba(124,58,237,0.15)', color: '#c4b5fd', padding: '1px 5px', borderRadius: 4, fontSize: '0.88em', fontFamily: 'JetBrains Mono, monospace' }}>{children}</code>
+    : <pre style={{ background: '#0b0b18', borderRadius: 8, padding: '10px 13px', marginTop: 6 }}><code style={{ color: '#c4b5fd', fontSize: '0.85em', fontFamily: 'JetBrains Mono, monospace' }}>{children}</code></pre>,
+  ul:     ({ node, ...p }) => <ul style={{ margin: '4px 0', paddingLeft: 20, lineHeight: 1.65 }} {...p} />,
+  ol:     ({ node, ...p }) => <ol style={{ margin: '4px 0', paddingLeft: 20, lineHeight: 1.65 }} {...p} />,
+  li:     ({ node, ...p }) => <li style={{ marginBottom: 3 }} {...p} />,
+};
 
 export default function WorkflowPreview({ chatbot, onClose }) {
   const [messages, setMessages] = useState([
@@ -107,10 +121,9 @@ export default function WorkflowPreview({ chatbot, onClose }) {
               border: `1px solid ${msg.role === 'user' ? 'rgba(124,58,237,0.25)' : 'rgba(255,255,255,0.06)'}`,
               fontSize: 12,
               color: '#cbd5e1',
-              lineHeight: 1.5,
-              whiteSpace: 'pre-wrap',
+              lineHeight: 1.65,
             }}>
-              {msg.content}
+              <ReactMarkdown components={mdComponentsWP}>{msg.content}</ReactMarkdown>
               {msg.role === 'assistant' && msg.confidence !== undefined && (
                 <div style={{ marginTop: 5, display: 'flex', alignItems: 'center', gap: 8 }}>
                   <div style={{ width: 50, height: 2, background: 'rgba(255,255,255,0.08)', borderRadius: 1, overflow: 'hidden' }}>

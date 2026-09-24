@@ -15,6 +15,7 @@
  */
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import ReactMarkdown from 'react-markdown';
 import {
   X, Send, Bot, User, Cpu, RefreshCw, XCircle,
   CheckCircle, AlertTriangle, ChevronDown, ChevronUp,
@@ -313,10 +314,9 @@ function MessageBubble({ msg }) {
         borderRadius: isArchitect ? '4px 12px 12px 12px' : '12px 4px 12px 12px',
         background: isArchitect ? 'rgba(124,58,237,0.08)' : 'rgba(255,255,255,0.04)',
         border: `1px solid ${isArchitect ? 'rgba(124,58,237,0.2)' : 'rgba(255,255,255,0.06)'}`,
-        fontSize: 13, color: '#e2e8f0', lineHeight: 1.6,
-        whiteSpace: 'pre-wrap',
+        fontSize: 13, color: '#e2e8f0', lineHeight: 1.65,
       }}>
-        {msg.content}
+        <ReactMarkdown components={mdComponents}>{msg.content}</ReactMarkdown>
       </div>
     </div>
   );
