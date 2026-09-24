@@ -4,6 +4,7 @@ import { Send, Loader2, Zap, ZapOff } from 'lucide-react';
 import { chatbotsApi, chatApi } from '@/api/apiClient';
 import DiagnosticPanel from '../components/diagnostic/DiagnosticPanel';
 import { runDiagnostics, buildTelemetry } from '../components/diagnostic/ragDiagnostics';
+import { useAppTheme } from '@/lib/ThemeContext';
 
 
 const mdComponentsChat = {
@@ -25,6 +26,7 @@ export default function Chat() {
   const [loading, setLoading] = useState(false);
   const [amdLocal, setAmdLocal] = useState(false);
   const messagesEndRef = useRef(null);
+  const { C } = useAppTheme();
 
   const embedId = new URLSearchParams(window.location.search).get('id');
 
@@ -88,36 +90,36 @@ export default function Chat() {
 
   if (!chatbot) {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: '#09090f', color: '#94a3b8', fontFamily: 'Inter, sans-serif', fontSize: 14 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: C.bg, color: C.t2, fontFamily: 'Inter, sans-serif', fontSize: 14 }}>
         Loading chatbot...
       </div>
     );
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: '#09090f', fontFamily: 'Inter, sans-serif' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: C.bg, fontFamily: 'Inter, sans-serif' }}>
 
       {/* Header */}
-      <div style={{ padding: '12px 20px', background: '#0d0d1c', borderBottom: '1px solid rgba(124,58,237,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+      <div style={{ padding: '12px 20px', background: C.panel, borderBottom: `1px solid ${C.panelBorder}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
         <div>
-          <div style={{ fontSize: 15, fontWeight: 700, color: '#f1f5f9' }}>{chatbot.title}</div>
-          <div style={{ fontSize: 11, color: '#475569', marginTop: 1 }}>{chatbot.description}</div>
+          <div style={{ fontSize: 15, fontWeight: 700, color: C.t1 }}>{chatbot.title}</div>
+          <div style={{ fontSize: 11, color: C.t3, marginTop: 1 }}>{chatbot.description}</div>
         </div>
         <button
           onClick={() => setAmdLocal(p => !p)}
           style={{
             display: 'flex', alignItems: 'center', gap: 6, padding: '6px 11px',
-            background: amdLocal ? 'rgba(239,68,68,0.12)' : 'rgba(124,58,237,0.08)',
-            border: `1px solid ${amdLocal ? 'rgba(239,68,68,0.35)' : 'rgba(124,58,237,0.25)'}`,
+            background: amdLocal ? 'rgba(239,68,68,0.12)' : C.accentBg,
+            border: `1px solid ${amdLocal ? 'rgba(239,68,68,0.35)' : C.panelBorder}`,
             borderRadius: 8, cursor: 'pointer', transition: 'all 0.15s',
           }}
         >
-          {amdLocal ? <Zap size={12} color="#ef4444" /> : <ZapOff size={12} color="#475569" />}
+          {amdLocal ? <Zap size={12} color="#ef4444" /> : <ZapOff size={12} color={C.t3} />}
           <div style={{ textAlign: 'left' }}>
-            <div style={{ fontSize: 10, fontWeight: 700, color: amdLocal ? '#ef4444' : '#475569', fontFamily: 'JetBrains Mono, monospace', letterSpacing: '0.05em' }}>
+            <div style={{ fontSize: 10, fontWeight: 700, color: amdLocal ? '#ef4444' : C.t3, fontFamily: 'JetBrains Mono, monospace', letterSpacing: '0.05em' }}>
               {amdLocal ? 'Diagnostics · ON' : 'Diagnostics · OFF'}
             </div>
-            <div style={{ fontSize: 9, color: '#334155' }}>
+            <div style={{ fontSize: 9, color: C.t3 }}>
               {amdLocal ? 'showing rag telemetry' : 'hide diagnostics'}
             </div>
           </div>
@@ -132,9 +134,9 @@ export default function Chat() {
               <div style={{
                 maxWidth: '78%', padding: '10px 14px',
                 borderRadius: msg.role === 'user' ? '14px 4px 14px 14px' : '4px 14px 14px 14px',
-                background: msg.role === 'user' ? 'rgba(124,58,237,0.7)' : 'rgba(255,255,255,0.05)',
-                border: `1px solid ${msg.role === 'user' ? 'rgba(124,58,237,0.5)' : 'rgba(255,255,255,0.08)'}`,
-                fontSize: 13, color: msg.role === 'user' ? '#fff' : '#cbd5e1',
+                background: msg.role === 'user' ? 'rgba(124,58,237,0.7)' : C.surface,
+                border: `1px solid ${msg.role === 'user' ? 'rgba(124,58,237,0.5)' : C.border}`,
+                fontSize: 13, color: msg.role === 'user' ? '#fff' : C.t1,
                 lineHeight: 1.55, whiteSpace: 'pre-wrap',
               }}>
                 {msg.role === 'assistant'
@@ -143,7 +145,7 @@ export default function Chat() {
                 {msg.role === 'assistant' && msg.confidence !== undefined && (
                   <div style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
                     <ConfidenceBar value={msg.confidence} />
-                    <span style={{ fontSize: 10, color: '#475569', fontFamily: 'JetBrains Mono, monospace' }}>
+                    <span style={{ fontSize: 10, color: C.t3, fontFamily: 'JetBrains Mono, monospace' }}>
                       {(msg.confidence * 100).toFixed(0)}% confidence
                     </span>
                   </div>
@@ -161,9 +163,9 @@ export default function Chat() {
 
         {loading && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{ padding: '10px 14px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '4px 14px 14px 14px', display: 'flex', gap: 5, alignItems: 'center' }}>
+            <div style={{ padding: '10px 14px', background: C.surface, border: `1px solid ${C.border}`, borderRadius: '4px 14px 14px 14px', display: 'flex', gap: 5, alignItems: 'center' }}>
               {[0, 1, 2].map(d => (
-                <div key={d} style={{ width: 5, height: 5, borderRadius: '50%', background: '#7c3aed', animation: `bounce 1s ease-in-out ${d * 0.18}s infinite` }} />
+                <div key={d} style={{ width: 5, height: 5, borderRadius: '50%', background: C.accent, animation: `bounce 1s ease-in-out ${d * 0.18}s infinite` }} />
               ))}
             </div>
           </div>
@@ -172,30 +174,30 @@ export default function Chat() {
       </div>
 
       {/* Input */}
-      <div style={{ padding: '12px 20px', background: '#0d0d1c', borderTop: '1px solid rgba(124,58,237,0.15)', display: 'flex', gap: 10, alignItems: 'center', flexShrink: 0 }}>
+      <div style={{ padding: '12px 20px', background: C.panel, borderTop: `1px solid ${C.panelBorder}`, display: 'flex', gap: 10, alignItems: 'center', flexShrink: 0 }}>
         <input
           value={input}
           onChange={e => setInput(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && handleSend()}
           placeholder="Type your message..."
           disabled={loading}
-          style={{ flex: 1, padding: '10px 14px', background: '#0c0c1a', border: '1px solid rgba(124,58,237,0.25)', borderRadius: 10, color: '#e2e8f0', fontSize: 13, outline: 'none', fontFamily: 'Inter, sans-serif' }}
+          style={{ flex: 1, padding: '10px 14px', background: C.input, border: `1px solid ${C.inputBorder}`, borderRadius: 10, color: C.t1, fontSize: 13, outline: 'none', fontFamily: 'Inter, sans-serif' }}
         />
         <button
           onClick={handleSend}
           disabled={loading || !input.trim()}
           style={{
             width: 38, height: 38,
-            background: input.trim() && !loading ? 'rgba(124,58,237,0.8)' : 'rgba(124,58,237,0.12)',
-            border: '1px solid rgba(124,58,237,0.3)', borderRadius: 10,
+            background: input.trim() && !loading ? 'rgba(124,58,237,0.8)' : C.accentBg,
+            border: `1px solid ${C.panelBorder}`, borderRadius: 10,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             cursor: input.trim() && !loading ? 'pointer' : 'default',
             transition: 'all 0.15s', flexShrink: 0,
           }}
         >
           {loading
-            ? <Loader2 size={14} color="#7c3aed" style={{ animation: 'spin 1s linear infinite' }} />
-            : <Send size={14} color={input.trim() ? '#fff' : '#334155'} />}
+            ? <Loader2 size={14} color={C.accent} style={{ animation: 'spin 1s linear infinite' }} />
+            : <Send size={14} color={input.trim() ? '#fff' : C.t3} />}
         </button>
       </div>
 

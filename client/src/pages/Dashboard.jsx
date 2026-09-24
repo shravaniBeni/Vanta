@@ -17,65 +17,7 @@ import {
 import { useAuth } from "@/lib/AuthContext";
 import { projectsApi, chatbotsApi } from "@/api/apiClient";
 import { createPageUrl } from "@/utils";
-
-// ─── Theme ────────────────────────────────────────────────────────────────────
-
-function useTheme() {
-  const [dark, setDark] = useState(() => {
-    const s = localStorage.getItem("vanta-theme");
-    return s ? s === "dark" : true; // default dark
-  });
-  useEffect(() => {
-    document.documentElement.classList.toggle("dark", dark);
-    localStorage.setItem("vanta-theme", dark ? "dark" : "light");
-  }, [dark]);
-  return [dark, () => setDark(d => !d)];
-}
-
-// ─── CSS vars (applied via inline style on root div, override per theme) ──────
-
-const DARK = {
-  bg:        "#09090f",   // near-true black with a hint of blue
-  bgSub:     "#0e0e18",
-  surface:   "#13131f",   // slightly raised surface
-  surfaceHi: "#19192a",   // hovered surface
-  border:    "rgba(255,255,255,0.06)",
-  borderHi:  "rgba(139,92,246,0.55)",
-  t1:        "#eeeeff",   // cool near-white
-  t2:        "#8888aa",
-  t3:        "#3f3f5c",
-  accent:    "#7c3aed",   // deep violet
-  accentLt:  "#a78bfa",   // lighter violet for text on dark
-  accentBg:  "rgba(124,58,237,0.10)",
-  amber:     "#38bdf8",
-  amberBg:   "rgba(56,189,248,0.10)",
-  green:     "#10b981",
-  greenBg:   "rgba(16,185,129,0.10)",
-  cyan:      "#22d3ee",   // split accent for variety
-  shadow:    "0 2px 16px rgba(0,0,0,0.6)",
-  shadowCard:"0 8px 40px rgba(0,0,0,0.55), 0 2px 8px rgba(0,0,0,0.4)",
-};
-
-const LIGHT = {
-  bg:        "#f5f4ff",
-  bgSub:     "#ebe9ff",
-  surface:   "#ffffff",
-  surfaceHi: "#f9f8ff",
-  border:    "rgba(0,0,0,0.09)",
-  borderHi:  "rgba(124,58,237,0.4)",
-  t1:        "#1a1730",
-  t2:        "#5a567a",
-  t3:        "#b0adc8",
-  accent:    "#7c3aed",
-  accentLt:  "#7c3aed",
-  accentBg:  "rgba(124,58,237,0.07)",
-  amber:     "#d97706",
-  amberBg:   "rgba(217,119,6,0.08)",
-  green:     "#059669",
-  greenBg:   "rgba(5,150,105,0.08)",
-  shadow:    "0 2px 16px rgba(0,0,0,0.08)",
-  shadowCard:"0 6px 24px rgba(0,0,0,0.1), 0 1px 4px rgba(0,0,0,0.06)",
-};
+import { useAppTheme } from "@/lib/ThemeContext";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -275,31 +217,17 @@ function StatCard({ value, label, desc, icon, iconBg, iconColor, C }) {
     <div style={{
       flex: 1, minWidth: 0,
       background: C.surface,
-      // Clipped top-right corner — the signature shape
-      clipPath: "polygon(0 0, calc(100% - 18px) 0, 100% 18px, 100% 100%, 0 100%)",
-      padding: "20px 22px",
-      boxShadow: `${C.shadowCard}, inset 0 0 0 1px ${C.border}`,
+      border: `1px solid ${C.border}`,
+      borderRadius: 8,
+      padding: "18px 20px",
+      boxShadow: C.shadow,
       display: "flex", alignItems: "center", gap: 16,
       animation: "vFadeUp 0.3s ease both",
       position: "relative", overflow: "hidden",
     }}>
-      {/* Noise texture overlay */}
-      <div style={{
-        position: "absolute", inset: 0, pointerEvents: "none", opacity: 0.025,
-        backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")`,
-        backgroundSize: "200px 200px",
-      }} />
-      {/* Top-right corner accent line */}
-      <div style={{
-        position: "absolute", top: 0, right: 18,
-        width: 26, height: 1,
-        background: `linear-gradient(90deg, transparent, ${iconColor})`,
-        transform: "rotate(-45deg) translate(10px,-6px)",
-        transformOrigin: "right", opacity: 0.6,
-      }} />
       <div style={{ width: 44, height: 44, flexShrink: 0,
         background: iconBg,
-        clipPath: "polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 0 100%)",
+        borderRadius: 8,
         display: "flex", alignItems: "center", justifyContent: "center" }}>
         {React.cloneElement(icon, { size: 20, color: iconColor })}
       </div>
@@ -334,39 +262,23 @@ function AppCard({ app, onArchitect, onEdit, onDeploy, onDelete, index, C }) {
     >
       <div style={{
         background: hover ? C.surfaceHi : C.surface,
-        // Clipped top-right + bottom-left corners for asymmetric feel
-        clipPath: "polygon(0 0, calc(100% - 16px) 0, 100% 16px, 100% 100%, 16px 100%, 0 calc(100% - 16px))",
-        padding: "18px 18px 16px",
+        border: `1px solid ${hover ? C.borderHi : C.border}`,
+        borderRadius: 0,
+        padding: "16px 16px 15px",
         boxShadow: hover
-          ? `${C.shadowCard}, inset 0 0 0 1px ${C.borderHi}, 0 0 0 1px ${C.borderHi}`
-          : `${C.shadow}, inset 0 0 0 1px ${C.border}`,
+          ? `${C.shadowCard}, 0 0 0 1px ${C.accent}33, 0 0 28px ${C.accent}22`
+          : C.shadow,
         display: "flex", flexDirection: "column",
-        transition: "all 0.2s ease",
+        minHeight: 222,
+        transform: hover ? "translateY(-3px)" : "translateY(0)",
+        transition: "background 0.2s ease, border-color 0.2s ease, box-shadow 0.25s ease, transform 0.25s ease",
         position: "relative", cursor: "default", overflow: "hidden",
       }}>
-        {/* Noise texture overlay */}
-        <div style={{
-          position: "absolute", inset: 0, pointerEvents: "none",
-          opacity: hover ? 0.04 : 0.02,
-          transition: "opacity 0.2s",
-          backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")`,
-          backgroundSize: "200px 200px",
-        }} />
-        {/* Gradient accent on top edge when hovered */}
         <div style={{
           position: "absolute", top: 0, left: 0, right: 0, height: 2,
-          background: hover
-            ? `linear-gradient(90deg, ${statusColor}, transparent 60%)`
-            : "transparent",
-          transition: "background 0.2s",
-        }} />
-        {/* Corner cut accent line (top-right) */}
-        <div style={{
-          position: "absolute", top: 0, right: 16,
-          width: 22, height: 1,
-          background: hover ? `linear-gradient(90deg, transparent, ${C.accentLt})` : "transparent",
-          transform: "rotate(-45deg) translate(9px,-5px)",
-          transformOrigin: "right", transition: "background 0.2s",
+          background: hover ? `linear-gradient(90deg, ${C.accentLt}, ${C.cyan || C.accentLt}, transparent 82%)` : "transparent",
+          opacity: hover ? 1 : 0,
+          transition: "opacity 0.25s ease",
         }} />
         {/* Top row */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
@@ -375,16 +287,16 @@ function AppCard({ app, onArchitect, onEdit, onDeploy, onDelete, index, C }) {
             color: statusColor,
             fontSize: 11, fontWeight: 700, fontFamily: "JetBrains Mono, monospace",
             letterSpacing: "0.08em", textTransform: "uppercase",
-            padding: "2px 9px",
-            clipPath: "polygon(0 0, calc(100% - 4px) 0, 100% 4px, 100% 100%, 0 100%)",
+            padding: "3px 9px",
+            borderRadius: 0,
           }}>
             {app.status || "draft"}
           </span>
           {/* Overflow menu */}
           <div style={{ position: "relative" }}>
-            <button
+              <button
               onClick={() => setMenu(o => !o)}
-              style={{ width: 28, height: 28, clipPath: "polygon(0 0, calc(100% - 5px) 0, 100% 5px, 100% 100%, 0 100%)", border: `1px solid ${menu ? C.borderHi : C.border}`, background: menu ? C.accentBg : "transparent", color: C.t3, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.15s" }}
+              style={{ width: 28, height: 28, borderRadius: 6, border: `1px solid ${menu ? C.borderHi : C.border}`, background: menu ? C.accentBg : "transparent", color: C.t3, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.15s" }}
             >
               <MoreHorizontal size={14} />
             </button>
@@ -392,7 +304,7 @@ function AppCard({ app, onArchitect, onEdit, onDeploy, onDelete, index, C }) {
               <div style={{
                 position: "absolute", right: 0, top: 32, zIndex: 20,
                 background: C.surface, border: `1px solid ${C.borderHi}`,
-                clipPath: "polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 0 100%)",
+                borderRadius: 0,
                 boxShadow: C.shadowCard, minWidth: 152, padding: "5px 0",
                 animation: "vFadeUp 0.15s ease both",
               }}>
@@ -432,7 +344,7 @@ function AppCard({ app, onArchitect, onEdit, onDeploy, onDelete, index, C }) {
           </div>
         )}
 
-        <h3 style={{ fontSize: 16, fontWeight: 800, color: C.t1, marginBottom: 6, lineHeight: 1.35, fontFamily: "Plus Jakarta Sans, sans-serif", letterSpacing: "-0.01em" }}>
+        <h3 style={{ fontSize: 16, fontWeight: 800, color: C.t1, marginBottom: 6, lineHeight: 1.35, fontFamily: "Plus Jakarta Sans, sans-serif", letterSpacing: "-0.01em", transition: "color 0.2s ease" }}>
           {app.title}
         </h3>
         {app.description && (
@@ -452,14 +364,14 @@ function AppCard({ app, onArchitect, onEdit, onDeploy, onDelete, index, C }) {
             onClick={() => onArchitect(app)}
             style={{
               flex: 1, padding: "9px 0",
-              clipPath: "polygon(0 0, calc(100% - 6px) 0, 100% 6px, 100% 100%, 0 100%)",
+              borderRadius: 5,
               background: C.accentBg, border: `1px solid ${C.borderHi}`,
               color: C.accentLt, fontSize: 13, fontWeight: 700, cursor: "pointer",
               display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
-              fontFamily: "Plus Jakarta Sans, sans-serif", transition: "all 0.15s",
+              fontFamily: "Plus Jakarta Sans, sans-serif", transition: "background 0.15s ease, box-shadow 0.15s ease",
             }}
-            onMouseEnter={e => e.currentTarget.style.background = `${C.accent}28`}
-            onMouseLeave={e => e.currentTarget.style.background = C.accentBg}
+            onMouseEnter={e => { e.currentTarget.style.background = `${C.accent}28`; e.currentTarget.style.boxShadow = `0 0 14px ${C.accent}22`; }}
+            onMouseLeave={e => { e.currentTarget.style.background = C.accentBg; e.currentTarget.style.boxShadow = "none"; }}
           >
             <Cpu size={13} /> Architect
           </button>
@@ -467,14 +379,14 @@ function AppCard({ app, onArchitect, onEdit, onDeploy, onDelete, index, C }) {
             onClick={() => onEdit(app)}
             style={{
               flex: 1, padding: "9px 0",
-              clipPath: "polygon(0 0, calc(100% - 6px) 0, 100% 6px, 100% 100%, 0 100%)",
+              borderRadius: 5,
               background: C.amberBg, border: `1px solid ${C.amber}40`,
               color: C.amber, fontSize: 13, fontWeight: 700, cursor: "pointer",
               display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
-              fontFamily: "Plus Jakarta Sans, sans-serif", transition: "all 0.15s",
+              fontFamily: "Plus Jakarta Sans, sans-serif", transition: "background 0.15s ease, box-shadow 0.15s ease",
             }}
-            onMouseEnter={e => e.currentTarget.style.background = `${C.amber}20`}
-            onMouseLeave={e => e.currentTarget.style.background = C.amberBg}
+            onMouseEnter={e => { e.currentTarget.style.background = `${C.amber}20`; e.currentTarget.style.boxShadow = `0 0 14px ${C.amber}1c`; }}
+            onMouseLeave={e => { e.currentTarget.style.background = C.amberBg; e.currentTarget.style.boxShadow = "none"; }}
           >
             <Edit3 size={13} /> Editor
           </button>
@@ -483,12 +395,14 @@ function AppCard({ app, onArchitect, onEdit, onDeploy, onDelete, index, C }) {
               onClick={() => onDeploy(app)}
               style={{
                 flex: 1, padding: "9px 0",
-                clipPath: "polygon(0 0, calc(100% - 6px) 0, 100% 6px, 100% 100%, 0 100%)",
+                borderRadius: 5,
                 background: C.greenBg, border: `1px solid ${C.green}40`,
                 color: C.green, fontSize: 13, fontWeight: 700, cursor: "pointer",
                 display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
-                fontFamily: "Plus Jakarta Sans, sans-serif",
+                fontFamily: "Plus Jakarta Sans, sans-serif", transition: "background 0.15s ease, box-shadow 0.15s ease",
               }}
+              onMouseEnter={e => { e.currentTarget.style.background = `${C.green}20`; e.currentTarget.style.boxShadow = `0 0 14px ${C.green}1c`; }}
+              onMouseLeave={e => { e.currentTarget.style.background = C.greenBg; e.currentTarget.style.boxShadow = "none"; }}
             >
               <Rocket size={13} /> View
             </button>
@@ -502,12 +416,12 @@ function AppCard({ app, onArchitect, onEdit, onDeploy, onDelete, index, C }) {
 // ─── Resizable sidebar ─────────────────────────────────────────────────────────
 
 const MIN_W = 56;
-const MAX_W = 320;
-const DEFAULT_W = 220;
+const MAX_W = 340;
+const DEFAULT_W = 304;
 
 function useSidebarResize() {
   const [width, setWidth] = useState(() => {
-    const s = localStorage.getItem("vanta-sidebar-w");
+    const s = localStorage.getItem("vanta-sidebar-w-v2");
     return s ? parseInt(s, 10) : DEFAULT_W;
   });
   const dragging = useRef(false);
@@ -534,7 +448,7 @@ function useSidebarResize() {
       dragging.current = false;
       document.body.style.userSelect = "";
       document.body.style.cursor = "";
-      setWidth(w => { localStorage.setItem("vanta-sidebar-w", w); return w; });
+      setWidth(w => { localStorage.setItem("vanta-sidebar-w-v2", w); return w; });
     };
     document.addEventListener("mousemove", onMove);
     document.addEventListener("mouseup", onUp);
@@ -550,8 +464,7 @@ function useSidebarResize() {
 export default function Dashboard() {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
-  const [dark, toggleTheme] = useTheme();
-  const C = dark ? DARK : LIGHT;
+  const { dark, toggleTheme, C } = useAppTheme();
 
   const [projects, setProjects]         = useState([]);
   const [apps, setApps]                 = useState([]);
@@ -622,7 +535,7 @@ export default function Dashboard() {
   }
 
   return (
-    <div style={{ minHeight: "100vh", background: C.bg, display: "flex", fontFamily: "Plus Jakarta Sans, sans-serif" }}>
+    <div className="dashboard-shell" style={{ minHeight: "100vh", background: C.bg, display: "flex", fontFamily: "Plus Jakarta Sans, sans-serif" }}>
 
       {/* ── CSS animations ─────────────────────────────────────────── */}
       <style>{`
@@ -634,6 +547,62 @@ export default function Dashboard() {
         ::-webkit-scrollbar { width: 4px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: ${C.border}; border-radius: 4px; }
+
+        .dashboard-sidebar { width: ${sidebarW}px; }
+        .dashboard-main { min-width: 0; }
+        .dashboard-content { width: 100%; }
+        .dashboard-stats { display: flex; }
+        .dashboard-toolbar { display: flex; }
+        .dashboard-app-grid { display: grid; }
+
+        @media (max-width: 1024px) {
+          .dashboard-sidebar { width: 232px !important; }
+          .dashboard-content { padding: 28px 24px 40px !important; }
+          .dashboard-app-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+        }
+
+        @media (max-width: 700px) {
+          .dashboard-shell { flex-direction: column !important; }
+          .dashboard-sidebar {
+            width: 100% !important;
+            height: auto !important;
+            max-height: none !important;
+            border-right: none !important;
+            border-bottom: 1px solid ${C.border};
+          }
+          .dashboard-sidebar > div:first-child { padding: 10px 14px !important; }
+          .dashboard-projects {
+            display: flex !important;
+            align-items: center;
+            gap: 6px;
+            flex: none !important;
+            padding: 8px 10px !important;
+            overflow-x: auto !important;
+            overflow-y: hidden !important;
+          }
+          .dashboard-projects > div:first-child { display: none !important; }
+          .dashboard-projects > button {
+            width: auto !important;
+            min-width: 136px;
+            flex: 0 0 auto;
+            padding: 8px 10px !important;
+            border-left: 0 !important;
+            border-bottom: 2px solid transparent !important;
+          }
+          .dashboard-projects > button[title="New project"] { min-width: 36px; }
+          .dashboard-projects > button > div { width: 24px !important; height: 24px !important; }
+          .dashboard-sidebar > div:nth-last-child(2) { display: block !important; padding: 8px 14px !important; }
+          .dashboard-sidebar > div:last-child { display: none !important; }
+          .dashboard-main { overflow: visible !important; }
+          .dashboard-content { padding: 24px 16px 36px !important; }
+          .dashboard-header-row { align-items: flex-start !important; flex-direction: column !important; gap: 18px; }
+          .dashboard-header-actions { width: 100%; }
+          .dashboard-header-actions > button:last-child { flex: 1; }
+          .dashboard-stats { flex-direction: column; gap: 10px !important; }
+          .dashboard-toolbar { flex-direction: column; align-items: stretch !important; gap: 8px !important; }
+          .dashboard-view-toggle { align-self: flex-end; }
+          .dashboard-app-grid { grid-template-columns: minmax(0, 1fr) !important; gap: 12px !important; }
+        }
       `}</style>
 
       {/* ── Modals ─────────────────────────────────────────────────── */}
@@ -643,28 +612,28 @@ export default function Dashboard() {
       {modal === "deleteApp"     && deleteAppTarget && <DeleteAppModal app={deleteAppTarget} onClose={() => { setModal(null); setDeleteAppTarget(null); }} onConfirm={handleDeleteAppConfirmed} C={C} />}
 
       {/* ── Sidebar ────────────────────────────────────────────────── */}
-      <div style={{ width: sidebarW, flexShrink: 0, background: C.bgSub, borderRight: `1px solid ${C.border}`, display: "flex", flexDirection: "column", position: "relative", transition: "width 0.05s", overflow: "hidden" }}>
+      <div className="dashboard-sidebar" style={{ width: sidebarW, flexShrink: 0, background: C.bgSub, borderRight: `1px solid ${C.border}`, display: "flex", flexDirection: "column", position: "relative", transition: "width 0.05s", overflow: "hidden" }}>
 
         {/* Logo */}
-        <div style={{ padding: collapsed ? "40px 0" : "18px 16px", borderBottom: `1px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: collapsed ? "center" : "flex-start", gap: 10 }}>
+        <div style={{ padding: collapsed ? "40px 0" : "12px 12px", borderBottom: `1px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: collapsed ? "center" : "flex-start", gap: 10 }}>
           <img
             src="/logo.png"
             alt="Vanta"
-            style={{ width: 48, height: 48, flexShrink: 0, objectFit: "contain", filter: `drop-shadow(0 0 12px ${C.accentBg})` }}
+            style={{ width: 48, height: 48, flexShrink: 0, objectFit: "contain" }}
           />          {!collapsed && (
-            <span style={{ fontFamily: "JetBrains Mono, monospace", fontSize: 15, fontWeight: 800, letterSpacing: "0.18em", textTransform: "uppercase", background: dark ? "linear-gradient(135deg, #a78bfa, #7c3aed, #38bdf8)" : `linear-gradient(135deg, ${C.accent}, #6d28d9)`, WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text", whiteSpace: "nowrap" }}>
+            <span style={{ fontFamily: "JetBrains Mono, monospace", fontSize: 15, fontWeight: 800, letterSpacing: "0.18em", textTransform: "uppercase", background: "linear-gradient(135deg, #a78bfa, #7c3aed 65%, #38bdf8)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text", whiteSpace: "nowrap" }}>
               Vanta
             </span>
           )}
         </div>
 
         {/* Projects */}
-        <div style={{ flex: 1, overflowY: "auto", padding: collapsed ? "12px 0" : "12px 0" }}>
+        <div className="dashboard-projects" style={{ flex: 1, overflowY: "auto", padding: collapsed ? "12px 0" : "12px 0" }}>
           {!collapsed && (
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 14px", marginBottom: 8 }}>
               <span style={{ fontFamily: "JetBrains Mono, monospace", fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: C.t3 }}>Projects</span>
               <button onClick={() => setModal("createProject")} title="New project"
-                style={{ width: 22, height: 22, clipPath: "polygon(0 0, calc(100% - 4px) 0, 100% 4px, 100% 100%, 0 100%)", border: `1px solid ${C.border}`, background: "transparent", color: C.t3, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.15s" }}
+                style={{ width: 22, height: 22, borderRadius: 6, border: `1px solid ${C.border}`, background: "transparent", color: C.t3, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.15s" }}
                 onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.color = C.accent; }}
                 onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.t3; }}
               >
@@ -704,7 +673,7 @@ export default function Dashboard() {
                 onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = "transparent"; }}
               >
                 {/* Project color dot */}
-                <div style={{ width: 28, height: 28, flexShrink: 0, clipPath: "polygon(0 0, calc(100% - 6px) 0, 100% 6px, 100% 100%, 0 100%)", background: isActive ? C.accentBg : C.border, border: `1px solid ${isActive ? C.borderHi : C.border}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <div style={{ width: 28, height: 28, flexShrink: 0, borderRadius: 0, background: isActive ? C.accentBg : C.border, border: `1px solid ${isActive ? C.borderHi : C.border}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
                   {isActive
                     ? <FolderOpen size={13} color={C.accentLt} />
                     : <Folder size={13} color={C.t3} />}
@@ -737,7 +706,7 @@ export default function Dashboard() {
             </div>
           ) : (
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <div style={{ width: 30, height: 30, flexShrink: 0, clipPath: "polygon(0 0, calc(100% - 6px) 0, 100% 6px, 100% 100%, 0 100%)", background: C.accentBg, border: `1px solid ${C.borderHi}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <div style={{ width: 30, height: 30, flexShrink: 0, borderRadius: 7, background: C.accentBg, border: `1px solid ${C.borderHi}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
                 <span style={{ fontFamily: "JetBrains Mono, monospace", fontSize: 12, color: C.accentLt, fontWeight: 800 }}>{user?.email?.[0]?.toUpperCase() || "?"}</span>
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
@@ -777,8 +746,8 @@ export default function Dashboard() {
       </div>
 
       {/* ── Main ───────────────────────────────────────────────────── */}
-      <div style={{ flex: 1, overflowY: "auto" }}>
-        <div style={{ maxWidth: 1120, margin: "0 auto", padding: "36px 40px" }}>
+      <div className="dashboard-main" style={{ flex: 1, overflowY: "auto" }}>
+        <div className="dashboard-content" style={{ maxWidth: 1056, margin: "0 auto", padding: "32px 32px 48px" }}>
 
           {/* Header */}
           <div style={{ animation: "vFadeUp 0.28s ease both" }}>
@@ -786,22 +755,22 @@ export default function Dashboard() {
               <Package size={14} color={C.accent} />
               <span style={{ fontFamily: "JetBrains Mono, monospace", fontSize: 11, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: "0.1em" }}>Project</span>
             </div>
-            <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginBottom: 32 }}>
-              <h1 style={{ fontSize: 32, fontWeight: 800, color: C.t1, letterSpacing: "-0.03em", lineHeight: 1 }}>
+            <div className="dashboard-header-row" style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginBottom: 28 }}>
+              <h1 style={{ fontSize: 30, fontWeight: 800, color: C.t1, letterSpacing: "-0.02em", lineHeight: 1.1 }}>
                 {selectedProject?.name || "Dashboard"}
               </h1>
-              <div style={{ display: "flex", gap: 8 }}>
+              <div className="dashboard-header-actions" style={{ display: "flex", gap: 8 }}>
                 {selectedProject && (
                   <>
                     <button onClick={() => { setEditTarget(selectedProject); setModal("editProject"); }}
-                      style={{ padding: "9px 11px", clipPath: "polygon(0 0, calc(100% - 6px) 0, 100% 6px, 100% 100%, 0 100%)", border: `1px solid ${C.border}`, background: "transparent", color: C.t2, cursor: "pointer", display: "flex", alignItems: "center", transition: "all 0.15s" }}
+                      style={{ padding: "9px 11px", borderRadius: 6, border: `1px solid ${C.border}`, background: "transparent", color: C.t2, cursor: "pointer", display: "flex", alignItems: "center", transition: "all 0.15s" }}
                       onMouseEnter={e => { e.currentTarget.style.borderColor = C.borderHi; e.currentTarget.style.color = C.t1; }}
                       onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.t2; }}
                     >
                       <Edit3 size={14} />
                     </button>
                     <button onClick={() => handleDeleteProject(selectedProject)}
-                      style={{ padding: "9px 11px", clipPath: "polygon(0 0, calc(100% - 6px) 0, 100% 6px, 100% 100%, 0 100%)", border: "1px solid rgba(239,68,68,0.2)", background: "transparent", color: C.t3, cursor: "pointer", display: "flex", alignItems: "center", transition: "all 0.15s" }}
+                      style={{ padding: "9px 11px", borderRadius: 6, border: "1px solid rgba(239,68,68,0.2)", background: "transparent", color: C.t3, cursor: "pointer", display: "flex", alignItems: "center", transition: "all 0.15s" }}
                       onMouseEnter={e => { e.currentTarget.style.color = "#f87171"; e.currentTarget.style.borderColor = "rgba(239,68,68,0.45)"; }}
                       onMouseLeave={e => { e.currentTarget.style.color = C.t3; e.currentTarget.style.borderColor = "rgba(239,68,68,0.2)"; }}
                     >
@@ -813,9 +782,9 @@ export default function Dashboard() {
                   onClick={() => selectedProject ? setModal("newApp") : setModal("createProject")}
                   style={{
                     display: "inline-flex", alignItems: "center", gap: 7,
-                    padding: "9px 20px",
-                    clipPath: "polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 0 100%)",
-                    background: `linear-gradient(135deg, ${C.accent}, #6d28d9)`,
+                    padding: "9px 16px",
+                    borderRadius: 6,
+                    background: C.accent,
                     border: "none", color: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer",
                     boxShadow: `0 4px 18px ${C.accentBg}`,
                     fontFamily: "Plus Jakarta Sans, sans-serif",
@@ -837,7 +806,7 @@ export default function Dashboard() {
 
           {/* Stat cards */}
           {selectedProject && (
-            <div style={{ display: "flex", gap: 14, marginBottom: 28 }}>
+            <div className="dashboard-stats" style={{ display: "flex", gap: 12, marginBottom: 24 }}>
               <StatCard value={allApps.length} label="Total" desc="RAG Apps in this project" icon={<Package />} iconBg={C.accentBg} iconColor={C.accentLt} C={C} />
               <StatCard value={allApps.filter(a => a.status === "deployed").length} label="Active" desc="Currently active" icon={<CheckCircle />} iconBg={C.greenBg} iconColor={C.green} C={C} />
               <StatCard value={allApps.filter(a => a.status === "draft").length} label="Draft" desc="Work in progress" icon={<Timer />} iconBg={C.amberBg} iconColor={C.amber} C={C} />
@@ -846,8 +815,8 @@ export default function Dashboard() {
 
           {/* Search + view toggle */}
           {selectedProject && allApps.length > 0 && (
-            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 24, animation: "vFadeUp 0.32s ease both" }}>
-              <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 10, background: C.surface, border: `1px solid ${C.border}`, clipPath: "polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 0 100%)", padding: "9px 14px", boxShadow: C.shadow }}>
+            <div className="dashboard-toolbar" style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 24, animation: "vFadeUp 0.32s ease both" }}>
+              <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 10, background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, padding: "9px 14px", boxShadow: C.shadow }}>
                 <Search size={14} color={C.t3} />
                 <input
                   value={search}
@@ -856,7 +825,7 @@ export default function Dashboard() {
                   style={{ flex: 1, background: "transparent", border: "none", color: C.t1, fontSize: 14, outline: "none", fontFamily: "Plus Jakarta Sans, sans-serif" }}
                 />
               </div>
-              <div style={{ display: "flex", gap: 4, background: C.surface, border: `1px solid ${C.border}`, clipPath: "polygon(0 0, calc(100% - 6px) 0, 100% 6px, 100% 100%, 0 100%)", padding: 4 }}>
+              <div className="dashboard-view-toggle" style={{ display: "flex", gap: 4, background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, padding: 4 }}>
                 {[["grid", <LayoutGrid size={14} />], ["list", <List size={14} />]].map(([mode, icon]) => (
                   <button key={mode} onClick={() => setViewMode(mode)}
                     style={{ width: 32, height: 32, border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", background: viewMode === mode ? C.accentBg : "transparent", color: viewMode === mode ? C.accentLt : C.t3, transition: "all 0.15s" }}
@@ -869,8 +838,8 @@ export default function Dashboard() {
           {/* Apps */}
           {selectedProject ? (
             filteredApps.length === 0 ? (
-              <div style={{ border: `1px dashed ${C.border}`, clipPath: "polygon(0 0, calc(100% - 20px) 0, 100% 20px, 100% 100%, 0 100%)", padding: "64px 24px", textAlign: "center", background: C.accentBg }}>
-                <div style={{ width: 50, height: 50, clipPath: "polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 0 100%)", background: C.accentBg, border: `1px solid ${C.borderHi}`, margin: "0 auto 16px", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <div style={{ border: `1px dashed ${C.border}`, borderRadius: 10, padding: "56px 24px", textAlign: "center", background: C.accentBg }}>
+                <div style={{ width: 50, height: 50, borderRadius: 10, background: C.accentBg, border: `1px solid ${C.borderHi}`, margin: "0 auto 16px", display: "flex", alignItems: "center", justifyContent: "center" }}>
                   <Bot size={22} color={C.accentLt} />
                 </div>
                 <p style={{ fontSize: 15, color: C.t2, marginBottom: 18, fontWeight: 600 }}>
@@ -878,14 +847,14 @@ export default function Dashboard() {
                 </p>
                 {!search && (
                   <button onClick={() => setModal("newApp")}
-                    style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "9px 20px", clipPath: "polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 0 100%)", background: C.accentBg, border: `1px solid ${C.borderHi}`, color: C.accentLt, fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "Plus Jakarta Sans, sans-serif" }}
+                    style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "9px 16px", borderRadius: 6, background: C.accentBg, border: `1px solid ${C.borderHi}`, color: C.accentLt, fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "Plus Jakarta Sans, sans-serif" }}
                   >
                     <Plus size={14} /> Create your first app
                   </button>
                 )}
               </div>
             ) : (
-              <div style={{
+              <div className="dashboard-app-grid" style={{
                 display: viewMode === "grid" ? "grid" : "flex",
                 gridTemplateColumns: viewMode === "grid" ? "repeat(auto-fill, minmax(300px, 1fr))" : undefined,
                 flexDirection: "column",
@@ -903,10 +872,10 @@ export default function Dashboard() {
               </div>
             )
           ) : (
-            <div style={{ border: `1px dashed ${C.border}`, clipPath: "polygon(0 0, calc(100% - 20px) 0, 100% 20px, 100% 100%, 0 100%)", padding: "64px 24px", textAlign: "center" }}>
+            <div style={{ border: `1px dashed ${C.border}`, borderRadius: 10, padding: "56px 24px", textAlign: "center" }}>
               <p style={{ fontSize: 15, color: C.t3, marginBottom: 18 }}>No projects yet.</p>
               <button onClick={() => setModal("createProject")}
-                style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "9px 20px", clipPath: "polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 0 100%)", background: `linear-gradient(135deg, ${C.accent}, #6d28d9)`, border: "none", color: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "Plus Jakarta Sans, sans-serif" }}
+                style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "9px 16px", borderRadius: 6, background: C.accent, border: "none", color: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "Plus Jakarta Sans, sans-serif" }}
               >
                 <Plus size={14} /> Create Project
               </button>

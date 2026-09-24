@@ -1,26 +1,19 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  Sparkles,
-  Cpu,
-  Code,
-  Zap,
-  ArrowRight,
-  Terminal,
-  GitBranch,
-  Layers,
+  Sparkles, Cpu, Code, Zap, ArrowRight, Terminal, GitBranch, Layers,
 } from "lucide-react";
 import { chatbotsApi } from "@/api/apiClient";
 import { createPageUrl } from "@/utils";
+import { useAppTheme } from "@/lib/ThemeContext";
 
 export default function Home() {
   const [description, setDescription] = useState("");
   const [loading, setLoading] = useState(false);
   const [charCount, setCharCount] = useState(0);
-  const [terminalLines, setTerminalLines] = useState([
-    "> Initializing Vanta...",
-  ]);
+  const [terminalLines, setTerminalLines] = useState(["> Initializing Vanta..."]);
   const navigate = useNavigate();
+  const { C } = useAppTheme();
 
   useEffect(() => {
     const lines = [
@@ -64,7 +57,7 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen bg-[#09090f] grid-bg relative overflow-hidden">
+    <div style={{ minHeight: '100vh', background: C.bg }} className="grid-bg relative overflow-hidden">
       {/* Ambient glows */}
       <div className="absolute top-0 left-1/4 w-96 h-96 bg-violet-700/10 rounded-full blur-[120px] pointer-events-none" />
       <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-purple-600/10 rounded-full blur-[120px] pointer-events-none" />
@@ -75,13 +68,13 @@ export default function Home() {
         <div className="flex items-center justify-between mb-16">
           <div className="flex items-center gap-2">
             <img src="/logo.png" alt="Vanta" className="w-8 h-8 object-contain" style={{ filter: 'drop-shadow(0 0 8px rgba(124,58,237,0.5))' }} />
-            <span className="font-mono text-sm font-bold text-white tracking-widest uppercase">
+            <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 13, fontWeight: 700, color: C.t1, letterSpacing: '0.12em', textTransform: 'uppercase' }}>
               Vanta
             </span>
           </div>
           <div className="flex items-center gap-2 neon-border rounded-full px-3 py-1">
             <span className="pulse-dot w-2 h-2 rounded-full bg-emerald-400 inline-block" />
-            <span className="font-mono text-xs text-violet-300">
+            <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 12, color: C.accentLt }}>
               RAG Engine · Online
             </span>
           </div>
@@ -90,52 +83,58 @@ export default function Home() {
         {/* Hero */}
         <div className="text-center mb-16 max-w-4xl mx-auto">
           <div className="inline-flex items-center gap-2 neon-border rounded-full px-4 py-1.5 mb-6">
-            <Terminal className="w-3.5 h-3.5 text-violet-400" />
-            <span className="font-mono text-xs text-violet-300">
+            <Terminal className="w-3.5 h-3.5" style={{ color: C.accentLt }} />
+            <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 12, color: C.accentLt }}>
               v1.0 · Powered by OpenAI + FAISS
             </span>
           </div>
 
           <h1 className="text-6xl md:text-7xl font-black mb-6 leading-tight">
-            <span className="text-white">Build </span>
+            <span style={{ color: C.t1 }}>Build </span>
             <span className="bg-gradient-to-r from-violet-400 via-purple-400 to-cyan-400 bg-clip-text text-transparent glow-text">
               AI Chatbots
             </span>
             <br />
-            <span className="text-white">In Seconds</span>
+            <span style={{ color: C.t1 }}>In Seconds</span>
           </h1>
 
-          <p className="text-slate-400 text-lg max-w-2xl mx-auto leading-relaxed">
+          <p style={{ color: C.t2, fontSize: 18, maxWidth: 560, margin: '0 auto', lineHeight: 1.65 }}>
             Describe your chatbot in plain English. Vanta generates a complete
-            <span className="text-violet-300 font-semibold">
-              {" "}
-              RAG workflow
-            </span>{" "}
-            — ready to deploy.
+            <span style={{ color: C.accentLt, fontWeight: 600 }}> RAG workflow</span> — ready to deploy.
           </p>
         </div>
 
         {/* Main input card */}
         <div className="max-w-3xl mx-auto mb-16">
-          <div className="neon-border rounded-2xl bg-[#13131f]/80 backdrop-blur-xl overflow-hidden">
-            <div className="flex items-center gap-2 px-5 py-3 border-b border-violet-600/10 bg-indigo-950/20">
+          <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 16, overflow: 'hidden' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 20px', borderBottom: `1px solid ${C.border}`, background: C.bgSub }}>
               <div className="w-3 h-3 rounded-full bg-red-500/70" />
               <div className="w-3 h-3 rounded-full bg-slate-500/50" />
               <div className="w-3 h-3 rounded-full bg-green-500/70" />
-              <span className="font-mono text-xs text-slate-500 ml-2">
+              <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 12, color: C.t3, marginLeft: 8 }}>
                 chatbot_generator.rag
               </span>
             </div>
 
-            <div className="p-6">
-              <div className="relative">
+            <div style={{ padding: 24 }}>
+              <div style={{ position: 'relative' }}>
                 <textarea
                   placeholder={`// Describe your chatbot...\n// Example: A customer support bot for my saree business that answers\n// questions about products, delivery, returns and policies.`}
                   value={description}
                   onChange={handleTextChange}
-                  className="w-full min-h-[160px] bg-[#0c0c1a] text-slate-200 placeholder:text-slate-600 font-mono text-sm rounded-xl border border-slate-700/50 focus:border-violet-600/60 focus:outline-none focus:ring-0 p-4 resize-none transition-colors leading-relaxed"
+                  style={{
+                    width: '100%', minHeight: 160,
+                    background: C.input, color: C.t1,
+                    fontFamily: 'JetBrains Mono, monospace', fontSize: 13,
+                    border: `1px solid ${C.inputBorder}`, borderRadius: 12,
+                    padding: 16, resize: 'none', outline: 'none',
+                    lineHeight: 1.65, boxSizing: 'border-box',
+                    transition: 'border-color 0.15s',
+                  }}
+                  onFocus={e => e.target.style.borderColor = C.borderHi}
+                  onBlur={e => e.target.style.borderColor = C.inputBorder}
                 />
-                <div className="absolute bottom-3 right-3 font-mono text-xs text-slate-600">
+                <div style={{ position: 'absolute', bottom: 12, right: 12, fontFamily: 'JetBrains Mono, monospace', fontSize: 11, color: C.t3 }}>
                   {charCount}
                 </div>
               </div>
@@ -143,22 +142,30 @@ export default function Home() {
               <button
                 onClick={handleGenerate}
                 disabled={loading || !description.trim()}
-                className={`mt-4 w-full py-4 rounded-xl font-bold text-base transition-all duration-300 flex items-center justify-center gap-3 ${
-                  loading || !description.trim()
-                    ? "bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700/50"
-                    : "bg-gradient-to-r from-violet-700 to-purple-600 hover:from-violet-600 hover:to-purple-500 text-white glow-indigo hover:scale-[1.01]"
-                }`}
+                style={{
+                  marginTop: 16, width: '100%', padding: '16px 0',
+                  borderRadius: 12, fontWeight: 700, fontSize: 15,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12,
+                  cursor: loading || !description.trim() ? 'not-allowed' : 'pointer',
+                  transition: 'all 0.25s',
+                  background: loading || !description.trim()
+                    ? C.surface
+                    : 'linear-gradient(135deg, #7c3aed, #6d28d9)',
+                  border: `1px solid ${loading || !description.trim() ? C.border : 'transparent'}`,
+                  color: loading || !description.trim() ? C.t3 : '#fff',
+                  boxShadow: loading || !description.trim() ? 'none' : '0 0 30px rgba(124,58,237,0.35)',
+                }}
               >
                 {loading ? (
                   <>
-                    <div className="w-5 h-5 border-2 border-slate-400 border-t-transparent rounded-full animate-spin" />
-                    <span className="font-mono">Generating workflow...</span>
+                    <div style={{ width: 20, height: 20, border: `2px solid ${C.t3}`, borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
+                    <span style={{ fontFamily: 'JetBrains Mono, monospace' }}>Generating workflow...</span>
                   </>
                 ) : (
                   <>
-                    <Zap className="w-5 h-5" />
+                    <Zap style={{ width: 20, height: 20 }} />
                     Generate RAG Workflow
-                    <ArrowRight className="w-4 h-4" />
+                    <ArrowRight style={{ width: 16, height: 16 }} />
                   </>
                 )}
               </button>
@@ -168,16 +175,14 @@ export default function Home() {
 
         {/* Terminal widget */}
         <div className="max-w-3xl mx-auto mb-16">
-          <div className="neon-border rounded-xl bg-[#0c0c1a]/90 overflow-hidden">
-            <div className="flex items-center gap-2 px-4 py-2 border-b border-slate-800/60 bg-black/30">
-              <Terminal className="w-3.5 h-3.5 text-violet-400" />
-              <span className="font-mono text-xs text-slate-500">
-                system.log
-              </span>
+          <div style={{ background: C.bgSub, border: `1px solid ${C.border}`, borderRadius: 12, overflow: 'hidden' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 16px', borderBottom: `1px solid ${C.border}` }}>
+              <Terminal style={{ width: 14, height: 14, color: C.accentLt }} />
+              <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11, color: C.t3 }}>system.log</span>
             </div>
-            <div className="p-4 space-y-1 min-h-[80px]">
+            <div style={{ padding: 16, minHeight: 80, display: 'flex', flexDirection: 'column', gap: 4 }}>
               {terminalLines.map((line, i) => (
-                <div key={i} className="font-mono text-xs text-violet-300/70">
+                <div key={i} style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 12, color: C.accentLt, opacity: 0.7 }}>
                   {line}
                 </div>
               ))}
@@ -188,52 +193,35 @@ export default function Home() {
         {/* Feature grid */}
         <div className="grid md:grid-cols-4 gap-4 max-w-5xl mx-auto">
           {[
-            {
-              icon: Sparkles,
-              color: "text-violet-400",
-              bg: "bg-violet-600/10 border-violet-600/20",
-              title: "AI Auto-Generation",
-              desc: "Describe in plain English, get a full workflow instantly",
-            },
-            {
-              icon: GitBranch,
-              color: "text-purple-400",
-              bg: "bg-purple-500/10 border-purple-500/20",
-              title: "Visual Flow Editor",
-              desc: "Drag & drop nodes to customize your pipeline",
-            },
-            {
-              icon: Code,
-              color: "text-cyan-400",
-              bg: "bg-cyan-500/10 border-cyan-500/20",
-              title: "Export Code",
-              desc: "Download production-ready Python to self-host",
-            },
-            {
-              icon: Cpu,
-              color: "text-red-400",
-              bg: "bg-red-500/10 border-red-500/20",
-              title: "Real RAG",
-              desc: "Actual document indexing, embeddings & retrieval",
-            },
-          ].map(({ icon: Icon, color, bg, title, desc }) => (
+            { icon: Sparkles, color: C.accentLt,  bgColor: C.accentBg,                    title: "AI Auto-Generation", desc: "Describe in plain English, get a full workflow instantly" },
+            { icon: GitBranch, color: '#c084fc',  bgColor: 'rgba(192,132,252,0.1)',        title: "Visual Flow Editor",  desc: "Drag & drop nodes to customize your pipeline" },
+            { icon: Code,      color: C.amber,    bgColor: C.amberBg,                      title: "Export Code",         desc: "Download production-ready Python to self-host" },
+            { icon: Cpu,       color: '#f87171',  bgColor: 'rgba(248,113,113,0.1)',        title: "Real RAG",            desc: "Actual document indexing, embeddings & retrieval" },
+          ].map(({ icon: Icon, color, bgColor, title, desc }) => (
             <div
               key={title}
-              className={`rounded-xl border p-5 ${bg} hover:scale-[1.02] transition-transform cursor-default`}
+              style={{
+                background: bgColor, border: `1px solid ${color}33`,
+                borderRadius: 12, padding: 20, cursor: 'default',
+                transition: 'transform 0.2s',
+              }}
+              onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.02)'}
+              onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
             >
-              <Icon className={`w-7 h-7 ${color} mb-3`} />
-              <h3 className="font-semibold text-white text-sm mb-1">{title}</h3>
-              <p className="text-slate-500 text-xs leading-relaxed">{desc}</p>
+              <Icon style={{ width: 28, height: 28, color, marginBottom: 12 }} />
+              <h3 style={{ fontWeight: 600, color: C.t1, fontSize: 14, marginBottom: 4 }}>{title}</h3>
+              <p style={{ color: C.t2, fontSize: 12, lineHeight: 1.55 }}>{desc}</p>
             </div>
           ))}
         </div>
 
-        <div className="text-center mt-16">
-          <p className="font-mono text-xs text-slate-700">
+        <div style={{ textAlign: 'center', marginTop: 64 }}>
+          <p style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11, color: C.t3 }}>
             © 2026 Vanta · Open Source RAG Platform
           </p>
         </div>
       </div>
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   );
 }

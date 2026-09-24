@@ -7,11 +7,13 @@ import { chatbotsApi } from '@/api/apiClient';
 import { createPageUrl } from '@/utils';
 import EmbedCode from '../components/deploy/EmbedCode';
 import CodeExport from '../components/deploy/CodeExport';
+import { useAppTheme } from '@/lib/ThemeContext';
 
 export default function Deploy() {
   const [chatbot, setChatbot] = useState(null);
   const [copied, setCopied] = useState(false);
   const navigate = useNavigate();
+  const { C } = useAppTheme();
 
   const chatbotId = new URLSearchParams(window.location.search).get('id');
 
@@ -34,8 +36,8 @@ export default function Deploy() {
 
   if (!chatbot) {
     return (
-      <div className="flex items-center justify-center h-screen bg-background">
-        <div className="text-muted-foreground font-mono text-sm">&gt; Loading deployment...</div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: C.bg }}>
+        <div style={{ color: C.t2, fontFamily: 'JetBrains Mono, monospace', fontSize: 13 }}>&gt; Loading deployment...</div>
       </div>
     );
   }
@@ -43,35 +45,37 @@ export default function Deploy() {
   const chatUrl = `${window.location.origin}${createPageUrl(`Chat?id=${chatbot.embed_id}`)}`;
 
   return (
-    <div className="min-h-screen bg-[#09090f] grid-bg">
+    <div style={{ minHeight: '100vh', background: C.bg }} className="grid-bg">
       <div className="container mx-auto px-4 py-8">
 
         {/* Header */}
-        <div className="flex items-center gap-4 mb-8">
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 32 }}>
           <button
             onClick={() => navigate(createPageUrl('Dashboard'))}
-            className="p-2 rounded-lg border border-primary 20 text-slate-400 hover:text-foreground hover:border-primary 40 transition-colors"
+            style={{ padding: 8, borderRadius: 8, border: `1px solid ${C.borderHi}`, color: C.t2, background: 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+            onMouseEnter={e => { e.currentTarget.style.color = C.t1; e.currentTarget.style.borderColor = C.borderHi; }}
+            onMouseLeave={e => { e.currentTarget.style.color = C.t2; }}
           >
-            <ArrowLeft className="w-5 h-5" />
+            <ArrowLeft style={{ width: 20, height: 20 }} />
           </button>
           <div>
-            <h1 className="text-2xl font-bold text-slate-100">🎉 Chatbot Deployed!</h1>
-            <p className="text-muted-foreground font-mono text-sm">{chatbot.title}</p>
+            <h1 style={{ fontSize: 24, fontWeight: 700, color: C.t1 }}>🎉 Chatbot Deployed!</h1>
+            <p style={{ color: C.t2, fontFamily: 'JetBrains Mono, monospace', fontSize: 13 }}>{chatbot.title}</p>
           </div>
         </div>
 
         <div className="grid lg:grid-cols-2 gap-6">
           {/* Left: Embed & Export */}
           <div className="space-y-6">
-            <div className="neon-border rounded-xl bg-[#13131f]/80 overflow-hidden">
-              <div className="p-5 border-b border-primary 10">
-                <h2 className="text-foreground font-semibold">Integration Options</h2>
+            <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, overflow: 'hidden' }}>
+              <div style={{ padding: '20px', borderBottom: `1px solid ${C.border}` }}>
+                <h2 style={{ color: C.t1, fontWeight: 600 }}>Integration Options</h2>
               </div>
-              <div className="p-5">
+              <div style={{ padding: '20px' }}>
                 <Tabs defaultValue="embed">
-                  <TabsList className="grid w-full grid-cols-2 bg-slate-900/60 border border-primary 20">
-                    <TabsTrigger value="embed" className="data-[state=active]:bg-primary data-[state=active]:text-foreground text-slate-400">Embed Code</TabsTrigger>
-                    <TabsTrigger value="python" className="data-[state=active]:bg-primary data-[state=active]:text-foreground text-slate-400">Export Python</TabsTrigger>
+                  <TabsList style={{ display: 'grid', width: '100%', gridTemplateColumns: '1fr 1fr', background: C.bgSub, border: `1px solid ${C.border}` }}>
+                    <TabsTrigger value="embed" style={{ color: C.t2 }}>Embed Code</TabsTrigger>
+                    <TabsTrigger value="python" style={{ color: C.t2 }}>Export Python</TabsTrigger>
                   </TabsList>
                   <TabsContent value="embed" className="mt-4">
                     <EmbedCode chatUrl={chatUrl} onCopy={handleCopy} copied={copied} />
@@ -84,29 +88,33 @@ export default function Deploy() {
             </div>
 
             {/* Direct link */}
-            <div className="neon-border rounded-xl bg-[#13131f]/80 overflow-hidden">
-              <div className="p-5 border-b border-primary 10">
-                <h2 className="text-foreground font-semibold">Direct Link</h2>
+            <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, overflow: 'hidden' }}>
+              <div style={{ padding: '20px', borderBottom: `1px solid ${C.border}` }}>
+                <h2 style={{ color: C.t1, fontWeight: 600 }}>Direct Link</h2>
               </div>
-              <div className="p-5">
-                <div className="flex items-center gap-2">
+              <div style={{ padding: '20px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <input
                     type="text"
                     value={chatUrl}
                     readOnly
-                    className="flex-1 px-3 py-2 bg-slate-900/60 border border-primary 20 rounded-lg text-sm text-slate-400 font-mono outline-none"
+                    style={{ flex: 1, padding: '8px 12px', background: C.bgSub, border: `1px solid ${C.border}`, borderRadius: 8, fontSize: 13, color: C.t2, fontFamily: 'JetBrains Mono, monospace', outline: 'none' }}
                   />
                   <button
                     onClick={() => handleCopy(chatUrl)}
-                    className="p-2 rounded-lg border border-primary 20 text-slate-400 hover:text-foreground hover:border-primary 40 transition-colors"
+                    style={{ padding: 8, borderRadius: 8, border: `1px solid ${C.border}`, color: C.t2, background: 'transparent', cursor: 'pointer' }}
+                    onMouseEnter={e => { e.currentTarget.style.color = C.t1; }}
+                    onMouseLeave={e => { e.currentTarget.style.color = C.t2; }}
                   >
-                    {copied ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
+                    {copied ? <Check style={{ width: 16, height: 16, color: '#22c55e' }} /> : <Copy style={{ width: 16, height: 16 }} />}
                   </button>
                   <button
                     onClick={() => window.open(chatUrl, '_blank')}
-                    className="p-2 rounded-lg border border-primary 20 text-slate-400 hover:text-foreground hover:border-primary 40 transition-colors"
+                    style={{ padding: 8, borderRadius: 8, border: `1px solid ${C.border}`, color: C.t2, background: 'transparent', cursor: 'pointer' }}
+                    onMouseEnter={e => { e.currentTarget.style.color = C.t1; }}
+                    onMouseLeave={e => { e.currentTarget.style.color = C.t2; }}
                   >
-                    <ExternalLink className="w-4 h-4" />
+                    <ExternalLink style={{ width: 16, height: 16 }} />
                   </button>
                 </div>
               </div>
@@ -114,13 +122,13 @@ export default function Deploy() {
           </div>
 
           {/* Right: Live preview */}
-          <div className="neon-border rounded-xl bg-[#13131f]/80 overflow-hidden">
-            <div className="p-5 border-b border-primary 10">
-              <h2 className="text-foreground font-semibold">Live Preview</h2>
+          <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, overflow: 'hidden' }}>
+            <div style={{ padding: '20px', borderBottom: `1px solid ${C.border}` }}>
+              <h2 style={{ color: C.t1, fontWeight: 600 }}>Live Preview</h2>
             </div>
-            <div className="p-5">
-              <div className="rounded-lg overflow-hidden border border-primary 20" style={{ height: 560 }}>
-                <iframe src={chatUrl} className="w-full h-full" title="Chatbot Preview" />
+            <div style={{ padding: '20px' }}>
+              <div style={{ borderRadius: 8, overflow: 'hidden', border: `1px solid ${C.border}`, height: 560 }}>
+                <iframe src={chatUrl} style={{ width: '100%', height: '100%' }} title="Chatbot Preview" />
               </div>
             </div>
           </div>

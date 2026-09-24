@@ -1,10 +1,3 @@
-/**
- * client/src/components/editor/NodePalette.jsx
- *
- * Redesigned: collapsible sidebar, toggleable panel, per-category fold,
- * larger fonts, compact icon-only mode when collapsed.
- */
-
 import React, { useState } from 'react';
 import {
   FileText, Scissors, Sparkles, Database, Cpu as CpuIcon, MessageSquare,
@@ -12,6 +5,7 @@ import {
   Workflow, Plus, FileSearch, ShieldCheck, Terminal,
   ChevronLeft, ChevronRight, ChevronDown, ChevronUp,
 } from 'lucide-react';
+import { useAppTheme } from '@/lib/ThemeContext';
 
 const NODE_PALETTE_DEFS = [
   { type: 'DocumentUpload',    label: 'Knowledge Source', icon: FileText,     color: '#60a5fa', bg: 'rgba(96,165,250,0.12)',  category: 'Input',       status: 'supported'    },
@@ -61,6 +55,7 @@ export default function NodePalette({ onAddNode }) {
   const [openCats, setOpenCats]   = useState(() =>
     Object.fromEntries(CATEGORIES.map(c => [c, true]))
   );
+  const { C } = useAppTheme();
 
   const toggleCat = cat =>
     setOpenCats(prev => ({ ...prev, [cat]: !prev[cat] }));
@@ -70,8 +65,8 @@ export default function NodePalette({ onAddNode }) {
   return (
     <div style={{
       width: W, flexShrink: 0, height: '100%',
-      background: '#0b0b18',
-      borderRight: '1px solid rgba(124,58,237,0.15)',
+      background: C.nodePalette,
+      borderRight: `1px solid ${C.panelBorder}`,
       display: 'flex', flexDirection: 'column',
       fontFamily: "'Plus Jakarta Sans', sans-serif",
       transition: 'width 0.2s ease',
@@ -85,12 +80,12 @@ export default function NodePalette({ onAddNode }) {
         display: 'flex', alignItems: 'center',
         justifyContent: collapsed ? 'center' : 'space-between',
         padding: collapsed ? 0 : '0 12px 0 14px',
-        borderBottom: '1px solid rgba(124,58,237,0.12)',
-        background: '#0d0d1c',
+        borderBottom: `1px solid ${C.panelBorder}`,
+        background: C.panel,
       }}>
         {!collapsed && (
           <span style={{
-            fontSize: 11, fontWeight: 700, color: '#6d6d8a',
+            fontSize: 11, fontWeight: 700, color: C.t3,
             letterSpacing: '0.1em', textTransform: 'uppercase',
             fontFamily: 'JetBrains Mono, monospace',
             whiteSpace: 'nowrap',
@@ -103,13 +98,13 @@ export default function NodePalette({ onAddNode }) {
           title={collapsed ? 'Expand palette' : 'Collapse palette'}
           style={{
             width: 30, height: 30, borderRadius: 8,
-            border: '1px solid rgba(124,58,237,0.2)',
+            border: `1px solid ${C.panelBorder}`,
             background: 'transparent', cursor: 'pointer',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            color: '#6d6d8a', transition: 'all 0.15s', flexShrink: 0,
+            color: C.t3, transition: 'all 0.15s', flexShrink: 0,
           }}
-          onMouseEnter={e => { e.currentTarget.style.background = 'rgba(124,58,237,0.12)'; e.currentTarget.style.color = '#a78bfa'; }}
-          onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#6d6d8a'; }}
+          onMouseEnter={e => { e.currentTarget.style.background = C.accentBg; e.currentTarget.style.color = C.accentLt; }}
+          onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = C.t3; }}
         >
           {collapsed ? <ChevronRight size={13} /> : <ChevronLeft size={13} />}
         </button>
@@ -175,8 +170,8 @@ export default function NodePalette({ onAddNode }) {
                     {cat}
                   </span>
                   {open
-                    ? <ChevronUp size={10} color="#475569" />
-                    : <ChevronDown size={10} color="#475569" />}
+                    ? <ChevronUp size={10} color={C.t3} />
+                    : <ChevronDown size={10} color={C.t3} />}
                 </button>
 
                 {/* Nodes in this category */}
@@ -220,7 +215,7 @@ export default function NodePalette({ onAddNode }) {
                           {/* Label + badge */}
                           <div style={{ flex: 1, minWidth: 0 }}>
                             <div style={{
-                              fontSize: 13, fontWeight: 600, color: '#d4d4f0',
+                              fontSize: 13, fontWeight: 600, color: C.t1,
                               whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
                               lineHeight: 1.3,
                             }}>
@@ -240,7 +235,7 @@ export default function NodePalette({ onAddNode }) {
                           </div>
 
                           {/* Add indicator */}
-                          <Plus size={12} color="#3d3d5c" style={{ flexShrink: 0 }} />
+                          <Plus size={12} color={C.t3} style={{ flexShrink: 0 }} />
                         </button>
                       );
                     })}
@@ -255,7 +250,7 @@ export default function NodePalette({ onAddNode }) {
       <style>{`
         ::-webkit-scrollbar { width: 3px; }
         ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: rgba(124,58,237,0.2); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb { background: ${C.panelBorder}; border-radius: 3px; }
       `}</style>
     </div>
   );

@@ -22,11 +22,29 @@ import {
   GitBranch, Zap, Loader, Play,
 } from 'lucide-react';
 import { architectChatApi } from '@/api/apiClient';
+import { useAppTheme } from '@/lib/ThemeContext';
+
+// ─── Markdown components ──────────────────────────────────────────────────────
+
+const mdComponents = {
+  p:        ({ node, ...p }) => <p style={{ margin: '0 0 5px 0', lineHeight: 1.65 }} {...p} />,
+  strong:   ({ node, ...p }) => <strong style={{ fontWeight: 700 }} {...p} />,
+  em:       ({ node, ...p }) => <em style={{ fontStyle: 'italic' }} {...p} />,
+  code:     ({ node, inline, children, ...p }) => inline
+    ? <code style={{ background: 'rgba(99,102,241,0.18)', padding: '1px 5px', borderRadius: 4, fontSize: '0.88em', fontFamily: 'JetBrains Mono, monospace' }}>{children}</code>
+    : <pre style={{ background: 'rgba(0,0,0,0.25)', borderRadius: 8, padding: '10px', marginTop: 6, overflow: 'auto' }}><code style={{ fontSize: '0.85em', fontFamily: 'JetBrains Mono, monospace' }}>{children}</code></pre>,
+  ul:       ({ node, ...p }) => <ul style={{ margin: '4px 0', paddingLeft: 20, lineHeight: 1.65 }} {...p} />,
+  ol:       ({ node, ...p }) => <ol style={{ margin: '4px 0', paddingLeft: 20, lineHeight: 1.65 }} {...p} />,
+  li:       ({ node, ...p }) => <li style={{ marginBottom: 3 }} {...p} />,
+  a:        ({ node, ...p }) => <a style={{ color: '#a78bfa', textDecoration: 'underline' }} {...p} />,
+  blockquote: ({ node, ...p }) => <blockquote style={{ borderLeft: '2px solid rgba(124,58,237,0.4)', paddingLeft: 10, margin: '6px 0', color: 'inherit', opacity: 0.85 }} {...p} />,
+};
 
 // ─── Proposal Display ─────────────────────────────────────────────────────────
 
 function ProposalSection({ title, children, defaultOpen = false }) {
   const [open, setOpen] = useState(defaultOpen);
+  const { C } = useAppTheme();
   return (
     <div style={{ marginBottom: 6 }}>
       <button
@@ -34,7 +52,7 @@ function ProposalSection({ title, children, defaultOpen = false }) {
         style={{
           width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           padding: '5px 0', background: 'transparent', border: 'none', cursor: 'pointer',
-          color: '#94a3b8', fontSize: 10, fontFamily: 'JetBrains Mono, monospace',
+          color: C.t3, fontSize: 10, fontFamily: 'JetBrains Mono, monospace',
           textTransform: 'uppercase', letterSpacing: '0.08em',
         }}
       >
@@ -48,12 +66,13 @@ function ProposalSection({ title, children, defaultOpen = false }) {
 
 function ProposalDisplay({ proposal, proposalStatus, onContinue, onApprove, approving }) {
   if (!proposal) return null;
+  const { C } = useAppTheme();
 
   const isActivated    = proposalStatus === 'activated';
   const isActivating   = proposalStatus === 'activating' || approving;
   const isError        = proposalStatus === 'activation_error';
   const isBlocked      = !proposal.executable;
-  const executableColor = proposal.executable ? '#22c55e' : '#a78bfa';
+  const executableColor = proposal.executable ? '#22c55e' : C.accentLt;
 
   // Progress steps shown during/after activation
   const steps = [
@@ -294,6 +313,7 @@ function ProposalDisplay({ proposal, proposalStatus, onContinue, onApprove, appr
 
 function MessageBubble({ msg }) {
   const isArchitect = msg.role === 'architect';
+  const { C } = useAppTheme();
   return (
     <div style={{
       display: 'flex', gap: 8, alignItems: 'flex-start',
@@ -302,19 +322,19 @@ function MessageBubble({ msg }) {
     }}>
       <div style={{
         width: 24, height: 24, borderRadius: '50%', flexShrink: 0,
-        background: isArchitect ? 'rgba(124,58,237,0.15)' : 'rgba(34,197,94,0.1)',
-        border: `1px solid ${isArchitect ? 'rgba(124,58,237,0.4)' : 'rgba(34,197,94,0.3)'}`,
+        background: isArchitect ? C.accentBg : 'rgba(34,197,94,0.1)',
+        border: `1px solid ${isArchitect ? C.borderHi : 'rgba(34,197,94,0.3)'}`,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
       }}>
-        {isArchitect ? <Bot size={11} color="#7c3aed" /> : <User size={11} color="#22c55e" />}
+        {isArchitect ? <Bot size={11} color={C.accent} /> : <User size={11} color="#22c55e" />}
       </div>
       <div style={{
         maxWidth: '80%',
         padding: '8px 11px',
         borderRadius: isArchitect ? '4px 12px 12px 12px' : '12px 4px 12px 12px',
-        background: isArchitect ? 'rgba(124,58,237,0.08)' : 'rgba(255,255,255,0.04)',
-        border: `1px solid ${isArchitect ? 'rgba(124,58,237,0.2)' : 'rgba(255,255,255,0.06)'}`,
-        fontSize: 13, color: '#e2e8f0', lineHeight: 1.65,
+        background: isArchitect ? C.accentBg : C.surface,
+        border: `1px solid ${isArchitect ? C.panelBorder : C.border}`,
+        fontSize: 13, color: C.t1, lineHeight: 1.65,
       }}>
         <ReactMarkdown components={mdComponents}>{msg.content}</ReactMarkdown>
       </div>
@@ -327,13 +347,14 @@ function MessageBubble({ msg }) {
 export default function ArchitectChatPanel({ chatbotId, hasDraft, onClose, onActivated }) {
   const [messages,     setMessages]     = useState([]);
   const [proposal,     setProposal]     = useState(null);
-  const [chatStatus,   setChatStatus]   = useState('idle');  // idle | clarifying | ready_for_review | activating | activated | activation_error
+  const [chatStatus,   setChatStatus]   = useState('idle');
   const [input,        setInput]        = useState('');
   const [loading,      setLoading]      = useState(false);
   const [approving,    setApproving]    = useState(false);
   const [error,        setError]        = useState('');
   const [initialized,  setInitialized]  = useState(false);
   const bottomRef = useRef(null);
+  const { C } = useAppTheme();
 
   // Load existing conversation on mount
   useEffect(() => {
@@ -494,8 +515,8 @@ export default function ArchitectChatPanel({ chatbotId, hasDraft, onClose, onAct
   return (
     <div style={{
       width: 380, height: '100%',
-      background: '#0d0d1c',
-      borderLeft: '1px solid rgba(124,58,237,0.2)',
+      background: C.panel,
+      borderLeft: `1px solid ${C.panelBorder}`,
       display: 'flex', flexDirection: 'column',
       fontFamily: 'Plus Jakarta Sans, sans-serif',
       flexShrink: 0,
@@ -503,36 +524,36 @@ export default function ArchitectChatPanel({ chatbotId, hasDraft, onClose, onAct
       {/* Header */}
       <div style={{
         padding: '12px 14px',
-        borderBottom: '1px solid rgba(124,58,237,0.15)',
+        borderBottom: `1px solid ${C.panelBorder}`,
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        background: '#0d0d1c', flexShrink: 0,
+        background: C.panel, flexShrink: 0,
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <div style={{
             width: 28, height: 28, borderRadius: 8,
-            background: 'rgba(124,58,237,0.15)', border: '1px solid rgba(124,58,237,0.3)',
+            background: C.accentBg, border: `1px solid ${C.borderHi}`,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}>
-            <Cpu size={13} color="#7c3aed" />
+            <Cpu size={13} color={C.accent} />
           </div>
           <div>
-            <div style={{ fontSize: 14, fontWeight: 700, color: '#f0f0ff', letterSpacing: '-0.01em' }}>Architect Chat</div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: C.t1, letterSpacing: '-0.01em' }}>Architect Chat</div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
               <div style={{
                 width: 5, height: 5, borderRadius: '50%',
                 background:
                   chatStatus === 'activated'        ? '#22c55e' :
-                  chatStatus === 'ready_for_review' ? '#818cf8' :
-                  chatStatus === 'activating'       ? '#a78bfa' :
+                  chatStatus === 'ready_for_review' ? C.accentLt :
+                  chatStatus === 'activating'       ? C.accentLt :
                   chatStatus === 'activation_error' ? '#ef4444' :
-                  chatStatus === 'clarifying'       ? '#a78bfa' : '#475569',
+                  chatStatus === 'clarifying'       ? C.accentLt : C.t3,
                 boxShadow:
                   chatStatus === 'activated'        ? '0 0 5px #22c55e' :
-                  chatStatus === 'activating'       ? '0 0 5px #a78bfa' :
-                  chatStatus === 'ready_for_review' ? '0 0 5px #818cf8' :
+                  chatStatus === 'activating'       ? `0 0 5px ${C.accentLt}` :
+                  chatStatus === 'ready_for_review' ? `0 0 5px ${C.accentLt}` :
                   chatStatus === 'activation_error' ? '0 0 5px #ef4444' : 'none',
               }} />
-              <span style={{ fontSize: 10, color: '#6d6d8a', fontFamily: 'JetBrains Mono, monospace', fontWeight: 600 }}>
+              <span style={{ fontSize: 10, color: C.t3, fontFamily: 'JetBrains Mono, monospace', fontWeight: 600 }}>
                 {chatStatus === 'activated'        ? 'activated'
                   : chatStatus === 'activating'    ? 'activating...'
                   : chatStatus === 'activation_error' ? 'activation failed'
@@ -549,21 +570,18 @@ export default function ArchitectChatPanel({ chatbotId, hasDraft, onClose, onAct
               onClick={handleCancel}
               disabled={loading}
               title="Cancel proposal (draft preserved)"
-              style={{
-                background: 'transparent', border: 'none', cursor: 'pointer',
-                color: '#475569', padding: '3px 5px', borderRadius: 5,
-              }}
+              style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: C.t3, padding: '3px 5px', borderRadius: 5 }}
               onMouseEnter={e => e.currentTarget.style.color = '#ef4444'}
-              onMouseLeave={e => e.currentTarget.style.color = '#475569'}
+              onMouseLeave={e => e.currentTarget.style.color = C.t3}
             >
               <XCircle size={13} />
             </button>
           )}
           <button
             onClick={onClose}
-            style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#475569', padding: '3px 5px' }}
-            onMouseEnter={e => e.currentTarget.style.color = '#e2e8f0'}
-            onMouseLeave={e => e.currentTarget.style.color = '#475569'}
+            style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: C.t3, padding: '3px 5px' }}
+            onMouseEnter={e => e.currentTarget.style.color = C.t1}
+            onMouseLeave={e => e.currentTarget.style.color = C.t3}
           >
             <X size={14} />
           </button>
@@ -585,26 +603,26 @@ export default function ArchitectChatPanel({ chatbotId, hasDraft, onClose, onAct
 
       {/* PATH A: Review Draft button — shown when draft exists and not yet started */}
       {hasDraft && !initialized && (
-        <div style={{ padding: '10px 14px', borderBottom: '1px solid rgba(124,58,237,0.1)', flexShrink: 0 }}>
+        <div style={{ padding: '10px 14px', borderBottom: `1px solid ${C.panelBorder}`, flexShrink: 0 }}>
           <button
             onClick={handleReviewDraft}
             disabled={loading}
             style={{
               width: '100%', padding: '8px 12px', borderRadius: 8,
-              background: 'rgba(124,58,237,0.15)', border: '1px solid rgba(124,58,237,0.35)',
-              color: '#818cf8', fontSize: 12, fontWeight: 600, cursor: 'pointer',
+              background: C.accentBg, border: `1px solid ${C.borderHi}`,
+              color: C.accentLt, fontSize: 12, fontWeight: 600, cursor: 'pointer',
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
             }}
-            onMouseEnter={e => e.currentTarget.style.background = 'rgba(124,58,237,0.25)'}
-            onMouseLeave={e => e.currentTarget.style.background = 'rgba(124,58,237,0.15)'}
+            onMouseEnter={e => e.currentTarget.style.background = `rgba(124,58,237,0.2)`}
+            onMouseLeave={e => e.currentTarget.style.background = C.accentBg}
           >
             {loading ? (
-              <><div style={{ width: 12, height: 12, border: '2px solid #7c3aed', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} /> Reviewing...</>
+              <><div style={{ width: 12, height: 12, border: `2px solid ${C.accent}`, borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} /> Reviewing...</>
             ) : (
               <><GitBranch size={12} /> Review Draft with Architect</>
             )}
           </button>
-          <p style={{ fontSize: 9, color: '#334155', fontFamily: 'JetBrains Mono, monospace', textAlign: 'center', marginTop: 5 }}>
+          <p style={{ fontSize: 9, color: C.t3, fontFamily: 'JetBrains Mono, monospace', textAlign: 'center', marginTop: 5 }}>
             Or type a message below to start a direct conversation.
           </p>
         </div>
@@ -614,11 +632,11 @@ export default function ArchitectChatPanel({ chatbotId, hasDraft, onClose, onAct
       <div style={{ flex: 1, overflowY: 'auto', padding: '14px' }}>
         {messages.length === 0 && !loading && (
           <div style={{ textAlign: 'center', marginTop: 30 }}>
-            <Cpu size={28} color="#334155" style={{ margin: '0 auto 10px' }} />
-            <p style={{ fontSize: 13, color: '#52526e', lineHeight: 1.6 }}>
+            <Cpu size={28} color={C.t3} style={{ margin: '0 auto 10px' }} />
+            <p style={{ fontSize: 13, color: C.t2, lineHeight: 1.6 }}>
               Ask me to review your workflow changes, or tell me what capability you'd like to add.
             </p>
-            <p style={{ fontSize: 11, color: '#3a3a55', fontFamily: 'JetBrains Mono, monospace', marginTop: 6 }}>
+            <p style={{ fontSize: 11, color: C.t3, fontFamily: 'JetBrains Mono, monospace', marginTop: 6 }}>
               I won't change anything — I propose only.
             </p>
           </div>
@@ -632,20 +650,20 @@ export default function ArchitectChatPanel({ chatbotId, hasDraft, onClose, onAct
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 10 }}>
             <div style={{
               width: 24, height: 24, borderRadius: '50%',
-              background: 'rgba(124,58,237,0.15)', border: '1px solid rgba(124,58,237,0.3)',
+              background: C.accentBg, border: `1px solid ${C.borderHi}`,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
             }}>
-              <Bot size={11} color="#7c3aed" />
+              <Bot size={11} color={C.accent} />
             </div>
             <div style={{
-              padding: '8px 12px', background: 'rgba(124,58,237,0.08)',
-              border: '1px solid rgba(124,58,237,0.15)',
+              padding: '8px 12px', background: C.accentBg,
+              border: `1px solid ${C.panelBorder}`,
               borderRadius: '4px 12px 12px 12px',
               display: 'flex', gap: 4, alignItems: 'center',
             }}>
               {[0, 1, 2].map(d => (
                 <div key={d} style={{
-                  width: 5, height: 5, borderRadius: '50%', background: '#7c3aed',
+                  width: 5, height: 5, borderRadius: '50%', background: C.accent,
                   animation: `bounce 1s ease-in-out ${d * 0.15}s infinite`,
                 }} />
               ))}
@@ -653,7 +671,7 @@ export default function ArchitectChatPanel({ chatbotId, hasDraft, onClose, onAct
           </div>
         )}
 
-        {/* Proposal display — shown for all post-generation states */}
+        {/* Proposal display */}
         {proposal && ['ready_for_review', 'activating', 'activated', 'activation_error'].includes(chatStatus) && (
           <ProposalDisplay
             proposal={proposal}
@@ -669,7 +687,7 @@ export default function ArchitectChatPanel({ chatbotId, hasDraft, onClose, onAct
 
       {/* Input */}
       <div style={{
-        padding: '12px 14px', borderTop: '1px solid rgba(124,58,237,0.12)',
+        padding: '12px 14px', borderTop: `1px solid ${C.panelBorder}`,
         display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0,
       }}>
         <input
@@ -680,23 +698,25 @@ export default function ArchitectChatPanel({ chatbotId, hasDraft, onClose, onAct
           disabled={loading}
           style={{
             flex: 1, padding: '8px 11px',
-            background: '#0c0c1a', border: '1px solid rgba(124,58,237,0.25)',
-            borderRadius: 8, color: '#e2e8f0', fontSize: 12, outline: 'none',
+            background: C.input, border: `1px solid ${C.inputBorder}`,
+            borderRadius: 8, color: C.t1, fontSize: 12, outline: 'none',
           }}
+          onFocus={e => e.target.style.borderColor = C.borderHi}
+          onBlur={e => e.target.style.borderColor = C.inputBorder}
         />
         <button
           onClick={handleSend}
           disabled={loading || !input.trim()}
           style={{
             width: 32, height: 32,
-            background: input.trim() && !loading ? 'rgba(124,58,237,0.8)' : 'rgba(124,58,237,0.15)',
-            border: '1px solid rgba(124,58,237,0.3)',
+            background: input.trim() && !loading ? 'rgba(124,58,237,0.8)' : C.accentBg,
+            border: `1px solid ${C.panelBorder}`,
             borderRadius: 8,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             cursor: input.trim() && !loading ? 'pointer' : 'default',
           }}
         >
-          <Send size={13} color={input.trim() && !loading ? '#fff' : '#334155'} />
+          <Send size={13} color={input.trim() && !loading ? '#fff' : C.t3} />
         </button>
       </div>
 

@@ -31,44 +31,51 @@ import {
 } from 'lucide-react';
 import { architectApi, documentsApi } from '@/api/apiClient';
 import { createPageUrl } from '@/utils';
+import { useAppTheme } from '@/lib/ThemeContext';
 
 const STEPS = { DESCRIBE: 0, QUESTIONS: 1, GENERATING: 2, REVIEW: 3, APPROVED: 4 };
 
 // ─── UI sub-components ────────────────────────────────────────────────────────
 
-function PlanSection({ icon: Icon, color, title, children, defaultOpen = true }) {
+function PlanSection({ icon: Icon, color, title, children, defaultOpen = true, C }) {
   const [open, setOpen] = useState(defaultOpen);
   return (
-    <div className="neon-border rounded-xl overflow-hidden mb-4">
+    <div style={{ marginBottom: 16, border: `1px solid ${C.border}`, borderRadius: 12, overflow: 'hidden' }}>
       <button
         onClick={() => setOpen(o => !o)}
-        className="w-full flex items-center justify-between px-5 py-3 bg-[#13131f]/60 hover:bg-[#13131f]/90 transition-colors"
+        style={{
+          width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '10px 20px', background: C.bgSub, border: 'none', cursor: 'pointer',
+          transition: 'background 0.15s',
+        }}
+        onMouseEnter={e => e.currentTarget.style.background = C.surfaceHi}
+        onMouseLeave={e => e.currentTarget.style.background = C.bgSub}
       >
-        <div className="flex items-center gap-2">
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <Icon size={14} style={{ color }} />
-          <span className="text-sm font-semibold text-slate-100 tracking-tight">{title}</span>
+          <span style={{ fontSize: 13, fontWeight: 600, color: C.t1, letterSpacing: '-0.01em' }}>{title}</span>
         </div>
         {open
-          ? <ChevronUp size={13} className="text-slate-400" />
-          : <ChevronDown size={13} className="text-slate-400" />}
+          ? <ChevronUp size={13} style={{ color: C.t3 }} />
+          : <ChevronDown size={13} style={{ color: C.t3 }} />}
       </button>
-      {open && <div className="px-5 py-4 bg-[#09090f]/50">{children}</div>}
+      {open && <div style={{ padding: '14px 20px', background: C.surface }}>{children}</div>}
     </div>
   );
 }
 
-function Val({ label, value }) {
+function Val({ label, value, C }) {
   return (
-    <div className="flex items-start justify-between gap-4 py-1.5 border-b border-slate-800/50 last:border-0">
-      <span className="text-xs text-slate-500 font-mono uppercase tracking-widest flex-shrink-0">{label}</span>
-      <span className="text-xs text-slate-100 text-right font-mono">{String(value)}</span>
+    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, padding: '6px 0', borderBottom: `1px solid ${C.border}` }}>
+      <span style={{ fontSize: 11, color: C.t3, fontFamily: 'JetBrains Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.08em', flexShrink: 0 }}>{label}</span>
+      <span style={{ fontSize: 11, color: C.t1, textAlign: 'right', fontFamily: 'JetBrains Mono, monospace' }}>{String(value)}</span>
     </div>
   );
 }
 
-function Reason({ text }) {
+function Reason({ text, C }) {
   return (
-    <p className="mt-2 text-xs text-violet-300/80 leading-relaxed italic border-l-2 border-violet-500/30 pl-3">
+    <p style={{ marginTop: 8, fontSize: 12, color: C.accentLt, lineHeight: 1.6, fontStyle: 'italic', borderLeft: `2px solid ${C.borderHi}`, paddingLeft: 12, opacity: 0.85 }}>
       {text}
     </p>
   );
@@ -76,93 +83,96 @@ function Reason({ text }) {
 
 // Full plan display — used in both REVIEW and APPROVED steps
 function PlanDisplay({ plan, planVersion, statusLabel, statusColor }) {
+  const { C } = useAppTheme();
   return (
-    <div className="space-y-4">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
       {/* Plan header */}
-      <div className="neon-border rounded-2xl bg-[#13131f]/80 p-6">
-        <div className="flex items-start justify-between">
+      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 16, padding: 24, marginBottom: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
           <div>
-            <div className="flex items-center gap-2 mb-1 flex-wrap">
-              <span className="font-mono text-xs uppercase tracking-wide" style={{ color: statusColor }}>
+            <div style={{ marginBottom: 4 }}>
+              <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.08em', color: statusColor }}>
                 v{planVersion} · {statusLabel}
               </span>
             </div>
-            <h2 className="text-xl font-bold text-slate-100 tracking-tight">{plan.domain}</h2>
-            <p className="text-slate-400 text-sm mt-1">{plan.use_case}</p>
+            <h2 style={{ fontSize: 20, fontWeight: 700, color: C.t1, letterSpacing: '-0.01em', margin: 0 }}>{plan.domain}</h2>
+            <p style={{ color: C.t2, fontSize: 13, marginTop: 4 }}>{plan.use_case}</p>
           </div>
-          <div className="w-10 h-10 rounded-xl bg-violet-600/20 border border-violet-500/30 flex items-center justify-center flex-shrink-0 ml-4">
-            <Cpu size={16} className="text-violet-300" />
+          <div style={{ width: 40, height: 40, borderRadius: 12, background: C.accentBg, border: `1px solid ${C.borderHi}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginLeft: 16 }}>
+            <Cpu size={16} color={C.accentLt} />
           </div>
         </div>
-        <p className="mt-4 text-slate-400 text-sm leading-relaxed border-l-2 border-violet-500/40 pl-3">
+        <p style={{ marginTop: 16, color: C.t2, fontSize: 13, lineHeight: 1.65, borderLeft: `2px solid ${C.borderHi}`, paddingLeft: 12 }}>
           {plan.summary}
         </p>
       </div>
 
       {/* Knowledge Profile */}
-      <PlanSection icon={BookOpen} color="#7c3aed" title="Knowledge Profile">
-        <Val label="Documents" value={plan.knowledge_profile.document_count} />
-        <Val label="Types" value={(plan.knowledge_profile.document_types || []).join(', ') || '—'} />
-        <Val label="Structure" value={plan.knowledge_profile.structure || '—'} />
-        <Val label="Language" value={plan.knowledge_profile.language || 'English'} />
+      <PlanSection icon={BookOpen} color="#7c3aed" title="Knowledge Profile" C={C}>
+        <Val label="Documents" value={plan.knowledge_profile.document_count} C={C} />
+        <Val label="Types" value={(plan.knowledge_profile.document_types || []).join(', ') || '—'} C={C} />
+        <Val label="Structure" value={plan.knowledge_profile.structure || '—'} C={C} />
+        <Val label="Language" value={plan.knowledge_profile.language || 'English'} C={C} />
         {plan.knowledge_profile.notes && (
-          <p className="text-xs text-violet-400/80 mt-2 italic leading-relaxed">
+          <p style={{ fontSize: 11, color: C.accentLt, marginTop: 8, fontStyle: 'italic', lineHeight: 1.6, opacity: 0.85 }}>
             {plan.knowledge_profile.notes}
           </p>
         )}
       </PlanSection>
 
       {/* Chunking */}
-      <PlanSection icon={Scissors} color="#6ee7b7" title="Chunking Strategy">
-        <Val label="Strategy" value={plan.chunking.strategy} />
-        <Val label="Chunk Size" value={`${plan.chunking.chunk_size} chars`} />
-        <Val label="Overlap" value={`${plan.chunking.chunk_overlap} chars`} />
-        <Reason text={plan.chunking.reason} />
+      <PlanSection icon={Scissors} color="#6ee7b7" title="Chunking Strategy" C={C}>
+        <Val label="Strategy" value={plan.chunking.strategy} C={C} />
+        <Val label="Chunk Size" value={`${plan.chunking.chunk_size} chars`} C={C} />
+        <Val label="Overlap" value={`${plan.chunking.chunk_overlap} chars`} C={C} />
+        <Reason text={plan.chunking.reason} C={C} />
       </PlanSection>
 
       {/* Embedding */}
-      <PlanSection icon={Sparkles} color="#c4b5fd" title="Embedding Configuration">
-        <Val label="Model" value={plan.embedding.model} />
-        <Val label="Dimension" value={plan.embedding.dimension} />
-        <Reason text={plan.embedding.reason} />
+      <PlanSection icon={Sparkles} color="#c4b5fd" title="Embedding Configuration" C={C}>
+        <Val label="Model" value={plan.embedding.model} C={C} />
+        <Val label="Dimension" value={plan.embedding.dimension} C={C} />
+        <Reason text={plan.embedding.reason} C={C} />
       </PlanSection>
 
       {/* Retrieval */}
-      <PlanSection icon={Search} color="#a78bfa" title="Retrieval Configuration">
-        <Val label="Strategy" value={plan.retrieval.active_strategy} />
-        <Val label="Metric" value={plan.retrieval.similarity_metric} />
-        <Val label="Top-K" value={plan.retrieval.top_k} />
-        <Val label="Reranking" value="disabled" />
-        <Reason text={plan.retrieval.reason} />
+      <PlanSection icon={Search} color="#a78bfa" title="Retrieval Configuration" C={C}>
+        <Val label="Strategy" value={plan.retrieval.active_strategy} C={C} />
+        <Val label="Metric" value={plan.retrieval.similarity_metric} C={C} />
+        <Val label="Top-K" value={plan.retrieval.top_k} C={C} />
+        <Val label="Reranking" value="disabled" C={C} />
+        <Reason text={plan.retrieval.reason} C={C} />
       </PlanSection>
 
       {/* Generation */}
-      <PlanSection icon={MessageSquare} color="#93c5fd" title="Generation Behavior">
+      <PlanSection icon={MessageSquare} color="#93c5fd" title="Generation Behavior" C={C}>
         <Val
           label="Grounding"
           value={plan.generation.grounding_required
             ? 'Strict (uploaded knowledge only)'
             : 'Flexible (general knowledge allowed)'}
+          C={C}
         />
-        <Val label="Response Style" value={plan.generation.response_style} />
-        <Reason text={plan.generation.reason} />
+        <Val label="Response Style" value={plan.generation.response_style} C={C} />
+        <Reason text={plan.generation.reason} C={C} />
       </PlanSection>
 
       {/* Future Recommendations */}
       {plan.future_recommendations?.length > 0 && (
         <PlanSection
           icon={TrendingUp}
-          color="#6b7280"
+          color={C.t3}
           title={`Future Recommendations (${plan.future_recommendations.length})`}
           defaultOpen={false}
+          C={C}
         >
-          <p className="text-xs text-slate-400 mb-3">
+          <p style={{ fontSize: 12, color: C.t2, marginBottom: 12 }}>
             These features could improve this use case but are not yet implemented in the current runtime.
           </p>
           {plan.future_recommendations.map((rec, i) => (
-            <div key={i} className="py-2 border-b border-slate-800/50 last:border-0">
-              <p className="text-xs text-slate-400 font-mono">{rec.feature}</p>
-              <p className="text-xs text-slate-400 mt-0.5">{rec.reason}</p>
+            <div key={i} style={{ padding: '8px 0', borderBottom: `1px solid ${C.border}` }}>
+              <p style={{ fontSize: 11, color: C.t2, fontFamily: 'JetBrains Mono, monospace', margin: 0 }}>{rec.feature}</p>
+              <p style={{ fontSize: 11, color: C.t3, marginTop: 2 }}>{rec.reason}</p>
             </div>
           ))}
         </PlanSection>
@@ -177,6 +187,7 @@ export default function Architect() {
   const navigate = useNavigate();
   const ragAppId = new URLSearchParams(window.location.search).get('id');
   const fileInputRef = useRef(null);
+  const { C } = useAppTheme();
 
   // Flow state
   const [step, setStep]               = useState(STEPS.DESCRIBE);
@@ -411,7 +422,7 @@ export default function Architect() {
   // ─────────────────────────────────────────────────────────────────────────────
 
   return (
-    <div className="min-h-screen bg-[#09090f]">
+    <div style={{ minHeight: '100vh', background: C.bg, fontFamily: 'Plus Jakarta Sans, sans-serif' }} className="grid-bg">
       <div className="absolute top-0 left-1/4 w-96 h-96 bg-violet-600/8 rounded-full blur-[120px] pointer-events-none" />
       <div className="absolute bottom-0 right-1/3 w-80 h-80 bg-purple-600/8 rounded-full blur-[100px] pointer-events-none" />
 
@@ -420,28 +431,30 @@ export default function Architect() {
         {/* Back nav */}
         <button
           onClick={() => navigate(createPageUrl('Dashboard'))}
-          className="flex items-center gap-2 text-slate-500 hover:text-slate-200 text-sm mb-8 transition-colors font-medium"
+          style={{ color: C.t2, background: 'transparent', border: 'none', cursor: 'pointer', fontSize: 14, fontWeight: 500, display: 'flex', alignItems: 'center', gap: 6, marginBottom: 32 }}
+          onMouseEnter={e => e.currentTarget.style.color = C.t1}
+          onMouseLeave={e => e.currentTarget.style.color = C.t2}
         >
           <ArrowLeft size={14} /> Dashboard
         </button>
 
         {/* Header */}
         <div className="flex items-center gap-3 mb-8">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-600 to-purple-600 flex items-center justify-center ">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-600 to-purple-600 flex items-center justify-center">
             <Cpu size={18} className="text-slate-100" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-slate-100 tracking-tight">AI RAG Architect</h1>
-            <p className="text-slate-500 text-sm mt-0.5">Design your optimal RAG pipeline</p>
+            <h1 style={{ fontSize: 24, fontWeight: 800, color: C.t1, letterSpacing: '-0.02em', margin: 0 }}>AI RAG Architect</h1>
+            <p style={{ color: C.t2, fontSize: 13, marginTop: 2 }}>Design your optimal RAG pipeline</p>
           </div>
         </div>
 
         {/* Error banner */}
         {error && (
-          <div className="mb-6 px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-sm flex items-center gap-2">
-            <AlertCircle size={14} className="flex-shrink-0" />
+          <div style={{ marginBottom: 24, padding: '10px 16px', borderRadius: 12, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.3)', color: '#fca5a5', fontSize: 13, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <AlertCircle size={14} style={{ flexShrink: 0 }} />
             {error}
-            <button onClick={() => setError('')} className="ml-auto text-red-500 hover:text-red-300">✕</button>
+            <button onClick={() => setError('')} style={{ marginLeft: 'auto', background: 'transparent', border: 'none', cursor: 'pointer', color: '#ef4444', fontSize: 13 }}>✕</button>
           </div>
         )}
 
@@ -450,94 +463,111 @@ export default function Architect() {
           <div className="space-y-6">
             {/* Show previous approved plan as reminder when creating a new version */}
             {plan && planStatus === 'approved' && (
-              <div className="px-4 py-3 rounded-xl bg-emerald-500/8 border border-emerald-500/20 text-emerald-400 text-xs flex items-center gap-2">
-                <CheckCircle size={13} className="flex-shrink-0" />
+              <div style={{ padding: '10px 16px', borderRadius: 12, background: 'rgba(34,197,94,0.07)', border: '1px solid rgba(34,197,94,0.2)', color: '#6ee7b7', fontSize: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
+                <CheckCircle size={13} style={{ flexShrink: 0 }} />
                 <span>Creating new version. Current approved plan is v{planVersion} — it will only be replaced after a successful generation.</span>
               </div>
             )}
 
-            <div className="neon-border rounded-2xl bg-[#13131f]/80 overflow-hidden">
-              <div className="flex items-center gap-2 px-5 py-3 border-b border-violet-500/10 bg-violet-950/20">
-                <div className="w-3 h-3 rounded-full bg-red-500/70" />
-                <div className="w-3 h-3 rounded-full bg-slate-500/50" />
-                <div className="w-3 h-3 rounded-full bg-green-500/70" />
-                <span className="font-mono text-xs text-slate-400 ml-2">requirement.describe</span>
+            <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 16, overflow: 'hidden' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 20px', borderBottom: `1px solid ${C.border}`, background: C.bgSub }}>
+                <div style={{ width: 12, height: 12, borderRadius: '50%', background: 'rgba(239,68,68,0.7)' }} />
+                <div style={{ width: 12, height: 12, borderRadius: '50%', background: 'rgba(100,116,139,0.5)' }} />
+                <div style={{ width: 12, height: 12, borderRadius: '50%', background: 'rgba(34,197,94,0.7)' }} />
+                <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11, color: C.t3, marginLeft: 8 }}>requirement.describe</span>
               </div>
-              <div className="p-6">
-                <label className="block font-mono text-xs text-slate-400 uppercase tracking-wider mb-2">
+              <div style={{ padding: 24 }}>
+                <label style={{ display: 'block', fontFamily: 'JetBrains Mono, monospace', fontSize: 10, color: C.t3, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 8 }}>
                   Describe your assistant
                 </label>
-                <div className="relative">
+                <div style={{ position: 'relative' }}>
                   <textarea
                     value={requirement}
                     onChange={e => { setRequirement(e.target.value); setCharCount(e.target.value.length); }}
                     placeholder="e.g. A customer support chatbot for my saree e-commerce store that answers questions about products, shipping, returns, and policies. Accuracy is more important than speed."
                     rows={5}
-                    className="w-full px-4 py-3 bg-slate-900/60 border border-violet-500/15 rounded-xl text-slate-100 text-sm font-mono focus:border-violet-500/50 focus:outline-none resize-none placeholder:text-slate-500 leading-relaxed"
+                    style={{
+                      width: '100%', padding: '12px 16px',
+                      background: C.input, border: `1px solid ${C.inputBorder}`,
+                      borderRadius: 12, color: C.t1, fontSize: 13,
+                      fontFamily: 'JetBrains Mono, monospace',
+                      outline: 'none', resize: 'none', lineHeight: 1.65, boxSizing: 'border-box',
+                    }}
+                    onFocus={e => e.target.style.borderColor = C.borderHi}
+                    onBlur={e => e.target.style.borderColor = C.inputBorder}
                   />
-                  <span className="absolute bottom-3 right-3 font-mono text-xs text-slate-400">{charCount}</span>
+                  <span style={{ position: 'absolute', bottom: 12, right: 12, fontFamily: 'JetBrains Mono, monospace', fontSize: 11, color: C.t3 }}>{charCount}</span>
                 </div>
               </div>
             </div>
 
             {/* Knowledge sources */}
-            <div className="neon-border rounded-2xl bg-[#13131f]/80 overflow-hidden">
-              <div className="px-6 py-4 border-b border-violet-500/10">
-                <h2 className="text-sm font-semibold text-slate-200">Knowledge Sources</h2>
-                <p className="text-slate-400 text-xs mt-0.5">Upload documents for the Architect to analyze (optional but recommended)</p>
+            <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 16, overflow: 'hidden' }}>
+              <div style={{ padding: '16px 24px', borderBottom: `1px solid ${C.border}` }}>
+                <h2 style={{ color: C.t1, fontWeight: 600, fontSize: 14, margin: 0 }}>Knowledge Sources</h2>
+                <p style={{ color: C.t2, fontSize: 12, marginTop: 3 }}>Upload documents for the Architect to analyze (optional but recommended)</p>
               </div>
-              <div className="p-6">
+              <div style={{ padding: 24 }}>
                 <input
                   ref={fileInputRef}
                   type="file"
                   multiple
                   accept=".pdf,.docx,.txt,.csv,.md"
-                  className="hidden"
+                  style={{ display: 'none' }}
                   onChange={handleFileUpload}
                 />
                 <button
                   onClick={() => fileInputRef.current?.click()}
                   disabled={uploading}
-                  className="w-full py-6 rounded-xl border border-dashed border-violet-500/35 bg-violet-600/5 hover:bg-violet-600/10 transition-colors flex flex-col items-center gap-2 cursor-pointer"
+                  style={{
+                    width: '100%', padding: '24px 0',
+                    borderRadius: 12, border: `2px dashed ${C.borderHi}`,
+                    background: C.accentBg, cursor: 'pointer',
+                    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8,
+                    transition: 'background 0.15s',
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.background = `rgba(124,58,237,0.14)`}
+                  onMouseLeave={e => e.currentTarget.style.background = C.accentBg}
                 >
                   {uploading ? (
                     <>
-                      <div className="w-5 h-5 border-2 border-violet-500 border-t-transparent rounded-full animate-spin" />
-                      <span className="text-xs text-violet-300 font-mono">Uploading & profiling...</span>
+                      <div style={{ width: 20, height: 20, border: `2px solid ${C.accent}`, borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
+                      <span style={{ fontSize: 12, color: C.accentLt, fontFamily: 'JetBrains Mono, monospace' }}>Uploading & profiling...</span>
                     </>
                   ) : (
                     <>
-                      <Upload size={20} className="text-violet-300" />
-                      <span className="text-sm text-slate-400">Click to upload files</span>
-                      <span className="text-xs text-slate-400 font-mono">PDF, DOCX, TXT, CSV</span>
+                      <Upload size={20} color={C.accentLt} />
+                      <span style={{ fontSize: 13, color: C.t2 }}>Click to upload files</span>
+                      <span style={{ fontSize: 11, color: C.t3, fontFamily: 'JetBrains Mono, monospace' }}>PDF, DOCX, TXT, CSV</span>
                     </>
                   )}
                 </button>
 
                 {uploadedDocs.length > 0 && (
-                  <div className="mt-4 space-y-2">
+                  <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
                     {uploadedDocs.map(doc => {
-                      const statusLabel = {
-                        profiled:  { text: 'profiled', color: 'text-violet-300' },
-                        indexing:  { text: 'indexing...', color: 'text-violet-400' },
-                        indexed:   { text: 'indexed', color: 'text-emerald-400' },
-                      }[doc.status] || { text: doc.status, color: 'text-slate-400' };
+                      const statusMeta = {
+                        profiled: { text: 'profiled', color: C.accentLt },
+                        indexing: { text: 'indexing...', color: C.accentLt },
+                        indexed:  { text: 'indexed', color: C.green },
+                      }[doc.status] || { text: doc.status, color: C.t3 };
                       return (
-                        <div key={doc.id} className="flex items-center gap-3 px-3 py-2 bg-slate-900/60 border border-violet-500/15 rounded-lg">
-                          <FileText size={12} className="text-violet-300 flex-shrink-0" />
-                          <div className="flex-1 min-w-0">
-                            <p className="text-xs text-slate-100 truncate">{doc.file_name}</p>
-                            <p className="text-xs text-slate-400 font-mono">
-                              {formatSize(doc.size_bytes)}
-                              {doc.chunk_count > 0 ? ` · ${doc.chunk_count} chunks` : ''}
+                        <div key={doc.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', background: C.bgSub, border: `1px solid ${C.border}`, borderRadius: 8 }}>
+                          <FileText size={12} color={C.accentLt} style={{ flexShrink: 0 }} />
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <p style={{ fontSize: 12, color: C.t1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', margin: 0 }}>{doc.file_name}</p>
+                            <p style={{ fontSize: 11, color: C.t3, fontFamily: 'JetBrains Mono, monospace', margin: 0 }}>
+                              {formatSize(doc.size_bytes)}{doc.chunk_count > 0 ? ` · ${doc.chunk_count} chunks` : ''}
                             </p>
                           </div>
-                          <span className={`text-xs font-mono flex-shrink-0 ${statusLabel.color}`}>
-                            {statusLabel.text}
+                          <span style={{ fontSize: 11, fontFamily: 'JetBrains Mono, monospace', color: statusMeta.color, flexShrink: 0 }}>
+                            {statusMeta.text}
                           </span>
                           <button
                             onClick={() => removeDoc(doc.id)}
-                            className="ml-1 p-1 rounded text-slate-400 hover:text-red-400 transition-colors flex-shrink-0"
+                            style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: C.t3, padding: 4, borderRadius: 4, flexShrink: 0 }}
+                            onMouseEnter={e => e.currentTarget.style.color = '#ef4444'}
+                            onMouseLeave={e => e.currentTarget.style.color = C.t3}
                             title="Remove document"
                           >
                             <Trash2 size={11} />
@@ -553,14 +583,19 @@ export default function Architect() {
             <button
               onClick={handleAnalyze}
               disabled={analyzeLoading || !requirement.trim()}
-              className={`w-full py-4 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all ${
-                analyzeLoading || !requirement.trim()
-                  ? 'bg-[#1a1a2e] text-slate-500 cursor-not-allowed'
-                  : 'bg-violet-600 text-slate-100  hover:opacity-90'
-              }`}
+              style={{
+                width: '100%', padding: '14px 0', borderRadius: 12,
+                fontWeight: 700, fontSize: 14, cursor: analyzeLoading || !requirement.trim() ? 'not-allowed' : 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                transition: 'all 0.15s',
+                background: analyzeLoading || !requirement.trim() ? C.surface : 'linear-gradient(135deg, #7c3aed, #6d28d9)',
+                border: analyzeLoading || !requirement.trim() ? `1px solid ${C.border}` : 'none',
+                color: analyzeLoading || !requirement.trim() ? C.t3 : '#fff',
+                boxShadow: analyzeLoading || !requirement.trim() ? 'none' : '0 0 20px rgba(124,58,237,0.3)',
+              }}
             >
               {analyzeLoading
-                ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Analyzing...</>
+                ? <><div style={{ width: 16, height: 16, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} /> Analyzing...</>
                 : <><Zap size={15} /> Analyze & Continue <ArrowRight size={14} /></>}
             </button>
           </div>
@@ -569,34 +604,36 @@ export default function Architect() {
         {/* ── STEP 1: Follow-up Questions ──────────────────────────────────── */}
         {step === STEPS.QUESTIONS && (
           <div className="space-y-6">
-            <div className="neon-border rounded-2xl bg-[#13131f]/80 p-6">
-              <div className="flex items-center gap-2 mb-4">
-                <MessageSquare size={15} className="text-violet-300" />
-                <h2 className="text-sm font-semibold text-slate-200">A few clarifying questions</h2>
-                <span className="ml-auto font-mono text-xs text-slate-400">
+            <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 16, padding: 24 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+                <MessageSquare size={15} color={C.accentLt} />
+                <h2 style={{ fontSize: 14, fontWeight: 600, color: C.t1, margin: 0 }}>A few clarifying questions</h2>
+                <span style={{ marginLeft: 'auto', fontFamily: 'JetBrains Mono, monospace', fontSize: 11, color: C.t3 }}>
                   {questions.length} question{questions.length !== 1 ? 's' : ''}
                 </span>
               </div>
-              <p className="text-slate-400 text-xs mb-6 leading-relaxed">
+              <p style={{ color: C.t2, fontSize: 12, marginBottom: 24, lineHeight: 1.6 }}>
                 These answers help the Architect tailor the configuration to your specific needs.
               </p>
-              <div className="space-y-6">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
                 {questions.map((q, i) => (
                   <div key={q.id}>
-                    <label className="block text-sm text-slate-100 mb-3">
-                      <span className="font-mono text-violet-300 mr-2">{i + 1}.</span>{q.question}
+                    <label style={{ display: 'block', fontSize: 13, color: C.t1, marginBottom: 12, lineHeight: 1.5 }}>
+                      <span style={{ fontFamily: 'JetBrains Mono, monospace', color: C.accentLt, marginRight: 8 }}>{i + 1}.</span>{q.question}
                     </label>
                     {q.type === 'single_choice' && q.options?.length > 0 ? (
-                      <div className="space-y-2">
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                         {q.options.map(opt => (
                           <button
                             key={opt}
                             onClick={() => setAnswers(a => ({ ...a, [q.id]: opt }))}
-                            className={`w-full text-left px-4 py-2.5 rounded-lg border text-sm transition-colors ${
-                              answers[q.id] === opt
-                                ? 'border-violet-500/50 bg-violet-600/15 text-violet-200'
-                                : 'border-violet-500/15 bg-slate-900/60 text-slate-400 hover:border-violet-500/30'
-                            }`}
+                            style={{
+                              width: '100%', textAlign: 'left', padding: '10px 14px',
+                              borderRadius: 8, fontSize: 13, cursor: 'pointer', transition: 'all 0.15s',
+                              border: `1px solid ${answers[q.id] === opt ? C.borderHi : C.border}`,
+                              background: answers[q.id] === opt ? C.accentBg : C.bgSub,
+                              color: answers[q.id] === opt ? C.accentLt : C.t2,
+                            }}
                           >
                             {opt}
                           </button>
@@ -608,7 +645,13 @@ export default function Architect() {
                         value={answers[q.id] || ''}
                         onChange={e => setAnswers(a => ({ ...a, [q.id]: e.target.value }))}
                         placeholder="Your answer..."
-                        className="w-full px-4 py-2.5 bg-slate-900/60 border border-violet-500/15 rounded-lg text-slate-100 text-sm focus:border-violet-500/50 focus:outline-none"
+                        style={{
+                          width: '100%', padding: '10px 14px',
+                          background: C.input, border: `1px solid ${C.inputBorder}`,
+                          borderRadius: 8, color: C.t1, fontSize: 13, outline: 'none', boxSizing: 'border-box',
+                        }}
+                        onFocus={e => e.target.style.borderColor = C.borderHi}
+                        onBlur={e => e.target.style.borderColor = C.inputBorder}
                       />
                     )}
                   </div>
@@ -616,20 +659,34 @@ export default function Architect() {
               </div>
             </div>
 
-            <div className="flex gap-3">
+            <div style={{ display: 'flex', gap: 12 }}>
               <button
                 onClick={handleEditRequirements}
-                className="py-3 px-5 rounded-xl border border-violet-500/15 text-slate-400 text-sm hover:border-violet-500/30 transition-colors"
+                style={{
+                  padding: '12px 20px', borderRadius: 12,
+                  border: `1px solid ${C.border}`, background: 'transparent',
+                  color: C.t2, fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
+                }}
+                onMouseEnter={e => e.currentTarget.style.borderColor = C.borderHi}
+                onMouseLeave={e => e.currentTarget.style.borderColor = C.border}
               >
-                <ArrowLeft size={13} className="inline mr-1" /> Back
+                <ArrowLeft size={13} /> Back
               </button>
               <button
                 onClick={() => handleGenerate()}
                 disabled={generateLoading}
-                className="flex-1 py-3 rounded-xl bg-violet-600 text-slate-100 text-sm font-semibold flex items-center justify-center gap-2 hover:opacity-90 transition-opacity disabled:opacity-50"
+                style={{
+                  flex: 1, padding: '12px 0', borderRadius: 12,
+                  background: generateLoading ? C.surface : 'linear-gradient(135deg, #7c3aed, #6d28d9)',
+                  border: generateLoading ? `1px solid ${C.border}` : 'none',
+                  color: generateLoading ? C.t3 : '#fff',
+                  fontSize: 13, fontWeight: 700, cursor: generateLoading ? 'not-allowed' : 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                  opacity: generateLoading ? 0.7 : 1,
+                }}
               >
                 {generateLoading
-                  ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Generating...</>
+                  ? <><div style={{ width: 16, height: 16, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} /> Generating...</>
                   : <><Cpu size={14} /> Generate Architecture Plan</>}
               </button>
             </div>
@@ -638,19 +695,16 @@ export default function Architect() {
 
         {/* ── STEP 2: Generating ───────────────────────────────────────────── */}
         {step === STEPS.GENERATING && (
-          <div className="neon-border rounded-2xl bg-[#13131f]/80 p-12 text-center">
-            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-violet-600/30 to-violet-700/30 border border-violet-500/30 flex items-center justify-center mx-auto mb-6">
-              <Cpu size={28} className="text-violet-300 animate-pulse" />
+          <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 16, padding: '48px 24px', textAlign: 'center' }}>
+            <div style={{ width: 64, height: 64, borderRadius: 16, background: 'rgba(124,58,237,0.15)', border: `1px solid ${C.borderHi}`, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px' }}>
+              <Cpu size={28} color={C.accentLt} style={{ animation: 'pulse 2s ease-in-out infinite' }} />
             </div>
-            <h2 className="text-lg font-bold text-slate-100 mb-2">Generating Architecture Plan</h2>
-            <p className="text-slate-400 text-sm mb-6">Analyzing your requirements and knowledge base...</p>
-            <div className="flex items-center justify-center gap-4 flex-wrap">
+            <h2 style={{ fontSize: 18, fontWeight: 700, color: C.t1, marginBottom: 8 }}>Generating Architecture Plan</h2>
+            <p style={{ color: C.t2, fontSize: 13, marginBottom: 24 }}>Analyzing your requirements and knowledge base...</p>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 16, flexWrap: 'wrap' }}>
               {['Profiling documents', 'Selecting chunking strategy', 'Configuring retrieval', 'Writing explanations'].map((label, i) => (
-                <div key={i} className="flex items-center gap-1.5 text-xs text-slate-400 font-mono">
-                  <div
-                    className="w-1.5 h-1.5 rounded-full bg-violet-400 animate-pulse"
-                    style={{ animationDelay: `${i * 0.3}s` }}
-                  />
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: C.t2, fontFamily: 'JetBrains Mono, monospace' }}>
+                  <div style={{ width: 6, height: 6, borderRadius: '50%', background: C.accentLt, animation: `bounce 1s ease-in-out ${i * 0.3}s infinite` }} />
                   {label}
                 </div>
               ))}
@@ -668,28 +722,37 @@ export default function Architect() {
               statusColor="#7c3aed"
             />
 
-            <div className="flex gap-3 pt-2">
+            <div style={{ display: 'flex', gap: 12, paddingTop: 8 }}>
               <button
                 onClick={handleEditRequirements}
-                className="py-3 px-4 rounded-xl border border-violet-500/15 text-slate-400 text-sm hover:border-violet-500/30 transition-colors flex items-center gap-1.5"
+                style={{ padding: '12px 16px', borderRadius: 12, border: `1px solid ${C.border}`, background: 'transparent', color: C.t2, fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
+                onMouseEnter={e => e.currentTarget.style.borderColor = C.borderHi}
+                onMouseLeave={e => e.currentTarget.style.borderColor = C.border}
               >
                 <Edit3 size={13} /> Edit Requirements
               </button>
               <button
                 onClick={handleRegenerate}
                 disabled={generateLoading}
-                className="py-3 px-4 rounded-xl border border-violet-500/30 text-violet-300 text-sm hover:bg-violet-600/10 transition-colors flex items-center gap-1.5 disabled:opacity-50"
+                style={{ padding: '12px 16px', borderRadius: 12, border: `1px solid ${C.borderHi}`, background: 'transparent', color: C.accentLt, fontSize: 13, cursor: generateLoading ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: 6, opacity: generateLoading ? 0.5 : 1 }}
               >
-                <RefreshCw size={13} className={generateLoading ? 'animate-spin' : ''} />
+                <RefreshCw size={13} style={{ animation: generateLoading ? 'spin 0.7s linear infinite' : 'none' }} />
                 Regenerate
               </button>
               <button
                 onClick={handleApprove}
                 disabled={approveLoading}
-                className="flex-1 py-3 rounded-xl bg-emerald-600 text-white text-sm font-bold flex items-center justify-center gap-2 hover:bg-emerald-500 transition-colors disabled:opacity-50"
+                style={{
+                  flex: 1, padding: '12px 0', borderRadius: 12,
+                  background: approveLoading ? C.surface : 'linear-gradient(135deg, #059669, #047857)',
+                  border: 'none', color: '#fff', fontSize: 13, fontWeight: 700,
+                  cursor: approveLoading ? 'not-allowed' : 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                  opacity: approveLoading ? 0.7 : 1,
+                }}
               >
                 {approveLoading
-                  ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Approving...</>
+                  ? <><div style={{ width: 16, height: 16, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} /> Approving...</>
                   : <><CheckCircle size={14} /> Approve Plan</>}
               </button>
             </div>
@@ -700,32 +763,32 @@ export default function Architect() {
         {step === STEPS.APPROVED && plan && (
           <div className="space-y-4">
             {/* Approval status banner */}
-            <div className="neon-border rounded-xl bg-emerald-900/10 border-emerald-500/25 overflow-hidden">
-              <div className="flex items-center gap-3 px-5 py-3 bg-emerald-900/10">
-                <div className="w-7 h-7 rounded-lg bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center flex-shrink-0">
-                  <Lock size={13} className="text-emerald-300" />
+            <div style={{ background: 'rgba(5,150,105,0.07)', border: '1px solid rgba(5,150,105,0.25)', borderRadius: 12, overflow: 'hidden' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 20px' }}>
+                <div style={{ width: 28, height: 28, borderRadius: 8, background: 'rgba(5,150,105,0.15)', border: '1px solid rgba(5,150,105,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <Lock size={13} color="#34d399" />
                 </div>
-                <div className="flex-1">
-                  <p className="text-sm font-semibold text-emerald-300">Approved Architect Plan — v{planVersion}</p>
-                  <p className="text-xs text-emerald-500 mt-0.5">
+                <div style={{ flex: 1 }}>
+                  <p style={{ fontSize: 13, fontWeight: 600, color: '#34d399', margin: 0 }}>Approved Architect Plan — v{planVersion}</p>
+                  <p style={{ fontSize: 11, color: '#6ee7b7', marginTop: 2, opacity: 0.8 }}>
                     Plan locked. Click "Build RAG Pipeline" to generate the workflow and index your knowledge.
                   </p>
                 </div>
               </div>
             </div>
 
-            {/* Build progress banner — shown while building */}
+            {/* Build progress banner */}
             {buildPipelineLoading && (
-              <div className="neon-border rounded-xl bg-violet-900/10 border-violet-500/25 p-4 flex items-center gap-3">
-                <div className="w-5 h-5 border-2 border-violet-500 border-t-transparent rounded-full animate-spin flex-shrink-0" />
+              <div style={{ background: C.accentBg, border: `1px solid ${C.borderHi}`, borderRadius: 12, padding: '14px 20px', display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{ width: 20, height: 20, border: `2px solid ${C.accent}`, borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.7s linear infinite', flexShrink: 0 }} />
                 <div>
-                  <p className="text-sm font-semibold text-violet-300">
+                  <p style={{ fontSize: 13, fontWeight: 600, color: C.accentLt, margin: 0 }}>
                     {buildStage === 'workflow'  && 'Building workflow...'}
                     {buildStage === 'indexing'  && 'Indexing knowledge...'}
                     {buildStage === 'opening'   && 'Opening editor...'}
                     {!buildStage && 'Building pipeline...'}
                   </p>
-                  <p className="text-xs text-violet-400 mt-0.5 font-mono">
+                  <p style={{ fontSize: 11, color: C.t2, marginTop: 2, fontFamily: 'JetBrains Mono, monospace' }}>
                     {buildStage === 'workflow'  && 'Generating nodes from approved plan'}
                     {buildStage === 'indexing'  && 'Chunking + embedding documents with approved config'}
                     {buildStage === 'opening'   && 'Pipeline ready — navigating to editor'}
@@ -740,55 +803,59 @@ export default function Architect() {
               plan={plan}
               planVersion={planVersion}
               statusLabel="approved"
-              statusColor="#6ee7b7"
+              statusColor="#34d399"
             />
 
             {/* New version confirmation */}
             {showNewVersionConfirm ? (
-              <div className="neon-border rounded-xl bg-amber-900/10 border-violet-500/30 25 p-5">
-                <p className="text-sm font-semibold text-amber-300 mb-1">Create a new version?</p>
-                <p className="text-xs text-violet-400/80 mb-4 leading-relaxed">
+              <div style={{ background: C.surface, border: `1px solid ${C.borderHi}`, borderRadius: 12, padding: 20 }}>
+                <p style={{ fontSize: 13, fontWeight: 600, color: C.t1, marginBottom: 4 }}>Create a new version?</p>
+                <p style={{ fontSize: 12, color: C.t2, marginBottom: 20, lineHeight: 1.6 }}>
                   This will start a new onboarding flow. The current approved plan (v{planVersion}) will only be
-                  replaced after you generate and approve a new plan. Until then, v{planVersion} remains active.
+                  replaced after you generate and approve a new plan.
                 </p>
-                <div className="flex gap-3">
+                <div style={{ display: 'flex', gap: 12 }}>
                   <button
                     onClick={() => setShowNewVersionConfirm(false)}
-                    className="flex-1 py-2.5 rounded-lg border border-violet-500/15 text-slate-400 text-sm hover:border-violet-500/30 transition-colors"
-                  >
-                    Cancel
-                  </button>
+                    style={{ flex: 1, padding: '10px 0', borderRadius: 10, border: `1px solid ${C.border}`, background: 'transparent', color: C.t2, fontSize: 13, cursor: 'pointer' }}
+                  >Cancel</button>
                   <button
                     onClick={handleCreateNewVersion}
-                    className="flex-1 py-2.5 rounded-lg bg-amber-600/20 border border-violet-500/30 30 text-amber-300 text-sm font-semibold hover:bg-amber-600/30 transition-colors"
-                  >
-                    Yes, create new version
-                  </button>
+                    style={{ flex: 1, padding: '10px 0', borderRadius: 10, background: 'rgba(217,119,6,0.15)', border: `1px solid rgba(217,119,6,0.35)`, color: '#fbbf24', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
+                  >Yes, create new version</button>
                 </div>
               </div>
             ) : (
-              <div className="flex gap-3 pt-2">
+              <div style={{ display: 'flex', gap: 12, paddingTop: 8 }}>
                 <button
                   onClick={() => navigate(createPageUrl('Dashboard'))}
-                  className="py-3 px-5 rounded-xl border border-violet-500/15 text-slate-400 text-sm hover:border-violet-500/30 transition-colors"
+                  style={{ padding: '12px 20px', borderRadius: 12, border: `1px solid ${C.border}`, background: 'transparent', color: C.t2, fontSize: 13, cursor: 'pointer' }}
                   disabled={buildPipelineLoading}
-                >
-                  Dashboard
-                </button>
+                  onMouseEnter={e => e.currentTarget.style.borderColor = C.borderHi}
+                  onMouseLeave={e => e.currentTarget.style.borderColor = C.border}
+                >Dashboard</button>
                 <button
                   onClick={() => setShowNewVersionConfirm(true)}
                   disabled={buildPipelineLoading}
-                  className="py-3 px-4 rounded-xl border border-violet-500/30 25 text-violet-400 text-sm hover:bg-amber-600/10 transition-colors flex items-center gap-1.5 disabled:opacity-40"
+                  style={{ padding: '12px 16px', borderRadius: 12, border: `1px solid ${C.borderHi}`, background: 'transparent', color: C.accentLt, fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, opacity: buildPipelineLoading ? 0.4 : 1 }}
                 >
                   <PlusCircle size={13} /> New Version
                 </button>
                 <button
                   onClick={handleBuildPipeline}
                   disabled={buildPipelineLoading}
-                  className="flex-1 py-3 rounded-xl bg-violet-600 text-slate-100 text-sm font-bold flex items-center justify-center gap-2 hover:opacity-90 transition-opacity disabled:opacity-50"
+                  style={{
+                    flex: 1, padding: '12px 0', borderRadius: 12,
+                    background: buildPipelineLoading ? C.surface : 'linear-gradient(135deg, #7c3aed, #6d28d9)',
+                    border: buildPipelineLoading ? `1px solid ${C.border}` : 'none',
+                    color: buildPipelineLoading ? C.t3 : '#fff',
+                    fontSize: 13, fontWeight: 700, cursor: buildPipelineLoading ? 'not-allowed' : 'pointer',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                    opacity: buildPipelineLoading ? 0.7 : 1,
+                  }}
                 >
                   {buildPipelineLoading ? (
-                    <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    <><div style={{ width: 16, height: 16, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
                       {buildStage === 'workflow' && 'Building workflow...'}
                       {buildStage === 'indexing' && 'Indexing knowledge...'}
                       {buildStage === 'opening'  && 'Opening editor...'}
@@ -804,5 +871,10 @@ export default function Architect() {
         )}
       </div>
     </div>
+    <style>{`
+      @keyframes spin { to { transform: rotate(360deg); } }
+      @keyframes bounce { 0%,100% { transform:translateY(0); opacity:0.5; } 50% { transform:translateY(-3px); opacity:1; } }
+      @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.5; } }
+    `}</style>
   );
 }

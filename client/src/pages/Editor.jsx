@@ -32,6 +32,7 @@ import NodePalette from '../components/editor/NodePalette';
 import NodeProperties from '../components/editor/NodeProperties';
 import WorkflowPreview from '../components/editor/WorkflowPreview';
 import ArchitectChatPanel from '../components/editor/ArchitectChatPanel';
+import { useAppTheme } from '@/lib/ThemeContext';
 
 export default function Editor() {
   const navigate     = useNavigate();
@@ -197,12 +198,13 @@ export default function Editor() {
   // ── Derived state ──────────────────────────────────────────────────────────
 
   const isEditing = hasDraft || draftDirty;
+  const { C } = useAppTheme();
 
   // ─────────────────────────────────────────────────────────────────────────────
 
   if (loading) {
     return (
-      <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#09090f', color: '#8888aa', fontFamily: 'JetBrains Mono, monospace', fontSize: 13 }}>
+      <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: C.bg, color: C.t2, fontFamily: 'JetBrains Mono, monospace', fontSize: 13 }}>
         {'> Loading workflow...'}
       </div>
     );
@@ -210,19 +212,19 @@ export default function Editor() {
 
   if (!chatbot) {
     return (
-      <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#09090f', color: '#ef4444', fontFamily: 'JetBrains Mono, monospace', fontSize: 13 }}>
+      <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: C.bg, color: '#ef4444', fontFamily: 'JetBrains Mono, monospace', fontSize: 13 }}>
         {'> Chatbot not found.'}
       </div>
     );
   }
 
   return (
-    <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', background: '#09090f', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+    <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', background: C.bg, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
 
       {/* ── Header ───────────────────────────────────────────────────────────── */}
       <div style={{
-        background: '#0d0d1c',
-        borderBottom: '1px solid rgba(124,58,237,0.18)',
+        background: C.panel,
+        borderBottom: `1px solid ${C.panelBorder}`,
         padding: '0 24px',
         height: 64,
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -233,22 +235,22 @@ export default function Editor() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
           <button
             onClick={() => navigate(createPageUrl('Dashboard'))}
-            style={{ background: 'transparent', border: '1px solid rgba(124,58,237, 0.2)', borderRadius: 8, padding: '7px 10px', cursor: 'pointer', color: '#8888aa', display: 'flex', alignItems: 'center' }}
-            onMouseEnter={e => e.currentTarget.style.color = '#e2e8f0'}
-            onMouseLeave={e => e.currentTarget.style.color = '#64748b'}
+            style={{ background: 'transparent', border: `1px solid ${C.borderHi}`, borderRadius: 8, padding: '7px 10px', cursor: 'pointer', color: C.t2, display: 'flex', alignItems: 'center' }}
+            onMouseEnter={e => e.currentTarget.style.color = C.t1}
+            onMouseLeave={e => e.currentTarget.style.color = C.t2}
           >
             <ArrowLeft size={16} />
           </button>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ fontSize: 15, fontWeight: 700, color: '#f0f0ff', letterSpacing: '-0.01em' }}>{chatbot.title}</span>
+              <span style={{ fontSize: 15, fontWeight: 700, color: C.t1, letterSpacing: '-0.01em' }}>{chatbot.title}</span>
               {/* Draft indicator */}
               {isEditing && (
                 <span style={{
                   fontSize: 9, fontFamily: 'JetBrains Mono, monospace',
-                  color: draftDirty ? '#a78bfa' : '#7c3aed',
-                  background: draftDirty ? 'rgba(167,139,250,0.1)' : 'rgba(124,58,237, 0.1)',
-                  border: `1px solid ${draftDirty ? 'rgba(167,139,250,0.3)' : 'rgba(124,58,237, 0.3)'}`,
+                  color: draftDirty ? C.accentLt : C.accent,
+                  background: draftDirty ? 'rgba(167,139,250,0.1)' : C.accentBg,
+                  border: `1px solid ${draftDirty ? 'rgba(167,139,250,0.3)' : C.borderHi}`,
                   padding: '2px 6px', borderRadius: 4, letterSpacing: '0.05em',
                   display: 'flex', alignItems: 'center', gap: 3,
                 }}>
@@ -257,7 +259,7 @@ export default function Editor() {
                 </span>
               )}
             </div>
-            <div style={{ fontSize: 12, color: '#8888aa', fontFamily: 'JetBrains Mono, monospace' }}>
+            <div style={{ fontSize: 12, color: C.t2, fontFamily: 'JetBrains Mono, monospace' }}>
               {isEditing
                 ? 'Draft changes — preview and deployed chat use the active workflow'
                 : chatbot.description?.slice(0, 55) + (chatbot.description?.length > 55 ? '...' : '')}
@@ -274,8 +276,8 @@ export default function Editor() {
               display: 'flex', alignItems: 'center', gap: 6,
               padding: '9px 16px',
               background: showPreview ? 'rgba(34,197,94,0.15)' : 'transparent',
-              border: `1px solid ${showPreview ? 'rgba(34,197,94,0.4)' : 'rgba(124,58,237, 0.3)'}`,
-              borderRadius: 8, color: showPreview ? '#22c55e' : '#94a3b8',
+              border: `1px solid ${showPreview ? 'rgba(34,197,94,0.4)' : C.panelBorder}`,
+              borderRadius: 8, color: showPreview ? '#22c55e' : C.t2,
               fontSize: 13, fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s',
             }}
           >
@@ -290,12 +292,12 @@ export default function Editor() {
             style={{
               display: 'flex', alignItems: 'center', gap: 6,
               padding: '9px 16px',
-              background: showArchitect ? 'rgba(124,58,237, 0.2)' : 'transparent',
-              border: `1px solid ${showArchitect ? 'rgba(124,58,237, 0.5)' : 'rgba(124,58,237, 0.3)'}`,
-              borderRadius: 8, color: showArchitect ? '#818cf8' : '#94a3b8',
+              background: showArchitect ? C.accentBg : 'transparent',
+              border: `1px solid ${showArchitect ? C.borderHi : C.panelBorder}`,
+              borderRadius: 8, color: showArchitect ? C.accentLt : C.t2,
               fontSize: 13, fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s',
             }}
-            onMouseEnter={e => { if (!showArchitect) e.currentTarget.style.background = 'rgba(124,58,237, 0.08)'; }}
+            onMouseEnter={e => { if (!showArchitect) e.currentTarget.style.background = C.accentBg; }}
             onMouseLeave={e => { if (!showArchitect) e.currentTarget.style.background = 'transparent'; }}
           >
             <MessageSquare size={14} />
@@ -313,7 +315,7 @@ export default function Editor() {
                 padding: '9px 16px',
                 background: 'transparent',
                 border: '1px solid rgba(239,68,68,0.3)',
-                borderRadius: 8, color: discarding ? '#475569' : '#f87171',
+                borderRadius: 8, color: discarding ? C.t3 : '#f87171',
                 fontSize: 13, fontWeight: 600, cursor: discarding ? 'wait' : 'pointer',
                 transition: 'all 0.15s',
               }}
@@ -333,15 +335,15 @@ export default function Editor() {
             style={{
               display: 'flex', alignItems: 'center', gap: 6,
               padding: '9px 18px',
-              background: draftDirty ? 'rgba(124,58,237, 0.15)' : 'transparent',
-              border: `1px solid ${draftDirty ? 'rgba(124,58,237, 0.5)' : 'rgba(124,58,237, 0.2)'}`,
-              borderRadius: 8, color: (savingDraft || !draftDirty) ? '#475569' : '#818cf8',
+              background: draftDirty ? C.accentBg : 'transparent',
+              border: `1px solid ${draftDirty ? C.borderHi : C.panelBorder}`,
+              borderRadius: 8, color: (savingDraft || !draftDirty) ? C.t3 : C.accentLt,
               fontSize: 13, fontWeight: 600,
               cursor: (savingDraft || !draftDirty) ? 'default' : 'pointer',
               transition: 'all 0.15s',
             }}
-            onMouseEnter={e => { if (draftDirty && !savingDraft) e.currentTarget.style.background = 'rgba(124,58,237, 0.25)'; }}
-            onMouseLeave={e => e.currentTarget.style.background = draftDirty ? 'rgba(124,58,237, 0.15)' : 'transparent'}
+            onMouseEnter={e => { if (draftDirty && !savingDraft) e.currentTarget.style.background = `rgba(124,58,237,0.25)`; }}
+            onMouseLeave={e => e.currentTarget.style.background = draftDirty ? C.accentBg : 'transparent'}
           >
             <Save size={14} />
             {savingDraft ? 'Saving...' : 'Save Draft'}
@@ -355,13 +357,13 @@ export default function Editor() {
             style={{
               display: 'flex', alignItems: 'center', gap: 6,
               padding: '9px 20px',
-              background: deploying ? 'rgba(124,58,237, 0.3)' : 'linear-gradient(135deg, #7c3aed, #8b5cf6)',
+              background: deploying ? C.accentBg : 'linear-gradient(135deg, #7c3aed, #8b5cf6)',
               border: 'none', borderRadius: 8, color: '#fff',
               fontSize: 13, fontWeight: 700, cursor: deploying ? 'wait' : 'pointer',
-              boxShadow: '0 0 20px rgba(124,58,237, 0.35)', transition: 'all 0.15s',
+              boxShadow: '0 0 20px rgba(124,58,237,0.35)', transition: 'all 0.15s',
             }}
-            onMouseEnter={e => { if (!deploying) e.currentTarget.style.boxShadow = '0 0 30px rgba(124,58,237, 0.55)'; }}
-            onMouseLeave={e => e.currentTarget.style.boxShadow = '0 0 20px rgba(124,58,237, 0.35)'}
+            onMouseEnter={e => { if (!deploying) e.currentTarget.style.boxShadow = '0 0 30px rgba(124,58,237,0.55)'; }}
+            onMouseLeave={e => e.currentTarget.style.boxShadow = '0 0 20px rgba(124,58,237,0.35)'}
           >
             <Rocket size={14} />
             {deploying ? 'Deploying...' : 'Deploy'}
@@ -384,11 +386,11 @@ export default function Editor() {
       {/* Draft-saved confirmation — shown briefly when hasDraft and not dirty */}
       {hasDraft && !draftDirty && !draftError && (
         <div style={{
-          background: 'rgba(124,58,237, 0.06)', borderBottom: '1px solid rgba(124,58,237, 0.12)',
+          background: C.accentBg, borderBottom: `1px solid ${C.panelBorder}`,
           padding: '5px 20px', display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0,
         }}>
-          <CheckCircle size={11} color="#7c3aed" />
-          <span style={{ fontSize: 10, color: '#a78bfa', fontFamily: 'JetBrains Mono, monospace' }}>
+          <CheckCircle size={11} color={C.accent} />
+          <span style={{ fontSize: 10, color: C.accentLt, fontFamily: 'JetBrains Mono, monospace' }}>
             Draft saved. Preview and deployed chat still use the active workflow until Phase 9B activates this draft.
           </span>
         </div>
