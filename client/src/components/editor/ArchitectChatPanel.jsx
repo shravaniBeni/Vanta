@@ -92,7 +92,7 @@ function ProposalDisplay({ proposal, proposalStatus, onContinue, onApprove, appr
       </div>
 
       {/* Summary */}
-      <p style={{ color: '#cbd5e1', fontSize: 11, lineHeight: 1.5, marginBottom: 8 }}>
+      <p style={{ color: '#cbd5e1', fontSize: 12, lineHeight: 1.6, marginBottom: 8 }}>
         {proposal.summary}
       </p>
 
@@ -238,7 +238,7 @@ function ProposalDisplay({ proposal, proposalStatus, onContinue, onApprove, appr
               flex: 1, padding: '6px 10px', borderRadius: 7,
               border: '1px solid rgba(124,58,237,0.3)',
               background: 'transparent', color: isActivating ? '#334155' : '#818cf8',
-              fontSize: 11, fontWeight: 600, cursor: isActivating ? 'default' : 'pointer',
+              fontSize: 13, fontWeight: 600, cursor: isActivating ? 'default' : 'pointer',
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
             }}
           >
@@ -313,7 +313,7 @@ function MessageBubble({ msg }) {
         borderRadius: isArchitect ? '4px 12px 12px 12px' : '12px 4px 12px 12px',
         background: isArchitect ? 'rgba(124,58,237,0.08)' : 'rgba(255,255,255,0.04)',
         border: `1px solid ${isArchitect ? 'rgba(124,58,237,0.2)' : 'rgba(255,255,255,0.06)'}`,
-        fontSize: 12, color: '#cbd5e1', lineHeight: 1.55,
+        fontSize: 13, color: '#e2e8f0', lineHeight: 1.6,
         whiteSpace: 'pre-wrap',
       }}>
         {msg.content}
@@ -493,11 +493,11 @@ export default function ArchitectChatPanel({ chatbotId, hasDraft, onClose, onAct
 
   return (
     <div style={{
-      width: 320, height: '100%',
+      width: 380, height: '100%',
       background: '#0d0d1c',
       borderLeft: '1px solid rgba(124,58,237,0.2)',
       display: 'flex', flexDirection: 'column',
-      fontFamily: 'Inter, sans-serif',
+      fontFamily: ''Plus Jakarta Sans', sans-serif',
       flexShrink: 0,
     }}>
       {/* Header */}
@@ -516,7 +516,7 @@ export default function ArchitectChatPanel({ chatbotId, hasDraft, onClose, onAct
             <Cpu size={13} color="#7c3aed" />
           </div>
           <div>
-            <div style={{ fontSize: 12, fontWeight: 700, color: '#f1f5f9' }}>Architect Chat</div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: '#f0f0ff', letterSpacing: '-0.01em' }}>Architect Chat</div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
               <div style={{
                 width: 5, height: 5, borderRadius: '50%',
@@ -532,7 +532,7 @@ export default function ArchitectChatPanel({ chatbotId, hasDraft, onClose, onAct
                   chatStatus === 'ready_for_review' ? '0 0 5px #818cf8' :
                   chatStatus === 'activation_error' ? '0 0 5px #ef4444' : 'none',
               }} />
-              <span style={{ fontSize: 9, color: '#64748b', fontFamily: 'JetBrains Mono, monospace' }}>
+              <span style={{ fontSize: 10, color: '#6d6d8a', fontFamily: 'JetBrains Mono, monospace', fontWeight: 600 }}>
                 {chatStatus === 'activated'        ? 'activated'
                   : chatStatus === 'activating'    ? 'activating...'
                   : chatStatus === 'activation_error' ? 'activation failed'
@@ -611,14 +611,14 @@ export default function ArchitectChatPanel({ chatbotId, hasDraft, onClose, onAct
       )}
 
       {/* Messages */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '12px' }}>
+      <div style={{ flex: 1, overflowY: 'auto', padding: '14px' }}>
         {messages.length === 0 && !loading && (
           <div style={{ textAlign: 'center', marginTop: 30 }}>
             <Cpu size={28} color="#334155" style={{ margin: '0 auto 10px' }} />
-            <p style={{ fontSize: 11, color: '#475569', lineHeight: 1.5 }}>
+            <p style={{ fontSize: 13, color: '#52526e', lineHeight: 1.6 }}>
               Ask me to review your workflow changes, or tell me what capability you'd like to add.
             </p>
-            <p style={{ fontSize: 10, color: '#334155', fontFamily: 'JetBrains Mono, monospace', marginTop: 6 }}>
+            <p style={{ fontSize: 11, color: '#3a3a55', fontFamily: 'JetBrains Mono, monospace', marginTop: 6 }}>
               I won't change anything — I propose only.
             </p>
           </div>
@@ -669,7 +669,7 @@ export default function ArchitectChatPanel({ chatbotId, hasDraft, onClose, onAct
 
       {/* Input */}
       <div style={{
-        padding: '10px 12px', borderTop: '1px solid rgba(124,58,237,0.15)',
+        padding: '12px 14px', borderTop: '1px solid rgba(124,58,237,0.12)',
         display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0,
       }}>
         <input

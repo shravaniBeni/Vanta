@@ -41,18 +41,18 @@ export default function WorkflowPreview({ chatbot, onClose }) {
 
   return (
     <div style={{
-      width: 320,
+      width: 380,
       height: '100%',
       background: '#0d0d1c',
       borderLeft: '1px solid rgba(124,58,237,0.2)',
       display: 'flex',
       flexDirection: 'column',
-      fontFamily: 'Inter, sans-serif',
+      fontFamily: ''Plus Jakarta Sans', sans-serif',
       flexShrink: 0,
     }}>
       {/* Header */}
       <div style={{
-        padding: '12px 14px',
+        padding: '14px 16px',
         borderBottom: '1px solid rgba(124,58,237,0.15)',
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         background: '#0d0d1c',
@@ -68,10 +68,10 @@ export default function WorkflowPreview({ chatbot, onClose }) {
             <MessageSquare size={13} color="#7c3aed" />
           </div>
           <div>
-            <div style={{ fontSize: 12, fontWeight: 700, color: '#f1f5f9' }}>Live Preview</div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: '#f0f0ff', letterSpacing: '-0.01em' }}>Live Preview</div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
               <div style={{ width: 5, height: 5, borderRadius: '50%', background: '#22c55e', boxShadow: '0 0 5px #22c55e' }} />
-              <span style={{ fontSize: 9, color: '#22c55e', fontFamily: 'JetBrains Mono, monospace' }}>testing mode</span>
+              <span style={{ fontSize: 10, color: '#34d399', fontFamily: 'JetBrains Mono, monospace', fontWeight: 600 }}>Live · Active Workflow</span>
             </div>
           </div>
         </div>
@@ -86,11 +86,11 @@ export default function WorkflowPreview({ chatbot, onClose }) {
       </div>
 
       {/* Messages */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '12px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <div style={{ flex: 1, overflowY: 'auto', padding: '14px', display: 'flex', flexDirection: 'column', gap: 12 }}>
         {messages.map((msg, i) => (
           <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'flex-start', flexDirection: msg.role === 'user' ? 'row-reverse' : 'row' }}>
             <div style={{
-              width: 24, height: 24, borderRadius: '50%', flexShrink: 0,
+              width: 28, height: 28, borderRadius: 9, flexShrink: 0,
               background: msg.role === 'user' ? 'rgba(124,58,237,0.2)' : 'rgba(34,197,94,0.15)',
               border: `1px solid ${msg.role === 'user' ? 'rgba(124,58,237,0.4)' : 'rgba(34,197,94,0.3)'}`,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -116,7 +116,7 @@ export default function WorkflowPreview({ chatbot, onClose }) {
                   <div style={{ width: 50, height: 2, background: 'rgba(255,255,255,0.08)', borderRadius: 1, overflow: 'hidden' }}>
                     <div style={{ width: `${Math.max(0, Math.min(1, msg.confidence)) * 100}%`, height: '100%', background: msg.confidence > 0.6 ? '#22c55e' : msg.confidence > 0.3 ? '#a78bfa' : '#ef4444', borderRadius: 1 }} />
                   </div>
-                  <span style={{ fontSize: 9, color: '#475569', fontFamily: 'JetBrains Mono, monospace' }}>
+                  <span style={{ fontSize: 10, color: '#6d6d8a', fontFamily: 'JetBrains Mono, monospace' }}>
                     {(msg.confidence * 100).toFixed(0)}% · {msg.chunks ?? 0} chunks
                   </span>
                 </div>
@@ -174,7 +174,7 @@ export default function WorkflowPreview({ chatbot, onClose }) {
             color: '#e2e8f0',
             fontSize: 12,
             outline: 'none',
-            fontFamily: 'Inter, sans-serif',
+            fontFamily: ''Plus Jakarta Sans', sans-serif',
           }}
         />
         <button
@@ -191,7 +191,7 @@ export default function WorkflowPreview({ chatbot, onClose }) {
             flexShrink: 0,
           }}
         >
-          <Send size={13} color={input.trim() && !loading ? '#fff' : '#334155'} />
+          <Send size={14} color={input.trim() && !loading ? '#fff' : '#334155'} />
         </button>
       </div>
 
