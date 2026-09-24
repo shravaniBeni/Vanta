@@ -47,7 +47,7 @@ export default function WorkflowPreview({ chatbot, onClose }) {
       borderLeft: '1px solid rgba(124,58,237,0.2)',
       display: 'flex',
       flexDirection: 'column',
-      fontFamily: ''Plus Jakarta Sans', sans-serif',
+      fontFamily: 'Plus Jakarta Sans, sans-serif',
       flexShrink: 0,
     }}>
       {/* Header */}
@@ -174,7 +174,7 @@ export default function WorkflowPreview({ chatbot, onClose }) {
             color: '#e2e8f0',
             fontSize: 12,
             outline: 'none',
-            fontFamily: ''Plus Jakarta Sans', sans-serif',
+            fontFamily: 'Plus Jakarta Sans, sans-serif',
           }}
         />
         <button

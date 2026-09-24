@@ -497,7 +497,7 @@ export default function ArchitectChatPanel({ chatbotId, hasDraft, onClose, onAct
       background: '#0d0d1c',
       borderLeft: '1px solid rgba(124,58,237,0.2)',
       display: 'flex', flexDirection: 'column',
-      fontFamily: ''Plus Jakarta Sans', sans-serif',
+      fontFamily: 'Plus Jakarta Sans, sans-serif',
       flexShrink: 0,
     }}>
       {/* Header */}
