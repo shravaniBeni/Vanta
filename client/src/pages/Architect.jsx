@@ -422,6 +422,7 @@ export default function Architect() {
   // ─────────────────────────────────────────────────────────────────────────────
 
   return (
+    <>
     <div style={{ minHeight: '100vh', background: C.bg, fontFamily: 'Plus Jakarta Sans, sans-serif' }} className="grid-bg">
       <div className="absolute top-0 left-1/4 w-96 h-96 bg-violet-600/8 rounded-full blur-[120px] pointer-events-none" />
       <div className="absolute bottom-0 right-1/3 w-80 h-80 bg-purple-600/8 rounded-full blur-[100px] pointer-events-none" />
@@ -876,5 +877,6 @@ export default function Architect() {
       @keyframes bounce { 0%,100% { transform:translateY(0); opacity:0.5; } 50% { transform:translateY(-3px); opacity:1; } }
       @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.5; } }
     `}</style>
+    </>
   );
 }
