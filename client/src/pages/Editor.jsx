@@ -24,7 +24,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Rocket, Eye, EyeOff, Save, Trash2, GitBranch, AlertTriangle, CheckCircle, MessageSquare } from 'lucide-react';
+import { ArrowLeft, Rocket, Eye, EyeOff, Save, Trash2, GitBranch, AlertTriangle, CheckCircle, MessageSquare, Workflow, Code } from 'lucide-react';
 import { chatbotsApi, workflowApi } from '@/api/apiClient';
 import { createPageUrl } from '@/utils';
 import NodeEditor from '../components/editor/NodeEditor';
@@ -32,6 +32,7 @@ import NodePalette from '../components/editor/NodePalette';
 import NodeProperties from '../components/editor/NodeProperties';
 import WorkflowPreview from '../components/editor/WorkflowPreview';
 import ArchitectChatPanel from '../components/editor/ArchitectChatPanel';
+import WorkflowCodeView from '../components/editor/WorkflowCodeView';
 import { useAppTheme } from '@/lib/ThemeContext';
 
 export default function Editor() {
@@ -59,6 +60,9 @@ export default function Editor() {
   const [showArchitect,  setShowArchitect]   = useState(false);
   const [deploying,      setDeploying]       = useState(false);
   const [draftError,     setDraftError]      = useState('');
+  // Phase 9D: tab switcher — 'visual' | 'code'
+  // Default: 'visual'. Switching to 'code' never mutates workflow.
+  const [activeTab,      setActiveTab]       = useState('visual');
 
   // Track the persisted draft to detect dirty state
   const persistedDraftRef = useRef({ nodes: [], connections: [] });
@@ -231,7 +235,7 @@ export default function Editor() {
         flexShrink: 0,
         boxShadow: '0 1px 0 rgba(124,58,237,0.08)',
       }}>
-        {/* Left: back + title */}
+        {/* Left: back + title + tab switcher */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
           <button
             onClick={() => navigate(createPageUrl('Dashboard'))}
@@ -264,6 +268,36 @@ export default function Editor() {
                 ? 'Draft changes — preview and deployed chat use the active workflow'
                 : chatbot.description?.slice(0, 55) + (chatbot.description?.length > 55 ? '...' : '')}
             </div>
+          </div>
+
+          {/* ── Phase 9D: Tab switcher ─────────────────────────────────────── */}
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 2,
+            background: C.bgSub, border: `1px solid ${C.border}`,
+            borderRadius: 10, padding: 3, marginLeft: 8,
+          }}>
+            {[
+              { id: 'visual', icon: <Workflow size={13} />, label: 'Visual Workflow' },
+              { id: 'code',   icon: <Code size={13} />,     label: 'Code' },
+            ].map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 5,
+                  padding: '5px 12px', borderRadius: 7, border: 'none',
+                  background: activeTab === tab.id ? C.surface : 'transparent',
+                  color: activeTab === tab.id ? C.t1 : C.t3,
+                  fontFamily: 'Plus Jakarta Sans, sans-serif',
+                  fontSize: 12, fontWeight: activeTab === tab.id ? 700 : 500,
+                  cursor: 'pointer', transition: 'all 0.15s',
+                  boxShadow: activeTab === tab.id ? C.shadow : 'none',
+                }}
+              >
+                {tab.icon}
+                {tab.label}
+              </button>
+            ))}
           </div>
         </div>
 
@@ -399,59 +433,70 @@ export default function Editor() {
       {/* ── Editor body ──────────────────────────────────────────────────────── */}
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
 
-        {/* Palette */}
-        <NodePalette onAddNode={(nodeType) => {
-          const newNode = {
-            id:     `node_${Date.now()}`,
-            type:   nodeType,
-            label:  nodeType,
-            x:      200 + Math.random() * 300,
-            y:      150 + Math.random() * 200,
-            params: {},
-          };
-          handleNodesChange([...draftNodes, newNode]);
-        }} />
-
-        {/* Canvas — shows draft */}
-        <div style={{ flex: 1 }}>
-          <NodeEditor
-            nodes={draftNodes}
-            connections={draftConnections}
-            onNodesChange={handleNodesChange}
-            onConnectionsChange={handleConnectionsChange}
-            onNodeSelect={setSelectedNode}
-          />
-        </div>
-
-        {/* Properties panel */}
-        {selectedNode && (
-          <NodeProperties
-            node={selectedNode}
-            chatbotId={chatbot.id}
-            onUpdate={handleNodeUpdate}
-            onClose={() => setSelectedNode(null)}
-          />
-        )}
-
-        {/* Preview — always uses ACTIVE workflow */}
-        {showPreview && (
-          <WorkflowPreview
+        {/* ── Code tab (Phase 9D) — shown instead of canvas when activeTab === 'code' */}
+        {activeTab === 'code' ? (
+          <WorkflowCodeView
             chatbot={chatbot}
-            onClose={() => setShowPreview(false)}
-          />
-        )}
-
-        {/* Architect Chat panel — advisory only, never activates */}
-        {showArchitect && (
-          <ArchitectChatPanel
-            chatbotId={chatbot.id}
             hasDraft={hasDraft}
-            onClose={() => setShowArchitect(false)}
-            onActivated={async (result) => {
-              // Architect activated a proposal — reload the editor to show the new active workflow
-              await loadEditor();
-            }}
+            draftDirty={draftDirty}
           />
+        ) : (
+          <>
+            {/* Palette */}
+            <NodePalette onAddNode={(nodeType) => {
+              const newNode = {
+                id:     `node_${Date.now()}`,
+                type:   nodeType,
+                label:  nodeType,
+                x:      200 + Math.random() * 300,
+                y:      150 + Math.random() * 200,
+                params: {},
+              };
+              handleNodesChange([...draftNodes, newNode]);
+            }} />
+
+            {/* Canvas — shows draft */}
+            <div style={{ flex: 1 }}>
+              <NodeEditor
+                nodes={draftNodes}
+                connections={draftConnections}
+                onNodesChange={handleNodesChange}
+                onConnectionsChange={handleConnectionsChange}
+                onNodeSelect={setSelectedNode}
+              />
+            </div>
+
+            {/* Properties panel */}
+            {selectedNode && (
+              <NodeProperties
+                node={selectedNode}
+                chatbotId={chatbot.id}
+                onUpdate={handleNodeUpdate}
+                onClose={() => setSelectedNode(null)}
+              />
+            )}
+
+            {/* Preview — always uses ACTIVE workflow */}
+            {showPreview && (
+              <WorkflowPreview
+                chatbot={chatbot}
+                onClose={() => setShowPreview(false)}
+              />
+            )}
+
+            {/* Architect Chat panel — advisory only, never activates */}
+            {showArchitect && (
+              <ArchitectChatPanel
+                chatbotId={chatbot.id}
+                hasDraft={hasDraft}
+                onClose={() => setShowArchitect(false)}
+                onActivated={async (result) => {
+                  // Architect activated a proposal — reload the editor to show the new active workflow
+                  await loadEditor();
+                }}
+              />
+            )}
+          </>
         )}
       </div>
     </div>
