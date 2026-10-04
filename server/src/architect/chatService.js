@@ -382,13 +382,26 @@ When producing the final proposal, respond with ONLY valid JSON matching this sc
     "reconfigure_nodes": [{"node_id":"...", "type":"...", "params":{}, "reason":"..."}],
     "connections": {"add": [{"from":"...", "to":"...", "reason":"..."}], "remove": [{"from":"...", "to":"..."}]}
   },
-  "unsupported_capabilities": ["..."],
-  "future_recommendations": [{"feature":"...", "reason":"..."}],
-  "requires_reindex": false,
-  "executable": false,
-  "reasoning": {"architecture":"...", "runtime_compatibility":"...", "knowledge_impact":"..."},
+  "unsupported_capabilities": [],
+  "future_recommendations": [],
+  "requires_reindex": true,
+  "executable": true,
+  "reasoning": {
+    "architecture": "describe the topology change",
+    "runtime_compatibility": "describe runtime support",
+    "knowledge_impact": "describe impact on knowledge base"
+  },
   "summary": "2-3 sentences"
 }
+
+CRITICAL JSON RULES:
+- "reasoning" MUST be a JSON object with three string fields: architecture, runtime_compatibility, knowledge_impact.
+  Do NOT write reasoning as a plain string. Do NOT omit it.
+- Every "reason" field in add_nodes, requested_capabilities, etc. must be a non-empty string.
+- "requires_reindex" must be a boolean (true/false), not a string.
+- "executable" must be a boolean (true/false), not a string.
+- "unsupported_capabilities" must be an empty array [] if all requested capabilities are supported.
+- OCR is a SUPPORTED capability in the current Vanta runtime. If the user added OCR, set executable=true.
 
 STRICT RULE FOR future_recommendations:
 Only include a capability in future_recommendations if it meets at least one of these criteria:
@@ -447,12 +460,15 @@ export function buildContextAcknowledgement(ctx) {
 
     if (ctx.validation.executable) {
       msg += `\n\nThe draft workflow is fully executable with the current runtime.`;
+      // Note: do NOT include "I have enough information to propose" here.
+      // That signal must only appear in genuine LLM conversational turns, not
+      // in the synthetic context-ack — otherwise historyIndicatesReady fires
+      // prematurely on the next user message.
     } else if (unsupported.length > 0) {
       msg += `\n\nThe draft is structurally valid (I understand what you're trying to build) but not yet executable because of the unsupported capabilities above.`;
     }
 
-    return msg;
-  }
+    return msg;  }
 
   // Direct chat path: describe active workflow
   const activeTypes = ctx.active_workflow.nodes.map(n => n.label || n.type);
@@ -635,7 +651,10 @@ export async function processArchitectMessage(userId, ragApp, userMessage, histo
   ];
   const userRequestsProposal   = proposalTriggers.some(t => lastUserMsg.includes(t));
   const historyIndicatesReady  = history.some(
-    m => m.role === 'architect' && m.content.includes('I have enough information to propose')
+    m => m.role === 'architect' &&
+         !m.metadata?.context_ack &&          // never trigger on the synthetic context-ack
+         !m.metadata?.auto_generated &&        // never trigger on auto-generated turns
+         m.content.includes('I have enough information to propose')
   );
   const shouldGenerateProposal = forceProposal || userRequestsProposal || historyIndicatesReady;
 
@@ -668,34 +687,73 @@ Do NOT include any conversational text, markdown fences, or explanation outside 
     let rawProposalJson;
     try {
       rawProposalJson = await invokeLLMJsonChat(proposalMessages, 0.3);
+      console.log('[chatService] invokeLLMJsonChat succeeded, keys:', Object.keys(rawProposalJson || {}).join(','));
     } catch (err) {
-      console.error('[chatService] invokeLLMJsonChat failed, falling back:', err.message);
+      console.error('[chatService] invokeLLMJsonChat failed, falling back to text parse:', err.message);
       try {
         const jsonResp = await invokeLLMChat(proposalMessages, DEFAULT_CHAT_MODEL, 0.3);
+        console.log('[chatService] fallback text response length:', jsonResp?.length);
         const stripped = jsonResp.replace(/```(?:json)?/gi, '').replace(/```/g, '').trim();
-        rawProposalJson = JSON.parse(stripped);
-      } catch {
+        // Find the JSON object within the text in case LLM wraps it
+        const jsonMatch = stripped.match(/\{[\s\S]*\}/);
+        rawProposalJson = jsonMatch ? JSON.parse(jsonMatch[0]) : JSON.parse(stripped);
+      } catch (fallbackErr) {
+        console.error('[chatService] fallback parse failed:', fallbackErr.message);
         rawProposalJson = {};
       }
     }
 
-    // Extract capability types mentioned in the conversation to ground
-    // future_recommendations — prevents the LLM from hallucinating unrelated suggestions
     const discussedCapabilities = _extractDiscussedCapabilities(history, userMessage, ctx);
+
+    // Log the raw proposal for debugging before validation
+    console.log('[chatService] raw proposal keys:', Object.keys(rawProposalJson || {}).join(','));
+    if (rawProposalJson?.reasoning && typeof rawProposalJson.reasoning === 'string') {
+      console.log('[chatService] reasoning is a string — will be coerced');
+    }
 
     const validationResult = validateAndNormalizeProposal(rawProposalJson, baseVersion, discussedCapabilities);
     if (validationResult.success) {
       proposal  = validationResult.data;
       status    = 'ready_for_review';
-      // Short transition line — the ProposalDisplay card is the authoritative UI.
-      // Marked with a metadata tag so the frontend can suppress it when the card is present.
       architectResponse = `Proposal ready. See the architecture proposal below.`;
     } else {
-      console.error('[chatService] Proposal validation failed:', JSON.stringify(validationResult.error).slice(0, 200));
-      architectResponse =
-        `I attempted to generate a proposal, but it didn't pass validation. ` +
-        `What is the primary goal you're trying to achieve with these workflow changes?`;
-      status = 'clarifying';
+      // Log the full validation error so we can see exactly what failed
+      console.error('[chatService] Proposal validation failed — fieldErrors:', JSON.stringify(validationResult.error?.fieldErrors));
+      console.error('[chatService] Proposal validation failed — raw keys:', Object.keys(rawProposalJson || {}).join(','));
+
+      // Second attempt: retry proposal generation with a more explicit instruction
+      // that reminds the LLM about required fields
+      try {
+        const retryMessages = [
+          ...proposalMessages.slice(0, -1),
+          {
+            role: 'user',
+            content: `Generate the structured JSON proposal. Your response must be ONLY valid JSON with ALL of these fields:
+base_architect_version (number), intent_summary (string), analysis (string), requested_capabilities (array of objects with type/runtime_status/reason), recommended_changes (object), unsupported_capabilities (array), future_recommendations (array), requires_reindex (boolean), executable (boolean), reasoning (object with architecture/runtime_compatibility/knowledge_impact strings), summary (string).
+Respond with ONLY the JSON object, no other text.`,
+          },
+        ];
+        const retryRaw = await invokeLLMJsonChat(retryMessages, 0.2);
+        console.log('[chatService] retry proposal keys:', Object.keys(retryRaw || {}).join(','));
+        const retryResult = validateAndNormalizeProposal(retryRaw, baseVersion, discussedCapabilities);
+        if (retryResult.success) {
+          proposal  = retryResult.data;
+          status    = 'ready_for_review';
+          architectResponse = `Proposal ready. See the architecture proposal below.`;
+        } else {
+          console.error('[chatService] Retry also failed:', JSON.stringify(retryResult.error?.fieldErrors));
+          architectResponse =
+            `I attempted to generate a proposal, but it didn't pass validation. ` +
+            `What is the primary goal you're trying to achieve with these workflow changes?`;
+          status = 'clarifying';
+        }
+      } catch (retryErr) {
+        console.error('[chatService] Retry invocation failed:', retryErr.message);
+        architectResponse =
+          `I attempted to generate a proposal, but it didn't pass validation. ` +
+          `What is the primary goal you're trying to achieve with these workflow changes?`;
+        status = 'clarifying';
+      }
     }
   } else {
     // Conversational turn
