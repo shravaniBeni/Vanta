@@ -29,9 +29,10 @@
  */
 
 import supabase from '../supabase.js';
-import { extractTextFromBuffer, chunkDocument } from '../documentParser.js';
+import { extractTextFromBuffer, chunkDocument, classificationNeedsOcr, DOC_CLASSIFICATION } from '../documentParser.js';
 import { embedText } from '../embeddings.js';
 import { deleteChunksForDocument } from '../vectorStore.js';
+import { extractTextWithOcr } from '../ocr.js';
 import { v4 as uuidv4 } from 'uuid';
 
 const STORAGE_BUCKET = 'knowledge-docs';
@@ -113,13 +114,60 @@ export async function indexDocumentWithPlan(documentId, ragAppId, userId) {
     throw dlErr;
   }
 
-  // ── 7. Extract text ────────────────────────────────────────────────────────
+  // ── 7. Extract text — use OCR if workflow contains OCR node ──────────────
+  // Determine whether the active workflow includes an OCR node.
+  const activeNodes = ragApp.nodes ?? [];
+  const hasOcrNode  = Array.isArray(activeNodes) && activeNodes.some(n => n.type === 'OCR');
+
   let text;
-  try {
-    text = await extractTextFromBuffer(buffer, doc.file_name);
-  } catch (parseErr) {
-    await _markError(documentId, `Text extraction failed: ${parseErr.message.slice(0, 200)}`);
-    throw parseErr;
+  let ocrMetadata = null;
+
+  if (hasOcrNode) {
+    // OCR path — fetch OCR config from the OCR node params
+    const ocrNode = activeNodes.find(n => n.type === 'OCR');
+    const ocrConfig = {
+      language:             ocrNode?.params?.language             ?? 'eng',
+      dpi:                  ocrNode?.params?.dpi                  ?? 300,
+      confidence_threshold: ocrNode?.params?.confidence_threshold ?? 60,
+      fallback_on_failure:  ocrNode?.params?.fallback_on_failure  ?? false,
+    };
+
+    console.log(`[indexer] OCR node detected — using OCR extraction for doc=${documentId.slice(0,8)}`);
+    try {
+      const result = await extractTextWithOcr(buffer, doc.file_name, ocrConfig);
+      text        = result.text;
+      ocrMetadata = result.metadata;
+    } catch (ocrErr) {
+      await _markError(documentId, `OCR extraction failed: ${ocrErr.message.slice(0, 200)}`);
+      throw ocrErr;
+    }
+  } else {
+    // Standard text extraction path — unchanged
+    try {
+      // Check profile to guard against silently indexing scanned documents
+      const { data: docRow } = await supabase
+        .from('documents')
+        .select('profile_data')
+        .eq('id', documentId)
+        .single();
+
+      const classification = docRow?.profile_data?.classification;
+      if (classificationNeedsOcr(classification)) {
+        const err = new Error(
+          `[indexer] Document "${doc.file_name}" is classified as ${classification} ` +
+          `but the active workflow does not contain an OCR node. ` +
+          `Add OCR to the workflow via the Architect before indexing this document.`
+        );
+        await _markError(documentId, err.message.slice(0, 500));
+        throw err;
+      }
+
+      text = await extractTextFromBuffer(buffer, doc.file_name);
+    } catch (err) {
+      if (err.message.includes('[indexer]')) throw err; // already handled above
+      await _markError(documentId, `Text extraction failed: ${err.message.slice(0, 200)}`);
+      throw err;
+    }
   }
 
   if (!text || text.trim().length === 0) {
@@ -151,6 +199,7 @@ export async function indexDocumentWithPlan(documentId, ragAppId, userId) {
     chunk_overlap,
     embedding_model:     plan.embedding?.model  || 'Xenova/bge-small-en-v1.5',
     embedding_dimension: plan.embedding?.dimension || 384,
+    ...(ocrMetadata ? { ocr: ocrMetadata } : {}),
   };
 
   let insertedCount = 0;

@@ -27,7 +27,6 @@
 // ─── Supported executable strategies ─────────────────────────────────────────
 
 const SUPPORTED_STRATEGIES = new Set(['fixed', 'recursive', 'structure-aware']);
-
 // ─── LLM model mapping ────────────────────────────────────────────────────────
 // response_style and temperature are INDEPENDENT fields.
 // temperature is a numeric hint derived from the style for the initial workflow,
@@ -112,8 +111,11 @@ export function buildWorkflowFromArchitectPlan({ ragAppId, architectPlan, archit
   // ── Stable node IDs ────────────────────────────────────────────────────────
   // Using descriptive deterministic IDs so the workflow is reproducible
   // and traceable to the architect version that produced it.
+  const requiresOcr = architectPlan.requires_ocr === true;
+
   const nodeIds = {
     knowledge:  'knowledge-source',
+    ocr:        'ocr',              // only present when requires_ocr === true
     chunking:   'chunking',
     embedding:  'embedding',
     retrieval:  'retrieval',
@@ -123,7 +125,15 @@ export function buildWorkflowFromArchitectPlan({ ragAppId, architectPlan, archit
 
   // ── Node positions (left-to-right, single row) ─────────────────────────────
   const y = 220;
-  const positions = {
+  const positions = requiresOcr ? {
+    [nodeIds.knowledge]:  { x: 80,   y },
+    [nodeIds.ocr]:        { x: 320,  y },
+    [nodeIds.chunking]:   { x: 560,  y },
+    [nodeIds.embedding]:  { x: 800,  y },
+    [nodeIds.retrieval]:  { x: 1040, y },
+    [nodeIds.generation]: { x: 1280, y },
+    [nodeIds.output]:     { x: 1520, y },
+  } : {
     [nodeIds.knowledge]:  { x: 80,   y },
     [nodeIds.chunking]:   { x: 320,  y },
     [nodeIds.embedding]:  { x: 560,  y },
@@ -154,9 +164,24 @@ export function buildWorkflowFromArchitectPlan({ ragAppId, architectPlan, archit
       },
     },
 
-    // 2. Chunking — TextSplitter
-    // NOTE: NodeProperties.jsx uses params.chunk_size and params.overlap (not chunk_overlap)
-    // chat.js uses: splitterNode?.params?.chunk_size and splitterNode?.params?.overlap
+    // 2. OCR — only present when requires_ocr === true
+    ...(requiresOcr ? [{
+      id:    nodeIds.ocr,
+      type:  'OCR',
+      label: 'OCR Layer',
+      x:     positions[nodeIds.ocr].x,
+      y:     positions[nodeIds.ocr].y,
+      params: {
+        language:             architectPlan.ocr?.language             ?? 'eng',
+        dpi:                  architectPlan.ocr?.dpi                  ?? 300,
+        confidence_threshold: architectPlan.ocr?.confidence_threshold ?? 60,
+        fallback_on_failure:  architectPlan.ocr?.fallback_on_failure  ?? false,
+        architect_version:    architectVersion,
+        reason:               'Document profiling detected scanned/image-heavy pages requiring OCR.',
+      },
+    }] : []),
+
+    // 3. Chunking — TextSplitter
     {
       id:    nodeIds.chunking,
       type:  'TextSplitter',
@@ -164,16 +189,16 @@ export function buildWorkflowFromArchitectPlan({ ragAppId, architectPlan, archit
       x:     positions[nodeIds.chunking].x,
       y:     positions[nodeIds.chunking].y,
       params: {
-        strategy:          strategy,           // 'fixed' | 'recursive' | 'structure-aware'
+        strategy:          strategy,
         chunk_size:        chunk_size,
-        overlap:           chunk_overlap,       // NodeProperties uses 'overlap', not 'chunk_overlap'
-        chunk_overlap:     chunk_overlap,       // also store under canonical name for traceability
+        overlap:           chunk_overlap,
+        chunk_overlap:     chunk_overlap,
         architect_version: architectVersion,
         reason:            architectPlan.chunking.reason || '',
       },
     },
 
-    // 3. Embedding — Embeddings
+    // 4. Embedding — Embeddings
     {
       id:    nodeIds.embedding,
       type:  'Embeddings',
@@ -190,7 +215,7 @@ export function buildWorkflowFromArchitectPlan({ ragAppId, architectPlan, archit
       },
     },
 
-    // 4. Retrieval — VectorStore
+    // 5. Retrieval — VectorStore
     {
       id:    nodeIds.retrieval,
       type:  'VectorStore',
@@ -198,7 +223,7 @@ export function buildWorkflowFromArchitectPlan({ ragAppId, architectPlan, archit
       x:     positions[nodeIds.retrieval].x,
       y:     positions[nodeIds.retrieval].y,
       params: {
-        type:              'pgvector',          // actual runtime, not FAISS
+        type:              'pgvector',
         metric:            architectPlan.retrieval.similarity_metric || 'cosine',
         top_k:             topK,
         reranking:         false,
@@ -208,9 +233,7 @@ export function buildWorkflowFromArchitectPlan({ ragAppId, architectPlan, archit
       },
     },
 
-    // 5. Generation — LLM
-    // chat.js reads: llmNode?.params?.model and llmNode?.params?.temperature
-    // Preserve those exact param keys so preview still works after materialization.
+    // 6. Generation — LLM
     {
       id:    nodeIds.generation,
       type:  'LLM',
@@ -218,7 +241,7 @@ export function buildWorkflowFromArchitectPlan({ ragAppId, architectPlan, archit
       x:     positions[nodeIds.generation].x,
       y:     positions[nodeIds.generation].y,
       params: {
-        model:              'openai/gpt-4o-mini',  // OpenRouter default
+        model:              'openai/gpt-4o-mini',
         temperature:        styleToTemperature(architectPlan.generation.response_style),
         grounding_required: architectPlan.generation.grounding_required,
         response_style:     architectPlan.generation.response_style || '',
@@ -227,7 +250,7 @@ export function buildWorkflowFromArchitectPlan({ ragAppId, architectPlan, archit
       },
     },
 
-    // 6. Output — ChatOutput
+    // 7. Output — ChatOutput
     {
       id:    nodeIds.output,
       type:  'ChatOutput',
@@ -241,8 +264,16 @@ export function buildWorkflowFromArchitectPlan({ ragAppId, architectPlan, archit
   ];
 
   // ── Build connections ──────────────────────────────────────────────────────
-  // Linear pipeline: knowledge → chunking → embedding → retrieval → generation → output
-  const connections = [
+  // With OCR:    knowledge → ocr → chunking → embedding → retrieval → generation → output
+  // Without OCR: knowledge → chunking → embedding → retrieval → generation → output
+  const connections = requiresOcr ? [
+    { from: nodeIds.knowledge,  to: nodeIds.ocr       },
+    { from: nodeIds.ocr,        to: nodeIds.chunking   },
+    { from: nodeIds.chunking,   to: nodeIds.embedding  },
+    { from: nodeIds.embedding,  to: nodeIds.retrieval  },
+    { from: nodeIds.retrieval,  to: nodeIds.generation },
+    { from: nodeIds.generation, to: nodeIds.output     },
+  ] : [
     { from: nodeIds.knowledge,  to: nodeIds.chunking   },
     { from: nodeIds.chunking,   to: nodeIds.embedding  },
     { from: nodeIds.embedding,  to: nodeIds.retrieval  },

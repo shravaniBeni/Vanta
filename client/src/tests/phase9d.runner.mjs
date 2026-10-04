@@ -307,21 +307,28 @@ test('17. Changing LLM temperature changes generated code', () => {
   has(hasFile(r2.files,'src/config.js').content, 'temperature:        0.7');
 });
 
-// 18. Unavailable OCR blocks generation
-test('18. Unavailable OCR blocks code generation', () => {
-  const w = {
-    ...makeWorkflow(),
-    nodes: [...makeWorkflow().nodes, {
-      id:'ocr', type:'OCR', label:'OCR Layer', x:200, y:400, params:{},
-    }],
+// 18. OCR is now SUPPORTED — workflows with OCR generate successfully
+test('18. OCR is now supported — OCR workflow generates successfully (Phase 10A)', () => {
+  const workflowWithOcr = {
+    id: 'bot-ocr', title: 'OCR RAG Bot', status: 'deployed', architect_version: 2,
+    nodes: [
+      { id: 'doc', type: 'DocumentUpload', label: 'Knowledge', x:0,    y:220, params: { rag_app_id:'bot-ocr', document_count:2, architect_version:2 } },
+      { id: 'ocr', type: 'OCR',            label: 'OCR Layer', x:240,  y:220, params: { language:'eng', dpi:300, confidence_threshold:60, architect_version:2 } },
+      ...makeWorkflow().nodes.filter(n => !['DocumentUpload'].includes(n.type)),
+    ],
+    connections: [
+      { from:'doc', to:'ocr' },
+      { from:'ocr', to:'chunking' },
+      { from:'chunking', to:'embedding' },
+      { from:'embedding', to:'retrieval' },
+      { from:'retrieval', to:'generation' },
+      { from:'generation', to:'output' },
+    ],
   };
-  const r = generateStandaloneCode(w);
-  assert(!r.ok, 'Generation must fail with OCR node');
-  assert(r.errors.length > 0, 'Must have errors');
-  const ocrError = r.errors.find(e => e.includes('OCR'));
-  assert(ocrError, `Must have error mentioning OCR. Got: ${r.errors.join('; ')}`);
-  has(ocrError, 'unavailable', 'Error must say "unavailable"');
-  eq(r.files.length, 0, 'Must produce no files when blocked');
+  const r = generateStandaloneCode(workflowWithOcr);
+  assert(r.ok, `OCR workflow must generate successfully now that OCR is supported. Errors: ${r.errors?.join('; ')}`);
+  // OCR workflow should have more files or different content
+  assert(r.files.length >= 10, 'Must generate project files');
 });
 
 // 19. Unknown node types block generation

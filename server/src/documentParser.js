@@ -1,17 +1,167 @@
 /**
  * server/src/documentParser.js
  *
- * Phase 4: Document parsing operates entirely from in-memory Buffers.
- * No temporary disk files are written by this module.
+ * Phase 10A additions:
+ *   profileDocument(buffer, fileName)  — classify document for OCR routing
  *
- * Supported types: PDF, DOCX/DOC, TXT/MD, CSV
- *
- * Public API:
- *   extractTextFromBuffer(buffer, originalName)  — parse text from a Buffer
- *   chunkText(text, chunkSize, overlap)           — split into overlapping chunks
+ * Existing public API (unchanged):
+ *   extractTextFromBuffer(buffer, originalName)
+ *   chunkText(text, chunkSize, overlap)
+ *   chunkDocument(text, plan)
+ *   isLegacyChunk(chunkMetadata)
+ *   sanitizeFilename(originalName)
  */
 
 import path from 'path';
+
+// ─── Document Profiler (Phase 10A) ───────────────────────────────────────────
+
+/**
+ * Classification constants for document profiling.
+ */
+export const DOC_CLASSIFICATION = {
+  TEXT_EXTRACTABLE: 'TEXT_EXTRACTABLE',
+  SCANNED:          'SCANNED',
+  MIXED:            'MIXED',
+  IMAGE_HEAVY:      'IMAGE_HEAVY',
+  NOT_PDF:          'NOT_PDF',  // Non-PDF types are always text-extractable via their parser
+};
+
+// Thresholds — isolated here so they can be tuned without touching logic.
+const PROFILER_THRESHOLDS = {
+  // A page with fewer than this many meaningful characters is considered blank/scanned.
+  // Form-feed chars (\f) are counted as 0. Whitespace-only pages count as 0.
+  BLANK_PAGE_CHAR_THRESHOLD: 50,
+
+  // If this percentage or more of pages are blank, the document is SCANNED.
+  // 0.80 = 80%
+  SCANNED_PAGE_RATIO: 0.80,
+
+  // If >= this percentage of pages are blank (but < SCANNED_PAGE_RATIO), it's IMAGE_HEAVY.
+  IMAGE_HEAVY_PAGE_RATIO: 0.40,
+
+  // Minimum page count before ratio-based classification triggers.
+  // Single-page short documents (e.g. 30-char cover sheet) should not be classified SCANNED.
+  MIN_PAGES_FOR_RATIO_CLASSIFICATION: 2,
+};
+
+/**
+ * Profile a document to determine if OCR is needed.
+ *
+ * For PDFs: inspects page-level character counts using pdf-parse's page-feed structure.
+ * For non-PDFs (DOCX, TXT, CSV, MD): always returns TEXT_EXTRACTABLE.
+ *
+ * Returns:
+ *   {
+ *     classification: 'TEXT_EXTRACTABLE'|'SCANNED'|'MIXED'|'IMAGE_HEAVY'|'NOT_PDF',
+ *     signals: {
+ *       page_count,
+ *       chars_total,
+ *       chars_per_page,   // number[] — char count per page
+ *       text_pages,       // pages with >= BLANK_PAGE_CHAR_THRESHOLD chars
+ *       scanned_pages,    // pages with < BLANK_PAGE_CHAR_THRESHOLD chars
+ *     }
+ *   }
+ *
+ * @param {Buffer} buffer
+ * @param {string} fileName
+ * @returns {Promise<{ classification: string, signals: object }>}
+ */
+export async function profileDocument(buffer, fileName) {
+  const ext = path.extname(fileName).toLowerCase();
+
+  // Non-PDF types are handled by their respective parsers, always text-extractable.
+  if (ext !== '.pdf') {
+    return {
+      classification: DOC_CLASSIFICATION.NOT_PDF,
+      signals: { page_count: 1, chars_total: buffer.length, chars_per_page: [buffer.length], text_pages: 1, scanned_pages: 0 },
+    };
+  }
+
+  // ── PDF profiling via pdf-parse ──────────────────────────────────────────
+  // pdf-parse separates pages with form-feed (\f = \x0C) in data.text.
+  // We split on \f to get per-page text, then count meaningful characters.
+
+  let pdfData;
+  try {
+    const pdfParse = (await import('pdf-parse')).default;
+    pdfData = await Promise.race([
+      pdfParse(buffer, { max: 0 }),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('PDF profiling timed out')), 30000)),
+    ]);
+  } catch (err) {
+    // If pdf-parse fails (encrypted, malformed), we can't profile — assume it needs review.
+    console.warn('[profileDocument] pdf-parse failed:', err.message);
+    return {
+      classification: DOC_CLASSIFICATION.SCANNED,
+      signals: { page_count: 0, chars_total: 0, chars_per_page: [], text_pages: 0, scanned_pages: 0, parse_error: err.message },
+    };
+  }
+
+  const fullText  = pdfData.text || '';
+  const pageCount = pdfData.numpages || 1;
+
+  // Split on form-feed to get per-page text segments.
+  // pdf-parse uses \f as a page separator. The last segment may be empty if text ends with \f.
+  const pageSegments = fullText.split('\f');
+
+  // Count meaningful characters per page (strip whitespace/form-feeds before counting).
+  const charsPerPage = pageSegments
+    .slice(0, pageCount)  // guard against extra segments
+    .map(seg => seg.replace(/[\s\f]/g, '').length);
+
+  // Pad if pdf-parse returned fewer segments than pages (can happen with some PDFs).
+  while (charsPerPage.length < pageCount) charsPerPage.push(0);
+
+  const T = PROFILER_THRESHOLDS;
+  const blankPages = charsPerPage.filter(c => c < T.BLANK_PAGE_CHAR_THRESHOLD).length;
+  const textPages  = pageCount - blankPages;
+  const charsTotal = charsPerPage.reduce((s, c) => s + c, 0);
+
+  const signals = {
+    page_count:     pageCount,
+    chars_total:    charsTotal,
+    chars_per_page: charsPerPage,
+    text_pages:     textPages,
+    scanned_pages:  blankPages,
+  };
+
+  // ── Classification ───────────────────────────────────────────────────────
+  let classification;
+
+  if (pageCount < T.MIN_PAGES_FOR_RATIO_CLASSIFICATION) {
+    // Single-page document: use absolute char count, not ratio.
+    // A one-page doc with 30 chars might be a legitimate short text; only call it
+    // SCANNED if it has literally zero meaningful characters.
+    classification = charsTotal === 0
+      ? DOC_CLASSIFICATION.SCANNED
+      : DOC_CLASSIFICATION.TEXT_EXTRACTABLE;
+  } else {
+    const blankRatio = blankPages / pageCount;
+
+    if (blankRatio >= T.SCANNED_PAGE_RATIO) {
+      classification = DOC_CLASSIFICATION.SCANNED;
+    } else if (blankRatio >= T.IMAGE_HEAVY_PAGE_RATIO) {
+      classification = DOC_CLASSIFICATION.IMAGE_HEAVY;
+    } else if (blankPages > 0) {
+      classification = DOC_CLASSIFICATION.MIXED;
+    } else {
+      classification = DOC_CLASSIFICATION.TEXT_EXTRACTABLE;
+    }
+  }
+
+  return { classification, signals };
+}
+
+/**
+ * Returns true if a document classification indicates OCR is needed.
+ * @param {string} classification
+ */
+export function classificationNeedsOcr(classification) {
+  return classification === DOC_CLASSIFICATION.SCANNED ||
+         classification === DOC_CLASSIFICATION.IMAGE_HEAVY ||
+         classification === DOC_CLASSIFICATION.MIXED;
+}
 
 /**
  * Extract plain text from an in-memory Buffer.

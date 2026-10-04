@@ -29,7 +29,7 @@ import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import supabase from '../supabase.js';
 import { getOwnedRagApp } from '../helpers.js';
-import { extractTextFromBuffer, sanitizeFilename } from '../documentParser.js';
+import { extractTextFromBuffer, sanitizeFilename, profileDocument, classificationNeedsOcr } from '../documentParser.js';
 import { deleteChunksForDocument, deleteChunksForApp } from '../vectorStore.js';
 import { indexDocumentWithPlan } from '../architect/indexer.js';
 
@@ -63,7 +63,7 @@ router.get('/', async (req, res) => {
 
     const { data, error } = await supabase
       .from('documents')
-      .select('id, rag_app_id, node_id, file_name, mime_type, size_bytes, chunk_count, status, error_message, created_at')
+      .select('id, rag_app_id, node_id, file_name, mime_type, size_bytes, chunk_count, status, error_message, profile_data, created_at')
       .eq('rag_app_id', rag_app_id)
       .order('created_at', { ascending: true });
 
@@ -194,24 +194,64 @@ async function handleUpload(req, res) {
     return res.status(422).json({ error: 'Document contained no extractable text' });
   }
 
-  // ── 6. Mark as profiled ───────────────────────────────────────────────────
-  // No document_chunks created here. Architect will analyze the original file.
+  // ── 6. Profile the document ───────────────────────────────────────────────
+  // Classify document type so the Architect and indexer can route correctly.
+  let profileData = null;
+  try {
+    profileData = await profileDocument(req.file.buffer, req.file.originalname);
+    console.log(`[documents/upload] profile: classification=${profileData.classification} pages=${profileData.signals.page_count} text_pages=${profileData.signals.text_pages}`);
+  } catch (profileErr) {
+    console.warn('[documents/upload] profile failed (non-fatal):', profileErr.message);
+  }
+
+  // ── 7. Check if current active workflow can handle this document type ──────
+  // If the document needs OCR and the active workflow has no OCR node,
+  // mark it as 'needs_architecture_review' rather than 'profiled'.
+  const needsOcr = profileData ? classificationNeedsOcr(profileData.classification) : false;
+  let finalStatus = 'profiled';
+
+  if (needsOcr) {
+    // Check if the current active workflow includes an OCR node
+    const activeNodes = ragApp.nodes ?? [];
+    const safeNodes = Array.isArray(activeNodes) ? activeNodes :
+      (typeof activeNodes === 'string' ? JSON.parse(activeNodes) : []);
+    const workflowHasOcr = safeNodes.some(n => n.type === 'OCR');
+
+    if (!workflowHasOcr) {
+      finalStatus = 'needs_architecture_review';
+      console.log(`[documents/upload] doc=${documentId.slice(0,8)} classification=${profileData.classification} — no OCR in workflow → needs_architecture_review`);
+    }
+  }
+
+  // ── 8. Mark as profiled (or needs_architecture_review) ───────────────────
   await supabase.from('documents').update({
-    status:        'profiled',
+    status:        finalStatus,
     error_message: null,
-    // chunk_count stays 0 — no final chunks yet
+    profile_data:  profileData,
   }).eq('id', documentId);
 
-  console.log(`[documents/upload] DONE docId=${documentId.slice(0,8)} status=profiled (no chunks yet)`);
+  console.log(`[documents/upload] DONE docId=${documentId.slice(0,8)} status=${finalStatus} (no chunks yet)`);
 
   // Return document metadata
-  res.json({
-    id:          documentId,
-    file_name:   req.file.originalname,
-    size_bytes:  req.file.size,
-    chunk_count: 0,
-    status:      'profiled',
-  });
+  const responseBody = {
+    id:                  documentId,
+    file_name:           req.file.originalname,
+    size_bytes:          req.file.size,
+    chunk_count:         0,
+    status:              finalStatus,
+    profile_data:        profileData,
+  };
+
+  // Surface needs_architecture_review to the client clearly
+  if (finalStatus === 'needs_architecture_review') {
+    responseBody.needs_ocr    = true;
+    responseBody.classification = profileData?.classification;
+    responseBody.message = `Document classified as ${profileData?.classification}. ` +
+      `Your current workflow does not include an OCR node. ` +
+      `Use the Architect to add OCR support before this document can be indexed.`;
+  }
+
+  res.json(responseBody);
 }
 
 // ─── POST /api/documents/:id/index ───────────────────────────────────────────

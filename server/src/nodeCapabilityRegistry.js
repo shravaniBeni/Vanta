@@ -164,13 +164,13 @@ export const NODE_REGISTRY = {
     type:                    'OCR',
     label:                   'OCR Layer',
     category:                'Processing',
-    runtime_status:          'unavailable',
+    runtime_status:          'supported',
     input_types:             ['documents'],
     output_types:            ['documents'],
     affects_ingestion:        true,
     affects_query_runtime:    false,
     requires_reindex_on_change: true,
-    description:             'Optical character recognition for scanned documents. Coming soon.',
+    description:             'Optical character recognition for scanned/image-heavy documents. Uses pdfjs-dist + Tesseract.js (local WASM).',
   },
 
   Translator: {

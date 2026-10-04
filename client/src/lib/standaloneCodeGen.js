@@ -38,7 +38,7 @@ const CLIENT_REGISTRY = {
   DocumentProcessor: { runtime_status: 'experimental' },
   WebCrawler:        { runtime_status: 'unavailable'  },
   VoiceRecognition:  { runtime_status: 'unavailable'  },
-  OCR:               { runtime_status: 'unavailable'  },
+  OCR:               { runtime_status: 'supported'    },
   Translator:        { runtime_status: 'unavailable'  },
   DataFilter:        { runtime_status: 'unavailable'  },
   DataValidation:    { runtime_status: 'unavailable'  },

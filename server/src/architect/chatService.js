@@ -115,9 +115,9 @@ export async function buildArchitectContext(ragApp) {
   try {
     const { data: docs } = await supabase
       .from('documents')
-      .select('id, file_name, mime_type, status, chunk_count')
+      .select('id, file_name, mime_type, status, chunk_count, profile_data')
       .eq('rag_app_id', ragApp.id)
-      .in('status', ['profiled', 'indexed']);
+      .in('status', ['profiled', 'indexed', 'needs_architecture_review']);
     documents = docs || [];
   } catch { /* non-fatal */ }
 
@@ -161,10 +161,11 @@ export async function buildArchitectContext(ragApp) {
     },
     capability_registry: registry,
     documents: documents.map(d => ({
-      file_name:   d.file_name,
-      mime_type:   d.mime_type,
-      status:      d.status,
-      chunk_count: d.chunk_count,
+      file_name:    d.file_name,
+      mime_type:    d.mime_type,
+      status:       d.status,
+      chunk_count:  d.chunk_count,
+      profile_data: d.profile_data ?? null,
     })),
     knowledge_profile: knowledgeProfile,
   };
@@ -299,7 +300,17 @@ ${draftConnList}`;
 
   // ── Document section ──────────────────────────────────────────────────────
   const docSection = ctx.documents.length > 0
-    ? ctx.documents.map(d => `  - ${d.file_name} (${d.status}, ${d.chunk_count ?? 0} chunks)`).join('\n')
+    ? ctx.documents.map(d => {
+        const profileNote = d.profile_data?.classification
+          ? ` [${d.profile_data.classification}` +
+            (d.profile_data.signals?.scanned_pages > 0
+              ? ` — ${d.profile_data.signals.scanned_pages}/${d.profile_data.signals.page_count} scanned pages`
+              : '') +
+            ']'
+          : '';
+        const reviewNote = d.status === 'needs_architecture_review' ? ' ⚠ NEEDS ARCHITECTURE REVIEW (no OCR in workflow)' : '';
+        return `  - ${d.file_name} (${d.status}, ${d.chunk_count ?? 0} chunks)${profileNote}${reviewNote}`;
+      }).join('\n')
     : '  (no indexed documents)';
 
   // ── Stale-draft warning ───────────────────────────────────────────────────
@@ -451,6 +462,13 @@ export function buildContextAcknowledgement(ctx) {
     msg += ` You also have a draft with ${ctx.draft_workflow.node_count} nodes (no semantic changes from active detected).`;
   } else {
     msg += ` No draft changes are saved yet.`;
+  }
+
+  // Highlight any documents that need architecture review
+  const reviewDocs = (ctx.documents || []).filter(d => d.status === 'needs_architecture_review');
+  if (reviewDocs.length > 0) {
+    const names = reviewDocs.map(d => `"${d.file_name}" (${d.profile_data?.classification ?? 'unknown'})`).join(', ');
+    msg += `\n\nNote: ${reviewDocs.length} document(s) need architecture review because they appear to be scanned or image-heavy: ${names}. The current workflow does not include an OCR node. I can propose adding OCR if you'd like these documents to be indexed.`;
   }
 
   return msg;
