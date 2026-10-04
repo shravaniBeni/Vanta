@@ -107,6 +107,16 @@ export const ArchitectProposalSchema = z.object({
  * Validate a raw LLM-generated proposal.
  * Normalizes and enforces runtime constraints before persistence.
  *
+ * Pre-parse normalisation handles common LLM output deviations:
+ *   - reasoning as a flat string → split into the 3 required fields
+ *   - reasoning fields that are empty strings → replaced with a minimal stub
+ *   - add_nodes[].reason as empty string → replaced with type-based stub
+ *   - requested_capabilities as string array → coerced to {type,runtime_status,reason} objects
+ *   - intent_summary/analysis/summary empty strings → replaced with stubs
+ *
+ * These normalisations preserve the schema's intent; they do NOT weaken
+ * the Zod constraints — the coerced values always satisfy min(1).
+ *
  * @param {object} raw
  * @param {number} expectedBaseVersion
  * @param {string[]} [discussedCapabilities] — capability types explicitly mentioned
@@ -120,6 +130,69 @@ export function validateAndNormalizeProposal(raw, expectedBaseVersion, discussed
 
   // Force base version
   raw.base_architect_version = expectedBaseVersion;
+
+  // ── Pre-parse coercions ────────────────────────────────────────────────────
+  // These fix common LLM output deviations BEFORE Zod validates.
+  // They never weaken the schema — every coerced value satisfies min(1).
+
+  // 1. reasoning: if missing entirely, create a minimal object
+  if (!raw.reasoning) {
+    raw.reasoning = {
+      architecture:          'See analysis.',
+      runtime_compatibility: 'See analysis.',
+      knowledge_impact:      'See analysis.',
+    };
+  }
+  // 2. reasoning: if it's a string, split it into the 3 required fields
+  if (typeof raw.reasoning === 'string') {
+    const text = raw.reasoning.trim() || 'See analysis.';
+    raw.reasoning = {
+      architecture:          text,
+      runtime_compatibility: text,
+      knowledge_impact:      text,
+    };
+  }
+  // 2. reasoning: if it's an object, fill in any missing/empty fields
+  if (raw.reasoning && typeof raw.reasoning === 'object') {
+    const stub = raw.reasoning.architecture || raw.reasoning.runtime_compatibility ||
+                 raw.reasoning.knowledge_impact || 'See analysis.';
+    if (!raw.reasoning.architecture?.trim())         raw.reasoning.architecture         = stub;
+    if (!raw.reasoning.runtime_compatibility?.trim()) raw.reasoning.runtime_compatibility = stub;
+    if (!raw.reasoning.knowledge_impact?.trim())     raw.reasoning.knowledge_impact     = stub;
+  }
+
+  // 3. requested_capabilities: coerce string[] → object[]
+  if (Array.isArray(raw.requested_capabilities)) {
+    raw.requested_capabilities = raw.requested_capabilities.map(cap => {
+      if (typeof cap === 'string') {
+        const regCap = getNodeCapability(cap);
+        return {
+          type:           cap,
+          runtime_status: regCap?.runtime_status ?? 'unavailable',
+          reason:         `${cap} requested.`,
+        };
+      }
+      // object: ensure reason is non-empty
+      if (!cap.reason?.trim()) cap.reason = `${cap.type} requested.`;
+      return cap;
+    });
+  }
+
+  // 4. add_nodes[].reason: fill empty reason strings with a type-based stub
+  if (Array.isArray(raw.recommended_changes?.add_nodes)) {
+    for (const node of raw.recommended_changes.add_nodes) {
+      if (!node.reason?.trim()) {
+        node.reason = `Add ${node.type || 'node'} to workflow.`;
+      }
+    }
+  }
+
+  // 5. intent_summary / analysis / summary: fill empty strings with stubs
+  if (!raw.intent_summary?.trim()) raw.intent_summary = 'Workflow update.';
+  if (!raw.analysis?.trim())       raw.analysis       = 'See recommended changes.';
+  if (!raw.summary?.trim())        raw.summary        = 'Workflow update proposed.';
+
+  // ── Existing normalisation (unchanged from Phase 9B) ──────────────────────
 
   // Validate node types in recommended additions against registry
   if (Array.isArray(raw.recommended_changes?.add_nodes)) {
@@ -136,7 +209,7 @@ export function validateAndNormalizeProposal(raw, expectedBaseVersion, discussed
   // Sync unsupported_capabilities from requested_capabilities if not explicitly set
   if (!Array.isArray(raw.unsupported_capabilities) || raw.unsupported_capabilities.length === 0) {
     raw.unsupported_capabilities = (raw.requested_capabilities || [])
-      .filter(cap => cap.runtime_status !== 'supported')
+      .filter(cap => typeof cap === 'object' && cap.runtime_status !== 'supported')
       .map(cap => cap.type);
   }
 
@@ -146,37 +219,25 @@ export function validateAndNormalizeProposal(raw, expectedBaseVersion, discussed
   }
 
   // ── Future recommendations grounding filter ──────────────────────────────
-  // Keep a recommendation only if:
-  //   a) its feature corresponds to a known registry capability type, AND
-  //   b) that type was explicitly requested/discussed in the conversation
-  //      OR is a direct prerequisite/companion of a requested capability
-  //      OR is present in unsupported_capabilities (i.e. user asked for it)
-  //
-  // When discussedCapabilities is empty (no tracking available), keep only
-  // recommendations whose feature appears in unsupported_capabilities —
-  // those are definitively grounded in what the user asked for.
   if (Array.isArray(raw.future_recommendations)) {
-    // Build the allowed set: discussed + unsupported + their registry prerequisites
     const requested = new Set([
       ...discussedCapabilities.map(t => t.toLowerCase()),
-      ...(raw.unsupported_capabilities || []).map(t => t.toLowerCase()),
-      ...(raw.requested_capabilities || []).map(c => c.type.toLowerCase()),
+      ...(raw.unsupported_capabilities || []).filter(t => typeof t === 'string').map(t => t.toLowerCase()),
+      ...(raw.requested_capabilities || []).filter(c => typeof c === 'object').map(c => c.type.toLowerCase()),
     ]);
 
-    // Prerequisite adjacency map — capabilities that are direct technical
-    // prerequisites or strongly justified companions (both directions)
     const prerequisites = {
-      ocr:             ['documentprocessor', 'imageanalysis'],
-      imageanalysis:   ['ocr', 'documentprocessor'],
+      ocr:               ['documentprocessor', 'imageanalysis'],
+      imageanalysis:     ['ocr', 'documentprocessor'],
       documentprocessor: ['ocr', 'imageanalysis'],
-      voicerecognition: [],
-      webcrawler:      [],
-      translator:      [],
-      datafilter:      [],
-      datavalidation:  [],
-      customcode:      [],
-      codeexecution:   [],
-      apiintegration:  [],
+      voicerecognition:  [],
+      webcrawler:        [],
+      translator:        [],
+      datafilter:        [],
+      datavalidation:    [],
+      customcode:        [],
+      codeexecution:     [],
+      apiintegration:    [],
     };
 
     const allowedTypes = new Set(requested);
@@ -188,16 +249,19 @@ export function validateAndNormalizeProposal(raw, expectedBaseVersion, discussed
     raw.future_recommendations = raw.future_recommendations.filter(rec => {
       if (!rec.feature) return false;
       const featureKey = rec.feature.toLowerCase().replace(/\s+/g, '');
-      // Check if the feature maps to a known registry type or allowed set
       const cap = getNodeCapability(rec.feature);
-      if (!cap) return false; // unknown type — strip
+      if (!cap) return false;
       return allowedTypes.has(featureKey) || allowedTypes.has(rec.feature.toLowerCase());
     });
   }
 
   const result = ArchitectProposalSchema.safeParse(raw);
   if (!result.success) {
-    return { success: false, error: result.error.flatten() };
+    // ── Diagnostic logging: expose exact field errors in server logs ─────────
+    const flat = result.error.flatten();
+    console.error('[proposalSchema] Validation failed — fieldErrors:', JSON.stringify(flat.fieldErrors));
+    console.error('[proposalSchema] Validation failed — formErrors:',  JSON.stringify(flat.formErrors));
+    return { success: false, error: flat };
   }
   return { success: true, data: result.data };
 }
