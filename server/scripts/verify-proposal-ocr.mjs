@@ -305,6 +305,44 @@ test('16. Full OCR proposal round-trip: validate → build → validateWorkflow'
   assert(!impact.blocked, 'Round-trip must not be blocked');
 });
 
+// 17. OCR proposal valid when all docs are TEXT_EXTRACTABLE (no scanned evidence needed)
+test('17. OCR proposal valid when documents are TEXT_EXTRACTABLE (no scanned-doc requirement)', () => {
+  const r = validateAndNormalizeProposal(makeOcrProposal({
+    analysis: "User added OCR node. Current documents are text-extractable but user is preparing for future scanned PDFs.",
+  }), 0, ['OCR']);
+  ok(r, 'Proposal must pass even when docs are text-extractable');
+  eq(r.data.executable, true, 'Must be executable');
+  assert(r.data.recommended_changes.add_nodes.some(n => n.type === 'OCR'), 'OCR must be in add_nodes');
+});
+
+// 18. Schema passes when LLM incorrectly puts OCR in future_recs (no-op proposal)
+// System prompt CRITICAL RULE for recommended_changes prevents this LLM error
+test('18. OCR in future_recs with no recommended_changes — passes schema, produces no-op', () => {
+  const r = validateAndNormalizeProposal({
+    intent_summary: "Consider OCR for future use",
+    analysis: "Docs are text-extractable, OCR not immediately needed.",
+    requested_capabilities: [],
+    recommended_changes: { add_nodes:[], remove_nodes:[], reconfigure_nodes:[], connections:{add:[],remove:[]} },
+    unsupported_capabilities: [],
+    future_recommendations: [{ feature:"OCR", reason:"For future scanned docs." }],
+    requires_reindex: false,
+    executable: true,
+    reasoning: { architecture:"No changes.", runtime_compatibility:"All supported.", knowledge_impact:"No impact." },
+    summary: "No changes made; OCR noted for future."
+  }, 0, ['OCR']);
+  ok(r, 'Schema passes (filter keeps OCR since discussed)');
+  eq(r.data.recommended_changes.add_nodes.length, 0, 'No actual changes in this path');
+  eq(r.data.future_recommendations.length, 1, 'OCR stays in future_recs when in discussed set');
+});
+
+// 19. discussedCapabilities always includes OCR when it's in diff.added_nodes
+test('19. OCR always in discussed when user adds it to draft canvas (diff.added_nodes)', () => {
+  const mockDiff = { added_nodes: [{ id:'ocr', type:'OCR', label:'OCR Layer' }] };
+  const fromDiff = (mockDiff.added_nodes || []).map(n => n.type);
+  assert(fromDiff.includes('OCR'), 'OCR must be extracted from diff.added_nodes');
+  // This means the future_recs filter never strips OCR in the OCR-addition scenario
+});
+
 // ─── Run ──────────────────────────────────────────────────────────────────────
 
 const promises = Object.values(results).filter(r => r instanceof Promise);

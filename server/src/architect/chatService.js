@@ -403,6 +403,15 @@ CRITICAL JSON RULES:
 - "unsupported_capabilities" must be an empty array [] if all requested capabilities are supported.
 - OCR is a SUPPORTED capability in the current Vanta runtime. If the user added OCR, set executable=true.
 
+CRITICAL RULE FOR recommended_changes:
+If the user has explicitly added a node to the draft canvas (visible in the DIFF section above),
+that node MUST appear in recommended_changes.add_nodes in the proposal.
+Do NOT move a node from the diff to future_recommendations merely because the current documents
+don't appear to require it. The user's explicit canvas action is the authoritative intent signal.
+For example: if the diff shows OCR was added, the proposal MUST add OCR in recommended_changes,
+even if all current documents are text-extractable. The user may be preparing for future scanned docs.
+future_recommendations is for capabilities NOT yet in the draft — never for nodes the user already added.
+
 STRICT RULE FOR future_recommendations:
 Only include a capability in future_recommendations if it meets at least one of these criteria:
   1. The user explicitly requested or discussed it in this conversation.
