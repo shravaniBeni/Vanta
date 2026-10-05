@@ -62,15 +62,15 @@ export async function invokeLLMChat(messages, model, temperature = 0.7) {
 
 /**
  * Call LLM and parse a JSON response.
- * max_tokens: 4096 — sufficient for structured Architect plan + follow-up
- * question JSON output. gpt-4o-mini default is 16384 which burns credits.
+ * max_tokens: 2048 — sufficient for structured Architect plan + follow-up
+ * question JSON output. Reduced from 4096 to stay within credit limits.
  * Throws a descriptive error if the LLM returns malformed JSON.
  */
 export async function invokeLLMJson(prompt) {
   const resp = await openai.chat.completions.create({
     model:           DEFAULT_JSON_MODEL,
     temperature:     0.3,
-    max_tokens:      4096,
+    max_tokens:      2048,
     response_format: { type: 'json_object' },
     messages: [
       { role: 'system', content: 'You are a helpful assistant that always responds with valid JSON.' },
@@ -88,8 +88,8 @@ export async function invokeLLMJson(prompt) {
 
 /**
  * Call LLM with a full messages array and force JSON output.
- * max_tokens: 4096 — sufficient for structured proposal JSON output.
- * gpt-4o-mini default is 16384 which was triggering 402 credit errors.
+ * max_tokens: 2048 — sufficient for structured proposal JSON output.
+ * Reduced from 4096 to stay within OpenRouter credit limits.
  *
  * @param {Array<{role:string, content:string}>} messages
  * @param {number} [temperature]
@@ -99,7 +99,7 @@ export async function invokeLLMJsonChat(messages, temperature = 0.3) {
   const resp = await openai.chat.completions.create({
     model:           DEFAULT_JSON_MODEL,
     temperature,
-    max_tokens:      4096,
+    max_tokens:      2048,
     response_format: { type: 'json_object' },
     messages,
   });
