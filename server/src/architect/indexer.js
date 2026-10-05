@@ -144,14 +144,18 @@ export async function indexDocumentWithPlan(documentId, ragAppId, userId) {
   } else {
     // Standard text extraction path — unchanged
     try {
-      // Check profile to guard against silently indexing scanned documents
-      const { data: docRow } = await supabase
-        .from('documents')
-        .select('profile_data')
-        .eq('id', documentId)
-        .single();
+      // Check profile to guard against silently indexing scanned documents.
+      // If profile_data column doesn't exist yet (migration 009 pending), skip check.
+      let classification = null;
+      try {
+        const { data: docRow } = await supabase
+          .from('documents')
+          .select('profile_data')
+          .eq('id', documentId)
+          .single();
+        classification = docRow?.profile_data?.classification ?? null;
+      } catch { /* profile_data column not yet added — skip OCR classification check */ }
 
-      const classification = docRow?.profile_data?.classification;
       if (classificationNeedsOcr(classification)) {
         const err = new Error(
           `[indexer] Document "${doc.file_name}" is classified as ${classification} ` +

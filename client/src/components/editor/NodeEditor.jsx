@@ -7,7 +7,7 @@ import { useAppTheme } from '@/lib/ThemeContext';
 const NODE_META = {
   DocumentUpload:    { icon: FileText,      color: '#3b82f6', bg: 'rgba(59,130,246,0.12)',  border: 'rgba(59,130,246,0.5)',  status: 'supported'    },
   WebCrawler:        { icon: Globe,         color: '#06b6d4', bg: 'rgba(6,182,212,0.12)',   border: 'rgba(6,182,212,0.5)',   status: 'unavailable'  },
-  OCR:               { icon: ScanText,      color: '#10b981', bg: 'rgba(16,185,129,0.12)',  border: 'rgba(16,185,129,0.5)',  status: 'unavailable'  },
+  OCR:               { icon: ScanText,      color: '#10b981', bg: 'rgba(16,185,129,0.12)',  border: 'rgba(16,185,129,0.5)',  status: 'supported'    },
   VoiceRecognition:  { icon: Mic,           color: '#ec4899', bg: 'rgba(236,72,153,0.12)',  border: 'rgba(236,72,153,0.5)',  status: 'unavailable'  },
   TextSplitter:      { icon: Scissors,      color: '#22c55e', bg: 'rgba(34,197,94,0.12)',   border: 'rgba(34,197,94,0.5)',   status: 'supported'    },
   DataFilter:        { icon: Filter,        color: '#a78bfa', bg: 'rgba(167,139,250,0.12)',  border: 'rgba(167,139,250,0.5)',  status: 'unavailable'  },

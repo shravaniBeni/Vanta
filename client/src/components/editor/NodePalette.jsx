@@ -12,7 +12,7 @@ const NODE_PALETTE_DEFS = [
   { type: 'WebCrawler',        label: 'Web Crawler',      icon: Globe,         color: '#22d3ee', bg: 'rgba(34,211,238,0.10)',  category: 'Input',       status: 'unavailable'  },
   { type: 'VoiceRecognition',  label: 'Voice to Text',    icon: Mic,           color: '#c084fc', bg: 'rgba(192,132,252,0.10)', category: 'Input',       status: 'unavailable'  },
   { type: 'DocumentProcessor', label: 'Doc Processor',    icon: FileSearch,    color: '#38bdf8', bg: 'rgba(56,189,248,0.10)',  category: 'Processing',  status: 'experimental' },
-  { type: 'OCR',               label: 'OCR Layer',        icon: ScanText,      color: '#34d399', bg: 'rgba(52,211,153,0.10)',  category: 'Processing',  status: 'unavailable'  },
+  { type: 'OCR',               label: 'OCR Layer',        icon: ScanText,      color: '#34d399', bg: 'rgba(52,211,153,0.10)',  category: 'Processing',  status: 'supported'    },
   { type: 'TextSplitter',      label: 'Text Splitter',    icon: Scissors,      color: '#4ade80', bg: 'rgba(74,222,128,0.10)',  category: 'Processing',  status: 'supported'    },
   { type: 'DataFilter',        label: 'Data Filter',      icon: Filter,        color: '#a78bfa', bg: 'rgba(167,139,250,0.10)', category: 'Processing',  status: 'unavailable'  },
   { type: 'DataValidation',    label: 'Data Validation',  icon: ShieldCheck,   color: '#86efac', bg: 'rgba(134,239,172,0.10)', category: 'Processing',  status: 'unavailable'  },
