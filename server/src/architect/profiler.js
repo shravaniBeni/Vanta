@@ -263,9 +263,9 @@ export async function profileDocuments(ragAppId) {
   // Accept profiled + indexed — both have original files in Storage
   const { data: docs, error: docsErr } = await supabase
     .from('documents')
-    .select('id, file_name, size_bytes, mime_type, chunk_count, status, storage_path')
+    .select('id, file_name, size_bytes, mime_type, chunk_count, status, storage_path, profile_data')
     .eq('rag_app_id', ragAppId)
-    .in('status', ['profiled', 'indexed', 'indexing']);
+    .in('status', ['profiled', 'indexed', 'indexing', 'needs_architecture_review']);
 
   if (docsErr) throw new Error(`[profiler] Failed to fetch documents: ${docsErr.message}`);
 
@@ -372,6 +372,26 @@ export async function profileDocuments(ragAppId) {
     average_document_length: avgDocLength,
     language:                signals.language,
     structure_type:          structureType,
+    // ── Phase 10A: per-document OCR classification ─────────────────────────
+    // Aggregate scan profile from documents.profile_data (set during upload).
+    // This tells the Initial Architect which documents need OCR before indexing.
+    document_scan_profiles:  docs.map(d => ({
+      file_name:       d.file_name,
+      classification:  d.profile_data?.classification ?? null,
+      page_count:      d.profile_data?.signals?.page_count ?? null,
+      scanned_pages:   d.profile_data?.signals?.scanned_pages ?? null,
+      text_pages:      d.profile_data?.signals?.text_pages ?? null,
+      needs_ocr:       d.status === 'needs_architecture_review' ||
+                       (d.profile_data?.classification === 'SCANNED') ||
+                       (d.profile_data?.classification === 'MIXED') ||
+                       (d.profile_data?.classification === 'IMAGE_HEAVY'),
+    })),
+    ocr_required:  docs.some(d =>
+      d.status === 'needs_architecture_review' ||
+      d.profile_data?.classification === 'SCANNED' ||
+      d.profile_data?.classification === 'MIXED' ||
+      d.profile_data?.classification === 'IMAGE_HEAVY'
+    ),
     signals: {
       heading_density:           signals.heading_density,
       has_markdown_headings:     signals.has_markdown_headings,

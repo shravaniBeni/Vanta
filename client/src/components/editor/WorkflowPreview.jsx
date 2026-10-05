@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
-import { X, Send, Bot, User, MessageSquare } from 'lucide-react';
-import { chatApi } from '@/api/apiClient';
+import { X, Send, Bot, User, MessageSquare, AlertTriangle, Info } from 'lucide-react';
+import { chatApi, documentsApi } from '@/api/apiClient';
 import { useAppTheme } from '@/lib/ThemeContext';
 
 
@@ -25,6 +25,22 @@ export default function WorkflowPreview({ chatbot, onClose }) {
   const [loading, setLoading] = useState(false);
   const bottomRef = useRef(null);
   const { C } = useAppTheme();
+
+  // ── Document status check ─────────────────────────────────────────────────
+  const [docStatus, setDocStatus] = useState(null); // null = loading, object = result
+
+  useEffect(() => {
+    let cancelled = false;
+    documentsApi.list(chatbot.id).then(docs => {
+      if (cancelled) return;
+      const indexed   = docs.filter(d => d.status === 'indexed');
+      const reviewing = docs.filter(d => d.status === 'needs_architecture_review');
+      const processing= docs.filter(d => ['indexing','profiling','profiled','uploaded'].includes(d.status));
+      const errored   = docs.filter(d => d.status === 'error');
+      setDocStatus({ total: docs.length, indexed, reviewing, processing, errored });
+    }).catch(() => setDocStatus({ total: 0, indexed: [], reviewing: [], processing: [], errored: [] }));
+    return () => { cancelled = true; };
+  }, [chatbot.id]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -96,6 +112,57 @@ export default function WorkflowPreview({ chatbot, onClose }) {
           <X size={14} />
         </button>
       </div>
+
+      {/* Document status banner */}
+      {docStatus && (
+        (() => {
+          // CASE A: no documents at all
+          if (docStatus.total === 0) return (
+            <div style={{ padding:'7px 14px', background: C.bgSub, borderBottom:`1px solid ${C.border}`, display:'flex', alignItems:'center', gap:7, flexShrink:0 }}>
+              <Info size={11} color={C.t3} />
+              <span style={{ fontSize:10, color:C.t3, fontFamily:'JetBrains Mono, monospace' }}>No knowledge sources have been uploaded yet.</span>
+            </div>
+          );
+          // CASE B: documents need architecture review (scanned + no OCR)
+          if (docStatus.reviewing.length > 0 && docStatus.indexed.length === 0) return (
+            <div style={{ padding:'7px 14px', background:'rgba(251,191,36,0.07)', borderBottom:`1px solid rgba(251,191,36,0.2)`, display:'flex', alignItems:'flex-start', gap:7, flexShrink:0 }}>
+              <AlertTriangle size={11} color='#fbbf24' style={{ marginTop:1, flexShrink:0 }} />
+              <span style={{ fontSize:10, color:'#fbbf24', fontFamily:'JetBrains Mono, monospace', lineHeight:1.5 }}>
+                {docStatus.reviewing.length} document{docStatus.reviewing.length > 1 ? 's' : ''} uploaded but not indexed — {docStatus.reviewing.length > 1 ? 'they appear' : 'it appears'} to be scanned and requires OCR before it can be searched. Review and approve the architecture plan to continue.
+              </span>
+            </div>
+          );
+          // CASE C: some documents still processing
+          if (docStatus.processing.length > 0 && docStatus.indexed.length === 0) return (
+            <div style={{ padding:'7px 14px', background: C.accentBg, borderBottom:`1px solid ${C.panelBorder}`, display:'flex', alignItems:'center', gap:7, flexShrink:0 }}>
+              <div style={{ width:10, height:10, border:`2px solid ${C.accent}`, borderTopColor:'transparent', borderRadius:'50%', animation:'spin 0.7s linear infinite', flexShrink:0 }} />
+              <span style={{ fontSize:10, color:C.accentLt, fontFamily:'JetBrains Mono, monospace' }}>
+                {docStatus.processing.length} document{docStatus.processing.length > 1 ? 's' : ''} currently being processed…
+              </span>
+            </div>
+          );
+          // CASE E: all errored
+          if (docStatus.errored.length > 0 && docStatus.indexed.length === 0) return (
+            <div style={{ padding:'7px 14px', background:'rgba(239,68,68,0.07)', borderBottom:`1px solid rgba(239,68,68,0.2)`, display:'flex', alignItems:'center', gap:7, flexShrink:0 }}>
+              <AlertTriangle size={11} color='#ef4444' style={{ flexShrink:0 }} />
+              <span style={{ fontSize:10, color:'#fca5a5', fontFamily:'JetBrains Mono, monospace' }}>
+                {docStatus.errored.length} document{docStatus.errored.length > 1 ? 's' : ''} failed to process. Check the Knowledge Source node for details.
+              </span>
+            </div>
+          );
+          // Mixed: some indexed, some pending
+          if (docStatus.indexed.length > 0 && (docStatus.reviewing.length + docStatus.processing.length) > 0) return (
+            <div style={{ padding:'7px 14px', background:'rgba(251,191,36,0.07)', borderBottom:`1px solid rgba(251,191,36,0.2)`, display:'flex', alignItems:'center', gap:7, flexShrink:0 }}>
+              <Info size={11} color='#fbbf24' />
+              <span style={{ fontSize:10, color:'#fbbf24', fontFamily:'JetBrains Mono, monospace' }}>
+                {docStatus.indexed.length} indexed · {docStatus.reviewing.length + docStatus.processing.length} pending. Answers may be incomplete.
+              </span>
+            </div>
+          );
+          return null;
+        })()
+      )}
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
 
       {/* Messages */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '14px', display: 'flex', flexDirection: 'column', gap: 12 }}>

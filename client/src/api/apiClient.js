@@ -133,6 +133,9 @@ export const documentsApi = {
   /** Delete a single document by ID (chunks + Storage object + row). */
   delete: (docId) => request('DELETE', `/api/documents/${docId}`),
 
+  /** Reprocess a document using the current active workflow (OCR-aware). */
+  reprocess: (docId) => request('POST', `/api/documents/${docId}/reprocess`),
+
   /** Delete ALL documents for a RAG app. Use with caution. */
   clear: (chatbotId) => request('DELETE', `/api/documents/app/${chatbotId}`),
 

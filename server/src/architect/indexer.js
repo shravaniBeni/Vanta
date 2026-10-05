@@ -281,7 +281,7 @@ export async function indexDocumentWithPlan(documentId, ragAppId, userId) {
  */
 export async function indexAllDocumentsWithPlan(ragAppId, userId, { force = false } = {}) {
   const statuses = force
-    ? ['profiled', 'indexed', 'error']
+    ? ['profiled', 'indexed', 'error', 'needs_architecture_review']
     : ['profiled'];
 
   const { data: docs, error } = await supabase

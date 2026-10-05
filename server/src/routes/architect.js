@@ -422,6 +422,7 @@ router.post('/build-pipeline', async (req, res) => {
 
     // Index all docs with the approved plan
     // force=true replaces legacy chunks (no architect_version) with plan-consistent chunks
+    // Also picks up needs_architecture_review docs now that OCR is in the workflow
     const indexResult = await indexAllDocumentsWithPlan(rag_app_id, req.user.id, { force: true });
 
     res.json({

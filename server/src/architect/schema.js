@@ -77,6 +77,10 @@ export const ArchitectPlanSchema = z.object({
   domain:            z.string().min(1),
   use_case:          z.string().min(1),
   knowledge_profile: KnowledgeProfileSchema,
+  // Phase 10A: OCR flag — set by planner when scanned/image-heavy docs detected.
+  // When true, workflowBuilder inserts OCR between DocumentUpload and TextSplitter.
+  requires_ocr:      z.boolean().default(false),
+  ocr_reason:        z.string().optional().default(''),
   chunking:          ChunkingSchema,
   embedding:         EmbeddingSchema,
   retrieval:         RetrievalSchema,
@@ -92,6 +96,14 @@ export const ArchitectPlanSchema = z.object({
  */
 export function normalizeRawPlan(raw) {
   if (!raw || typeof raw !== 'object') return raw;
+
+  // Phase 10A: Ensure requires_ocr is a boolean (LLM may omit it or return a string)
+  if (typeof raw.requires_ocr !== 'boolean') {
+    raw.requires_ocr = raw.requires_ocr === 'true' || raw.requires_ocr === true;
+  }
+  if (typeof raw.ocr_reason !== 'string') {
+    raw.ocr_reason = '';
+  }
 
   // Force fixed runtime values regardless of what the LLM returned
   if (raw.embedding) {

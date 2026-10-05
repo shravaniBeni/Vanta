@@ -286,6 +286,47 @@ router.post('/:id/index', async (req, res) => {
   }
 });
 
+// ─── POST /api/documents/:id/reprocess ───────────────────────────────────────
+// Part 9/12: Reprocess a document using the current active workflow.
+// Unlike /index, this works even when architect_status != 'approved'
+// by reading active workflow nodes directly (for chatbots already built).
+// Routes OCR or standard extraction based on active workflow and profile_data.
+
+router.post('/:id/reprocess', async (req, res) => {
+  try {
+    const { data: doc, error: docErr } = await supabase
+      .from('documents')
+      .select('id, rag_app_id, status, file_name, storage_path, profile_data')
+      .eq('id', req.params.id)
+      .single();
+
+    if (docErr || !doc) return res.status(404).json({ error: 'Document not found' });
+
+    const ragApp = await getOwnedRagApp(doc.rag_app_id, req.user.id);
+    if (!ragApp) return res.status(404).json({ error: 'Document not found' });
+
+    // Allow reprocess regardless of architect_status if workflow nodes exist
+    if (!ragApp.nodes || !Array.isArray(ragApp.nodes) || ragApp.nodes.length === 0) {
+      return res.status(400).json({
+        error: 'No active workflow found. Build a RAG pipeline first before reprocessing documents.',
+      });
+    }
+
+    // indexDocumentWithPlan requires architect_status = 'approved'
+    // For chatbots with an already-built active workflow we can call it directly
+    const result = await indexDocumentWithPlan(doc.id, doc.rag_app_id, req.user.id);
+
+    res.json({
+      id:          doc.id,
+      status:      'indexed',
+      chunk_count: result.chunk_count,
+    });
+  } catch (err) {
+    console.error('[documents/reprocess]', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ─── POST /api/documents/:id/signed-url ──────────────────────────────────────
 
 router.post('/:id/signed-url', async (req, res) => {

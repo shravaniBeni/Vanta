@@ -1,7 +1,8 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { X, Settings, Upload, FileText, Trash2, AlertCircle } from 'lucide-react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { X, Settings, Upload, FileText, Trash2, AlertCircle, RefreshCw, ScanText, CheckCircle, Clock, XCircle, MessageSquare, Plus } from 'lucide-react';
 import { documentsApi } from '@/api/apiClient';
 import { useAppTheme } from '@/lib/ThemeContext';
+import { createPageUrl } from '@/utils';
 
 // inputStyle / labelStyle / selectStyle are now functions of C, called inside the component
 function makeStyles(C) {
@@ -73,6 +74,243 @@ function Toggle({ checked, onChange, C }) {
         transition: 'left 0.2s',
       }} />
     </button>
+  );
+}
+
+// ─── KnowledgeSourceManager ───────────────────────────────────────────────────
+// Parts 7–11: Persistent, live document manager for the DocumentUpload node.
+// Shows all documents for the chatbot, supports add/delete/reprocess.
+// New uploads use the active workflow to determine OCR/indexing path.
+
+function KnowledgeSourceManager({ chatbotId, C }) {
+  const [docs, setDocs]           = useState([]);
+  const [loading, setLoading]     = useState(true);
+  const [uploading, setUploading] = useState(false);
+  const [error, setError]         = useState('');
+  const fileInputRef              = useRef(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const data = await documentsApi.list(chatbotId);
+      setDocs(data || []);
+    } catch (err) {
+      setError('Failed to load documents: ' + err.message);
+    } finally {
+      setLoading(false);
+    }
+  }, [chatbotId]);
+
+  useEffect(() => { load(); }, [load]);
+
+  // Stats
+  const indexed    = docs.filter(d => d.status === 'indexed');
+  const reviewing  = docs.filter(d => d.status === 'needs_architecture_review');
+  const processing = docs.filter(d => ['indexing','profiling','profiled','uploaded'].includes(d.status));
+  const errored    = docs.filter(d => d.status === 'error');
+  const totalChunks = docs.reduce((s, d) => s + (d.chunk_count || 0), 0);
+
+  // Upload new document — uses existing documents/upload route
+  // The server determines OCR/indexing path from active workflow
+  const handleUpload = async (e) => {
+    const files = Array.from(e.target.files);
+    if (!files.length) return;
+    setUploading(true);
+    setError('');
+    for (const file of files) {
+      try {
+        await documentsApi.upload(file, chatbotId, 'knowledge-source');
+      } catch (err) {
+        setError(`Failed to upload ${file.name}: ${err.message}`);
+      }
+    }
+    setUploading(false);
+    e.target.value = '';
+    await load();
+  };
+
+  // Delete document
+  const handleDelete = async (docId) => {
+    try {
+      await documentsApi.delete(docId);
+      setDocs(prev => prev.filter(d => d.id !== docId));
+    } catch (err) {
+      setError('Delete failed: ' + err.message);
+    }
+  };
+
+  // Reprocess: re-index a document using current active workflow
+  const handleReprocess = async (docId) => {
+    setError('');
+    try {
+      await documentsApi.reprocess(docId);
+      await load();
+    } catch (err) {
+      setError('Reprocess failed: ' + err.message);
+    }
+  };
+
+  const formatSize = (b) => {
+    if (!b) return '';
+    if (b < 1024 * 1024) return `${(b / 1024).toFixed(1)} KB`;
+    return `${(b / (1024 * 1024)).toFixed(1)} MB`;
+  };
+
+  // Per-document status icon + color
+  const statusInfo = (doc) => {
+    switch (doc.status) {
+      case 'indexed':
+        return { icon: <CheckCircle size={10} />, color: C.green, label: `${doc.chunk_count || 0} chunks` };
+      case 'needs_architecture_review':
+        return { icon: <ScanText size={10} />, color: '#fbbf24', label: `${doc.profile_data?.classification ?? 'scanned'} · OCR required` };
+      case 'indexing':
+        return { icon: <RefreshCw size={10} style={{ animation:'spin 0.7s linear infinite' }} />, color: C.accentLt, label: 'indexing…' };
+      case 'profiled':
+        return { icon: <Clock size={10} />, color: C.t3, label: 'waiting for pipeline' };
+      case 'error':
+        return { icon: <XCircle size={10} />, color: '#ef4444', label: doc.error_message?.slice(0, 40) || 'error' };
+      default:
+        return { icon: <Clock size={10} />, color: C.t3, label: doc.status };
+    }
+  };
+
+  return (
+    <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+
+      {/* Stats header */}
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'8px 10px', background:C.bgSub, borderRadius:8, border:`1px solid ${C.border}` }}>
+        <div>
+          <div style={{ fontSize:12, fontWeight:700, color:C.t1 }}>Knowledge Source</div>
+          <div style={{ fontSize:10, color:C.t3, fontFamily:'JetBrains Mono, monospace', marginTop:2 }}>
+            {docs.length} document{docs.length !== 1 ? 's' : ''} · {totalChunks.toLocaleString()} chunks
+          </div>
+        </div>
+        <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+          {indexed.length > 0 && (
+            <span style={{ fontSize:9, color:C.green, fontFamily:'JetBrains Mono, monospace' }}>✓ {indexed.length} indexed</span>
+          )}
+          {reviewing.length > 0 && (
+            <span style={{ fontSize:9, color:'#fbbf24', fontFamily:'JetBrains Mono, monospace' }}>⚠ {reviewing.length} OCR</span>
+          )}
+          <button onClick={load} title="Refresh" style={{ background:'transparent', border:'none', cursor:'pointer', color:C.t3, padding:2, borderRadius:4 }}
+            onMouseEnter={e => e.currentTarget.style.color = C.t1}
+            onMouseLeave={e => e.currentTarget.style.color = C.t3}
+          >
+            <RefreshCw size={11} />
+          </button>
+        </div>
+      </div>
+
+      {/* Error */}
+      {error && (
+        <div style={{ padding:'6px 8px', background:'rgba(239,68,68,0.08)', border:'1px solid rgba(239,68,68,0.25)', borderRadius:6, display:'flex', alignItems:'center', gap:5 }}>
+          <AlertCircle size={10} color="#ef4444" />
+          <span style={{ fontSize:9, color:'#fca5a5', flex:1, fontFamily:'JetBrains Mono, monospace', lineHeight:1.4 }}>{error}</span>
+          <button onClick={() => setError('')} style={{ background:'transparent', border:'none', cursor:'pointer', color:'#ef4444', fontSize:10 }}>✕</button>
+        </div>
+      )}
+
+      {/* Document list */}
+      {loading ? (
+        <div style={{ display:'flex', alignItems:'center', gap:6, padding:'6px 0' }}>
+          <div style={{ width:10, height:10, border:`2px solid ${C.accent}`, borderTopColor:'transparent', borderRadius:'50%', animation:'spin 0.7s linear infinite' }} />
+          <span style={{ fontSize:10, color:C.t3, fontFamily:'JetBrains Mono, monospace' }}>Loading…</span>
+        </div>
+      ) : docs.length === 0 ? (
+        <p style={{ fontSize:10, color:C.t3, fontFamily:'JetBrains Mono, monospace', textAlign:'center', padding:'8px 0', margin:0 }}>
+          No documents yet. Add some below.
+        </p>
+      ) : (
+        <div style={{ display:'flex', flexDirection:'column', gap:5, maxHeight:200, overflowY:'auto' }}>
+          {docs.map(doc => {
+            const si = statusInfo(doc);
+            const canReprocess = ['error','needs_architecture_review','profiled'].includes(doc.status);
+            return (
+              <div key={doc.id} style={{
+                display:'flex', alignItems:'flex-start', gap:7, padding:'7px 9px',
+                background: doc.status === 'error' ? 'rgba(239,68,68,0.04)'
+                          : doc.status === 'needs_architecture_review' ? 'rgba(251,191,36,0.04)'
+                          : C.bgSub,
+                border: `1px solid ${doc.status === 'error' ? 'rgba(239,68,68,0.2)'
+                          : doc.status === 'needs_architecture_review' ? 'rgba(251,191,36,0.2)'
+                          : C.border}`,
+                borderRadius: 7,
+              }}>
+                <FileText size={11} color={si.color} style={{ flexShrink:0, marginTop:1 }} />
+                <div style={{ flex:1, minWidth:0 }}>
+                  <div style={{ fontSize:10, color:C.t1, fontWeight:500, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                    {doc.file_name}
+                  </div>
+                  <div style={{ display:'flex', alignItems:'center', gap:5, marginTop:2 }}>
+                    <span style={{ color:si.color }}>{si.icon}</span>
+                    <span style={{ fontSize:9, color:si.color, fontFamily:'JetBrains Mono, monospace' }}>{si.label}</span>
+                    {doc.size_bytes > 0 && (
+                      <span style={{ fontSize:9, color:C.t3, fontFamily:'JetBrains Mono, monospace' }}>· {formatSize(doc.size_bytes)}</span>
+                    )}
+                  </div>
+                </div>
+                <div style={{ display:'flex', gap:3, flexShrink:0 }}>
+                  {canReprocess && (
+                    <button onClick={() => handleReprocess(doc.id)} title="Reprocess with current workflow"
+                      style={{ background:'transparent', border:'none', cursor:'pointer', color:C.t3, padding:2, borderRadius:3 }}
+                      onMouseEnter={e => e.currentTarget.style.color = C.accentLt}
+                      onMouseLeave={e => e.currentTarget.style.color = C.t3}
+                    >
+                      <RefreshCw size={10} />
+                    </button>
+                  )}
+                  <button onClick={() => handleDelete(doc.id)} title="Remove document"
+                    style={{ background:'transparent', border:'none', cursor:'pointer', color:C.t3, padding:2, borderRadius:3 }}
+                    onMouseEnter={e => e.currentTarget.style.color = '#ef4444'}
+                    onMouseLeave={e => e.currentTarget.style.color = C.t3}
+                  >
+                    <Trash2 size={10} />
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Add documents */}
+      <div>
+        <input
+          ref={fileInputRef}
+          type="file"
+          multiple
+          accept=".pdf,.docx,.doc,.txt,.md,.csv"
+          style={{ display:'none' }}
+          onChange={handleUpload}
+        />
+        <button
+          onClick={() => fileInputRef.current?.click()}
+          disabled={uploading}
+          style={{
+            width:'100%', padding:'9px 0', borderRadius:8,
+            border:`1px dashed ${C.borderHi}`, background:C.accentBg,
+            cursor: uploading ? 'wait' : 'pointer',
+            display:'flex', alignItems:'center', justifyContent:'center', gap:6,
+            color: C.accentLt, fontSize:11, fontWeight:600, transition:'all 0.15s',
+          }}
+          onMouseEnter={e => { if(!uploading) e.currentTarget.style.background = `rgba(109,40,217,0.14)`; }}
+          onMouseLeave={e => e.currentTarget.style.background = C.accentBg}
+        >
+          {uploading ? (
+            <>
+              <div style={{ width:12, height:12, border:`2px solid ${C.accent}`, borderTopColor:'transparent', borderRadius:'50%', animation:'spin 0.7s linear infinite' }} />
+              Uploading…
+            </>
+          ) : (
+            <><Plus size={12} /> Add documents</>
+          )}
+        </button>
+        <p style={{ fontSize:8, color:C.t3, fontFamily:'JetBrains Mono, monospace', textAlign:'center', marginTop:4, lineHeight:1.4 }}>
+          New documents use the current active workflow · PDF, DOCX, TXT, CSV
+        </p>
+      </div>
+    </div>
   );
 }
 
@@ -167,156 +405,17 @@ export default function NodeProperties({ node, chatbotId, onUpdate, onClose }) {
   const renderParams = () => {
     switch (node.type) {
       case 'DocumentUpload':
-        // For Architect-generated workflows (params.documents from workflowBuilder),
-        // show the persisted document list from the knowledge source node params.
-        if (params.architect_version !== undefined && Array.isArray(params.documents)) {
-          return (
-            <>
-              <Field C={C} label="Knowledge Source">
-                <div style={{ ...inputStyle, color: '#3b82f6' }}>
-                  RAG App Knowledge Base
-                </div>
-              </Field>
-              <Field C={C} label={`Documents (${params.documents.length})`}>
-                {params.documents.length === 0 ? (
-                  <p style={{ fontSize: 10, color: C.t3, fontFamily: 'JetBrains Mono, monospace', margin: 0 }}>
-                    // No documents indexed
-                  </p>
-                ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-                    {params.documents.map((doc, i) => {
-                      const statusColor = doc.status === 'indexed' ? '#22c55e'
-                        : doc.status === 'profiled' ? C.accent
-                        : doc.status === 'error' ? '#ef4444' : C.accentLt;
-                      return (
-                        <div key={doc.id || i} style={{
-                          display: 'flex', alignItems: 'center', gap: 7,
-                          padding: '6px 9px',
-                          background: 'rgba(59,130,246,0.06)',
-                          border: '1px solid rgba(59,130,246,0.2)',
-                          borderRadius: 7,
-                        }}>
-                          <FileText size={11} color="#3b82f6" style={{ flexShrink: 0 }} />
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ fontSize: 10, color: C.t1, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                              {doc.file_name}
-                            </div>
-                            <div style={{ fontSize: 9, color: C.t3, fontFamily: 'JetBrains Mono, monospace' }}>
-                              {doc.status}
-                              {doc.chunk_count > 0 ? ` · ${doc.chunk_count} chunks` : ''}
-                            </div>
-                          </div>
-                          <div style={{ width: 6, height: 6, borderRadius: '50%', background: statusColor, boxShadow: `0 0 5px ${statusColor}`, flexShrink: 0 }} />
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </Field>
-              <div style={{ padding: '6px 8px', background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.15)', borderRadius: 7, marginTop: 4 }}>
-                <p style={{ fontSize: 9, color: C.t2, fontFamily: 'JetBrains Mono, monospace', margin: 0 }}>
-                  Architect v{params.architect_version} · {params.document_count || 0} document(s). Manage knowledge in the Architect onboarding screen.
-                </p>
-              </div>
-              <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-            </>
-          );
+        // ── Architect-generated workflows: live persistent document manager ──
+        // Both architect-generated (params.architect_version set) and plain nodes
+        // use the same live manager when chatbotId is present.
+        if (chatbotId) {
+          return <KnowledgeSourceManager chatbotId={chatbotId} C={C} />;
         }
-        // Legacy / non-architect DocumentUpload — original upload UI
+        // Fallback: no chatbotId (shouldn't happen in practice)
         return (
-          <>
-            <Field C={C} label="Upload Documents">
-              <input
-                ref={fileInputRef}
-                type="file"
-                multiple
-                accept=".pdf,.docx,.doc,.txt,.ppt,.pptx,.csv,.xlsx,.xls,.png,.jpg,.jpeg,.gif,.webp,.md"
-                style={{ display: 'none' }}
-                onChange={handleFileUpload}
-              />
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                disabled={uploading}
-                style={{
-                  width: '100%', padding: '18px 12px',
-                  background: C.accentBg,
-                  border: `1px dashed ${C.borderHi}`,
-                  borderRadius: 9, cursor: uploading ? 'wait' : 'pointer',
-                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
-                  transition: 'all 0.15s',
-                }}
-                onMouseEnter={e => { if (!uploading) e.currentTarget.style.background = `rgba(109,40,217,0.14)`; }}
-                onMouseLeave={e => e.currentTarget.style.background = C.accentBg}
-              >
-                {uploading ? (
-                  <>
-                    <div style={{ width: 18, height: 18, border: `2px solid ${C.accent}`, borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
-                    <span style={{ fontSize: 11, color: C.accent, fontFamily: 'JetBrains Mono, monospace' }}>Uploading...</span>
-                  </>
-                ) : (
-                  <>
-                    <Upload size={18} color={C.accent} />
-                    <span style={{ fontSize: 11, color: C.t2 }}>Click to upload files</span>
-                    <span style={{ fontSize: 9, color: C.t3, fontFamily: 'JetBrains Mono, monospace' }}>PDF, DOCX, TXT, PPT, CSV, images...</span>
-                  </>
-                )}
-              </button>
-            </Field>
-
-            {docsLoading && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 0' }}>
-                <div style={{ width: 12, height: 12, border: `2px solid ${C.accent}`, borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
-                <span style={{ fontSize: 10, color: C.t3, fontFamily: 'JetBrains Mono, monospace' }}>Loading documents...</span>
-              </div>
-            )}
-            {docsError && !docsLoading && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 8px', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)', borderRadius: 6, marginBottom: 8 }}>
-                <AlertCircle size={11} color="#ef4444" />
-                <span style={{ fontSize: 10, color: '#fca5a5' }}>{docsError}</span>
-              </div>
-            )}
-
-            {(params.uploaded_files || []).length > 0 && (
-              <Field C={C} label={`Files (${params.uploaded_files.length})`}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-                  {params.uploaded_files.map((f, i) => (
-                    <div key={f.id || i} style={{
-                      display: 'flex', alignItems: 'center', gap: 7,
-                      padding: '6px 9px',
-                      background: f.status === 'error' ? 'rgba(239,68,68,0.06)' : C.accentBg,
-                      border: `1px solid ${f.status === 'error' ? 'rgba(239,68,68,0.2)' : C.panelBorder}`,
-                      borderRadius: 7,
-                    }}>
-                      <FileText size={11} color={f.status === 'error' ? '#ef4444' : C.accent} style={{ flexShrink: 0 }} />
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 10, color: C.t1, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name}</div>
-                        <div style={{ fontSize: 9, color: C.t3, fontFamily: 'JetBrains Mono, monospace' }}>
-                          {formatSize(f.size)}
-                          {f.status === 'indexed' && f.chunks ? ` · ${f.chunks} chunks` : ''}
-                          {f.status === 'processing' ? ' · indexing...' : ''}
-                          {f.status === 'error' ? ` · error` : ''}
-                        </div>
-                      </div>
-                      <button onClick={() => removeFile(i)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: C.t3, padding: 0, flexShrink: 0 }}
-                        onMouseEnter={e => e.currentTarget.style.color = '#ef4444'}
-                        onMouseLeave={e => e.currentTarget.style.color = C.t3}
-                      >
-                        <Trash2 size={11} />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </Field>
-            )}
-
-            {!docsLoading && (params.uploaded_files || []).length === 0 && !docsError && (
-              <p style={{ fontSize: 10, color: C.t3, fontFamily: 'JetBrains Mono, monospace', textAlign: 'center', marginTop: 4 }}>
-                // No documents yet
-              </p>
-            )}
-
-            <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-          </>
+          <p style={{ fontSize: 11, color: C.t3, fontFamily: 'JetBrains Mono, monospace' }}>
+            // Connect to a chatbot to manage documents.
+          </p>
         );
 
       case 'OCR':
