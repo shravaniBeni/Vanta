@@ -69,6 +69,8 @@ export function buildCandidateWorkflow(activeNodes, activeConnections, proposal)
   // ── Step 2: Add nodes ──────────────────────────────────────────────────────
   const existingIds = new Set(nodes.map(n => n.id));
   const addedTypePositions = { x: 80, y: 500 }; // new nodes placed below main pipeline
+  // Map: nodeType → newly generated ID (for type-string connection resolution)
+  const newTypeToId = {};
 
   for (const addSpec of (changes.add_nodes || [])) {
     const cap = getNodeCapability(addSpec.type);
@@ -87,6 +89,9 @@ export function buildCandidateWorkflow(activeNodes, activeConnections, proposal)
     });
     addedTypePositions.x += 240; // space them out
     existingIds.add(newId);
+    // Track type → generated ID so connection proposals using type strings can resolve
+    newTypeToId[addSpec.type]            = newId;
+    newTypeToId[addSpec.type.toLowerCase()] = newId;
   }
 
   // ── Step 3: Reconfigure nodes ──────────────────────────────────────────────
@@ -106,16 +111,84 @@ export function buildCandidateWorkflow(activeNodes, activeConnections, proposal)
   }
 
   // ── Step 5: Add connections ────────────────────────────────────────────────
+  // Resolve type-string endpoints to real node IDs.
+  // The LLM often writes {"from":"WebCrawler","to":"chunking"} — the new node's
+  // type string instead of its generated ID. Resolve those references here.
+  const finalIds   = new Set(nodes.map(n => n.id));
+  const typeToExistingId = Object.fromEntries(nodes.map(n => [n.type, n.id]));
+  const typeToExistingIdLc = Object.fromEntries(nodes.map(n => [n.type.toLowerCase(), n.id]));
+
+  function resolveEndpoint(ref) {
+    // Already a real ID
+    if (finalIds.has(ref)) return ref;
+    // Type string (exact match, case-insensitive)
+    return newTypeToId[ref] || newTypeToId[ref.toLowerCase()] ||
+           typeToExistingId[ref] || typeToExistingIdLc[ref.toLowerCase()] ||
+           null;
+  }
+
   const existingConnSet = new Set(connections.map(c => `${c.from}→${c.to}`));
   for (const addConn of (changes.connections?.add || [])) {
-    const key = `${addConn.from}→${addConn.to}`;
+    const fromId = resolveEndpoint(addConn.from);
+    const toId   = resolveEndpoint(addConn.to);
+    if (!fromId || !toId) {
+      console.warn(
+        `[proposalActivator] Connection skipped — could not resolve endpoints: ` +
+        `"${addConn.from}" → "${addConn.to}". ` +
+        `Available IDs: ${[...finalIds].slice(0, 10).join(', ')}`
+      );
+      continue;
+    }
+    const key = `${fromId}→${toId}`;
     if (!existingConnSet.has(key)) {
-      // Only add if both endpoints exist in the candidate nodes
-      const finalIds = new Set(nodes.map(n => n.id));
-      if (finalIds.has(addConn.from) && finalIds.has(addConn.to)) {
-        connections.push({ from: addConn.from, to: addConn.to });
-        existingConnSet.add(key);
-      }
+      connections.push({ from: fromId, to: toId });
+      existingConnSet.add(key);
+    }
+  }
+
+  // ── Step 6: Auto-connect orphaned ingestion-input nodes ───────────────────
+  // After applying all explicit connection changes, detect newly-added nodes
+  // that (a) are ingestion-input capable (output_types includes 'documents')
+  // (b) are not yet connected to anything (no outgoing connection)
+  // and auto-connect them to the first compatible downstream node in the graph.
+  // This is the safety net when the LLM omits the connection from its proposal.
+  for (const [typeStr, newId] of Object.entries(newTypeToId)) {
+    const cap = getNodeCapability(typeStr);
+    if (!cap) continue;
+
+    // Only handle nodes that produce 'documents' output and have no outgoing connections
+    const hasOutput    = cap.output_types && cap.output_types.length > 0;
+    const hasOutgoing  = connections.some(c => c.from === newId);
+    if (!hasOutput || hasOutgoing) continue;
+
+    // Find the best target: a node in the workflow whose input_types overlap
+    // with this node's output_types. Prefer the first one in execution order.
+    const candidateTargets = nodes
+      .filter(n => n.id !== newId)
+      .map(n => ({ n, cap: getNodeCapability(n.type) }))
+      .filter(({ cap: tc }) =>
+        tc &&
+        tc.input_types &&
+        tc.input_types.some(t => cap.output_types.includes(t)) &&
+        tc.runtime_status === 'supported'
+      );
+
+    if (candidateTargets.length === 0) continue;
+
+    // Pick the target that already has the most incoming connections (i.e., the
+    // established aggregation point in the pipeline — typically TextSplitter).
+    const incomingCount = (id) => connections.filter(c => c.to === id).length;
+    candidateTargets.sort((a, b) => incomingCount(b.n.id) - incomingCount(a.n.id));
+
+    const targetId = candidateTargets[0].n.id;
+    const autoKey  = `${newId}→${targetId}`;
+    if (!existingConnSet.has(autoKey)) {
+      console.log(
+        `[proposalActivator] Auto-connecting orphaned node ${typeStr} (${newId}) → ` +
+        `${candidateTargets[0].n.type} (${targetId})`
+      );
+      connections.push({ from: newId, to: targetId });
+      existingConnSet.add(autoKey);
     }
   }
 

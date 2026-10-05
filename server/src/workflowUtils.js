@@ -248,6 +248,24 @@ export function validateWorkflow(nodes, connections) {
     }
   }
 
+  // ── 7. Dangling nodes — ingestion-input nodes with no outgoing connections ─
+  // A node that produces output but has no downstream connection will silently
+  // contribute no data to the pipeline. Warn so the user can diagnose.
+  for (const node of nodes) {
+    const cap = getNodeCapability(node.type);
+    if (!cap) continue;
+    if (!cap.output_types || cap.output_types.length === 0) continue; // terminal node — OK
+
+    const hasOutgoing = connections.some(c => c.from === node.id);
+    if (!hasOutgoing && cap.runtime_status === 'supported') {
+      warnings.push(
+        `Node '${node.label || node.type}' (id=${node.id}) produces output ` +
+        `[${cap.output_types.join(', ')}] but has no downstream connection. ` +
+        `It will not contribute to the pipeline.`
+      );
+    }
+  }
+
   // structurally_valid: only structural/topological errors count (not unsupported capabilities)
   const structurally_valid = errors.length === 0;
 
