@@ -138,13 +138,13 @@ export const NODE_REGISTRY = {
     type:                    'WebCrawler',
     label:                   'Web Crawler',
     category:                'Input',
-    runtime_status:          'unavailable',
+    runtime_status:          'supported',
     input_types:             [],
     output_types:            ['documents'],
     affects_ingestion:        true,
     affects_query_runtime:    false,
     requires_reindex_on_change: false,
-    description:             'Web content ingestion. Coming soon.',
+    description:             'Crawls a website and ingests pages as searchable knowledge. Respects same-domain, max_pages, and depth limits.',
   },
 
   VoiceRecognition: {

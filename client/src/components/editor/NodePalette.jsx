@@ -9,7 +9,7 @@ import { useAppTheme } from '@/lib/ThemeContext';
 
 const NODE_PALETTE_DEFS = [
   { type: 'DocumentUpload',    label: 'Knowledge Source', icon: FileText,     color: '#60a5fa', bg: 'rgba(96,165,250,0.12)',  category: 'Input',       status: 'supported'    },
-  { type: 'WebCrawler',        label: 'Web Crawler',      icon: Globe,         color: '#22d3ee', bg: 'rgba(34,211,238,0.10)',  category: 'Input',       status: 'unavailable'  },
+  { type: 'WebCrawler',        label: 'Web Crawler',      icon: Globe,         color: '#22d3ee', bg: 'rgba(34,211,238,0.10)',  category: 'Input',       status: 'supported'    },
   { type: 'VoiceRecognition',  label: 'Voice to Text',    icon: Mic,           color: '#c084fc', bg: 'rgba(192,132,252,0.10)', category: 'Input',       status: 'unavailable'  },
   { type: 'DocumentProcessor', label: 'Doc Processor',    icon: FileSearch,    color: '#38bdf8', bg: 'rgba(56,189,248,0.10)',  category: 'Processing',  status: 'experimental' },
   { type: 'OCR',               label: 'OCR Layer',        icon: ScanText,      color: '#34d399', bg: 'rgba(52,211,153,0.10)',  category: 'Processing',  status: 'supported'    },

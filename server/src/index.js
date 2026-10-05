@@ -19,6 +19,7 @@ import projectRoutes       from './routes/projects.js';
 import architectRoutes     from './routes/architect.js';
 import workflowRoutes      from './routes/workflow.js';
 import architectChatRoutes from './routes/architectChat.js';
+import crawlRoutes         from './routes/crawl.js';
 
 const app  = express();
 const PORT = process.env.PORT || 3001;
@@ -83,6 +84,7 @@ app.use('/api/projects',       requireAuth,  projectRoutes);
 app.use('/api/architect',      requireAuth,  architectRoutes);
 app.use('/api/workflow',       requireAuth,  workflowRoutes);
 app.use('/api/architect-chat', requireAuth,  architectChatRoutes);
+app.use('/api/crawl',          requireAuth,  crawlRoutes);
 
 // ─── Global error handler ─────────────────────────────────────────────────────
 

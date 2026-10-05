@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { X, Settings, Upload, FileText, Trash2, AlertCircle, RefreshCw, ScanText, CheckCircle, Clock, XCircle, MessageSquare, Plus } from 'lucide-react';
-import { documentsApi } from '@/api/apiClient';
+import { X, Settings, Upload, FileText, Trash2, AlertCircle, RefreshCw, ScanText, CheckCircle, Clock, XCircle, MessageSquare, Plus, Globe, Loader } from 'lucide-react';
+import { documentsApi, crawlApi } from '@/api/apiClient';
 import { useAppTheme } from '@/lib/ThemeContext';
 import { createPageUrl } from '@/utils';
 
@@ -74,6 +74,213 @@ function Toggle({ checked, onChange, C }) {
         transition: 'left 0.2s',
       }} />
     </button>
+  );
+}
+
+// ─── WebCrawlerPanel ──────────────────────────────────────────────────────────
+// Full crawl UI: URL config + crawl trigger + indexed pages list
+
+function WebCrawlerPanel({ chatbotId, params, set, C, inputStyle }) {
+  const [crawling,   setCrawling]   = useState(false);
+  const [crawlResult, setCrawlResult] = useState(null);
+  const [crawlError,  setCrawlError]  = useState('');
+  const [pages,      setPages]      = useState([]);
+  const [loadingPages, setLoadingPages] = useState(false);
+
+  // Local form state (separate from node params to allow editing before crawl)
+  const [url,       setUrl]       = useState(params.url        || '');
+  const [maxPages,  setMaxPages]  = useState(params.max_pages  ?? 10);
+  const [depth,     setDepth]     = useState(params.depth      ?? 2);
+  const [sameDomain, setSameDomain] = useState(params.same_domain !== false);
+
+  // Load already-crawled pages on mount
+  useEffect(() => {
+    if (!chatbotId) return;
+    loadPages();
+  }, [chatbotId]);
+
+  const loadPages = useCallback(async () => {
+    if (!chatbotId) return;
+    setLoadingPages(true);
+    try {
+      const data = await crawlApi.status(chatbotId);
+      setPages(data.pages || []);
+    } catch { /* non-fatal */ }
+    finally { setLoadingPages(false); }
+  }, [chatbotId]);
+
+  const handleCrawl = async () => {
+    if (!url.trim()) { setCrawlError('Enter a URL to crawl.'); return; }
+    try { new URL(url.trim()); } catch { setCrawlError('Invalid URL.'); return; }
+    if (!chatbotId) { setCrawlError('Save the chatbot first.'); return; }
+
+    // Persist config to node params
+    set('url', url.trim());
+    set('max_pages', maxPages);
+    set('depth', depth);
+    set('same_domain', sameDomain);
+
+    setCrawling(true);
+    setCrawlError('');
+    setCrawlResult(null);
+
+    try {
+      const result = await crawlApi.start(chatbotId, {
+        url:        url.trim(),
+        max_pages:  maxPages,
+        depth_limit: depth,
+        same_domain: sameDomain,
+      });
+      setCrawlResult(result);
+      await loadPages();
+    } catch (err) {
+      setCrawlError(err.message);
+    } finally {
+      setCrawling(false);
+    }
+  };
+
+  const totalChunks = pages.reduce((s, p) => s + (p.chunk_count || 0), 0);
+
+  return (
+    <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+
+      {/* URL input */}
+      <div>
+        <label style={{ display:'block', fontSize:9, color:C.t3, fontFamily:'JetBrains Mono, monospace', textTransform:'uppercase', letterSpacing:'0.1em', marginBottom:5 }}>Seed URL</label>
+        <input
+          type="url"
+          value={url}
+          onChange={e => setUrl(e.target.value)}
+          placeholder="https://docs.example.com"
+          style={{ ...inputStyle, width:'100%' }}
+          onFocus={e => e.target.style.borderColor = C.borderHi}
+          onBlur={e => e.target.style.borderColor = C.inputBorder}
+        />
+      </div>
+
+      {/* Config row */}
+      <div style={{ display:'flex', gap:8 }}>
+        <div style={{ flex:1 }}>
+          <label style={{ display:'block', fontSize:9, color:C.t3, fontFamily:'JetBrains Mono, monospace', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:4 }}>Max Pages</label>
+          <input
+            type="number" min="1" max="50"
+            value={maxPages}
+            onChange={e => setMaxPages(Math.max(1, Math.min(50, parseInt(e.target.value) || 10)))}
+            style={{ ...inputStyle, width:'100%' }}
+          />
+        </div>
+        <div style={{ flex:1 }}>
+          <label style={{ display:'block', fontSize:9, color:C.t3, fontFamily:'JetBrains Mono, monospace', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:4 }}>Depth</label>
+          <input
+            type="number" min="0" max="5"
+            value={depth}
+            onChange={e => setDepth(Math.max(0, Math.min(5, parseInt(e.target.value) || 2)))}
+            style={{ ...inputStyle, width:'100%' }}
+          />
+        </div>
+      </div>
+
+      {/* Same-domain toggle */}
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+        <span style={{ fontSize:10, color:C.t2, fontFamily:'JetBrains Mono, monospace' }}>Same domain only</span>
+        <button
+          onClick={() => setSameDomain(d => !d)}
+          style={{
+            width:32, height:18, borderRadius:9,
+            background: sameDomain ? C.accent : C.bgSub,
+            border:`1px solid ${sameDomain ? C.accent : C.border}`,
+            cursor:'pointer', position:'relative', flexShrink:0, transition:'all 0.2s',
+          }}
+        >
+          <div style={{
+            width:12, height:12, background:'white', borderRadius:'50%',
+            position:'absolute', top:2, left: sameDomain ? 16 : 2, transition:'left 0.2s',
+          }} />
+        </button>
+      </div>
+
+      {/* Error */}
+      {crawlError && (
+        <div style={{ padding:'6px 8px', background:'rgba(239,68,68,0.08)', border:'1px solid rgba(239,68,68,0.25)', borderRadius:6, display:'flex', alignItems:'center', gap:5 }}>
+          <AlertCircle size={10} color="#ef4444" />
+          <span style={{ fontSize:9, color:'#fca5a5', flex:1, fontFamily:'JetBrains Mono, monospace', lineHeight:1.4 }}>{crawlError}</span>
+          <button onClick={() => setCrawlError('')} style={{ background:'transparent', border:'none', cursor:'pointer', color:'#ef4444', fontSize:9 }}>✕</button>
+        </div>
+      )}
+
+      {/* Crawl result */}
+      {crawlResult && !crawlError && (
+        <div style={{ padding:'7px 9px', background:'rgba(34,197,94,0.07)', border:'1px solid rgba(34,197,94,0.2)', borderRadius:6 }}>
+          <p style={{ fontSize:9, color:'#86efac', fontFamily:'JetBrains Mono, monospace', margin:0, lineHeight:1.5 }}>
+            ✓ {crawlResult.pages_crawled} pages · {crawlResult.chunks_indexed} chunks indexed
+            {crawlResult.errors?.length > 0 && ` · ${crawlResult.errors.length} errors`}
+          </p>
+        </div>
+      )}
+
+      {/* Crawl button */}
+      <button
+        onClick={handleCrawl}
+        disabled={crawling || !url.trim()}
+        style={{
+          width:'100%', padding:'9px 0', borderRadius:8,
+          background: crawling || !url.trim() ? C.surface : 'linear-gradient(135deg, #06b6d4, #0891b2)',
+          border: crawling || !url.trim() ? `1px solid ${C.border}` : 'none',
+          color: crawling || !url.trim() ? C.t3 : '#fff',
+          cursor: crawling || !url.trim() ? 'not-allowed' : 'pointer',
+          display:'flex', alignItems:'center', justifyContent:'center', gap:6,
+          fontSize:11, fontWeight:700, transition:'all 0.15s',
+          boxShadow: crawling || !url.trim() ? 'none' : '0 0 14px rgba(6,182,212,0.3)',
+        }}
+      >
+        {crawling ? (
+          <><div style={{ width:11, height:11, border:'2px solid rgba(255,255,255,0.3)', borderTopColor:'#fff', borderRadius:'50%', animation:'spin 0.7s linear infinite' }} /> Crawling...</>
+        ) : (
+          <><Globe size={12} /> Start Crawl</>
+        )}
+      </button>
+
+      {/* Indexed pages */}
+      {(pages.length > 0 || loadingPages) && (
+        <div>
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:5 }}>
+            <span style={{ fontSize:9, color:C.t3, fontFamily:'JetBrains Mono, monospace', textTransform:'uppercase', letterSpacing:'0.08em' }}>
+              {pages.length} pages · {totalChunks} chunks
+            </span>
+            <button onClick={loadPages} style={{ background:'transparent', border:'none', cursor:'pointer', color:C.t3, padding:2 }}
+              onMouseEnter={e => e.currentTarget.style.color = C.t1}
+              onMouseLeave={e => e.currentTarget.style.color = C.t3}
+            >
+              <RefreshCw size={10} />
+            </button>
+          </div>
+          {loadingPages ? (
+            <div style={{ display:'flex', alignItems:'center', gap:5, padding:'4px 0' }}>
+              <div style={{ width:10, height:10, border:`2px solid ${C.accent}`, borderTopColor:'transparent', borderRadius:'50%', animation:'spin 0.7s linear infinite' }} />
+              <span style={{ fontSize:9, color:C.t3, fontFamily:'JetBrains Mono, monospace' }}>Loading…</span>
+            </div>
+          ) : (
+            <div style={{ display:'flex', flexDirection:'column', gap:4, maxHeight:150, overflowY:'auto' }}>
+              {pages.map(p => (
+                <div key={p.id} style={{ display:'flex', alignItems:'center', gap:6, padding:'4px 7px', background:C.bgSub, border:`1px solid ${C.border}`, borderRadius:5 }}>
+                  <Globe size={9} color="#22d3ee" style={{ flexShrink:0 }} />
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <div style={{ fontSize:9, color:C.t1, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{p.title}</div>
+                  </div>
+                  <span style={{ fontSize:8, color:C.t3, fontFamily:'JetBrains Mono, monospace', flexShrink:0 }}>{p.chunk_count}c</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      <p style={{ fontSize:8, color:C.t3, fontFamily:'JetBrains Mono, monospace', margin:0, lineHeight:1.4 }}>
+        Crawls HTML pages · max 50 pages · same-domain by default · 300 ms delay
+      </p>
+    </div>
   );
 }
 
@@ -439,16 +646,9 @@ export default function NodeProperties({ node, chatbotId, onUpdate, onClose }) {
           </Field>
         );
       case 'WebCrawler':
-        return (
-          <>
-            <Field C={C} label="Max Pages">
-              <input type="number" style={inputStyle} value={params.max_pages || 10} onChange={e => set('max_pages', parseInt(e.target.value))} />
-            </Field>
-            <Field C={C} label="Depth Limit">
-              <input type="number" style={inputStyle} value={params.depth || 2} onChange={e => set('depth', parseInt(e.target.value))} />
-            </Field>
-          </>
-        );
+        return <WebCrawlerPanel chatbotId={chatbotId} params={params} set={set} C={C} inputStyle={inputStyle} />;
+
+
       case 'Translator':
         return (
           <Field C={C} label="Target Language">
@@ -680,6 +880,7 @@ export default function NodeProperties({ node, chatbotId, onUpdate, onClose }) {
                   <div key={ft} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                     <span style={{ fontSize: 11, color: C.t2 }}>{ft}</span>
                     <Toggle
+                      C={C}
                       checked={params[`allow_${ft.toLowerCase()}`] !== false}
                       onChange={v => set(`allow_${ft.toLowerCase()}`, v)}
                     />

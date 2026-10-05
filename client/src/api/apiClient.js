@@ -252,6 +252,18 @@ export const architectChatApi = {
     request('DELETE', `/api/architect-chat/${ragAppId}/cancel`),
 };
 
+// ─── Web Crawler ──────────────────────────────────────────────────────────────
+
+export const crawlApi = {
+  /** Start a crawl — embeds pages directly into the RAG app's vector store */
+  start: (ragAppId, params) =>
+    request('POST', '/api/crawl/start', { rag_app_id: ragAppId, ...params }),
+
+  /** Get crawl history (web pages indexed) for a RAG app */
+  status: (ragAppId) =>
+    request('GET', `/api/crawl/status/${ragAppId}`),
+};
+
 export const chatApi = {
   // Public deployed/embed chatbot
   sendPublic: (embedId, query, sessionId) =>
