@@ -63,7 +63,7 @@ router.get('/', async (req, res) => {
 
     const { data, error } = await supabase
       .from('documents')
-      .select('id, rag_app_id, node_id, file_name, mime_type, size_bytes, chunk_count, status, error_message, profile_data, created_at')
+      .select('id, rag_app_id, node_id, file_name, mime_type, size_bytes, chunk_count, status, error_message, created_at')
       .eq('rag_app_id', rag_app_id)
       .order('created_at', { ascending: true });
 
@@ -72,7 +72,21 @@ router.get('/', async (req, res) => {
       return res.status(500).json({ error: 'Failed to fetch documents' });
     }
 
-    res.json(data ?? []);
+    // Try to enrich with profile_data if the column exists (added in migration 009)
+    let enriched = data ?? [];
+    try {
+      const { data: withProfile, error: profileErr } = await supabase
+        .from('documents')
+        .select('id, profile_data')
+        .eq('rag_app_id', rag_app_id);
+
+      if (!profileErr && withProfile) {
+        const profileMap = Object.fromEntries(withProfile.map(d => [d.id, d.profile_data]));
+        enriched = enriched.map(d => ({ ...d, profile_data: profileMap[d.id] ?? null }));
+      }
+    } catch { /* migration 009 not yet applied — profile_data unavailable, non-fatal */ }
+
+    res.json(enriched);
   } catch (err) {
     console.error('[documents GET /]', err.message);
     res.status(500).json({ error: 'Failed to fetch documents' });
@@ -224,11 +238,20 @@ async function handleUpload(req, res) {
   }
 
   // ── 8. Mark as profiled (or needs_architecture_review) ───────────────────
-  await supabase.from('documents').update({
-    status:        finalStatus,
-    error_message: null,
-    profile_data:  profileData,
-  }).eq('id', documentId);
+  // profile_data column requires migration 009 — update without it if column absent
+  try {
+    await supabase.from('documents').update({
+      status:        finalStatus,
+      error_message: null,
+      profile_data:  profileData,
+    }).eq('id', documentId);
+  } catch {
+    // Fallback: migration 009 not applied yet — update without profile_data
+    await supabase.from('documents').update({
+      status:        finalStatus,
+      error_message: null,
+    }).eq('id', documentId);
+  }
 
   console.log(`[documents/upload] DONE docId=${documentId.slice(0,8)} status=${finalStatus} (no chunks yet)`);
 
