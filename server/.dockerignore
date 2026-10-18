@@ -1,0 +1,44 @@
+# ─── Vanta Server — .dockerignore ────────────────────────────────────────────
+# Excludes files that must NOT be copied into the Docker image.
+
+# Never copy secrets into the image
+.env
+.env.*
+!.env.example
+
+# Developer machine node_modules — the Dockerfile runs `npm ci` inside the image
+# to get platform-correct binaries (linux/amd64 for sharp, etc.)
+node_modules/
+
+# Windows-specific sharp binary — replaced by linux/amd64 version in image
+# (sharp selects the right binary at install time; this is belt-and-suspenders)
+node_modules/@img/sharp-win32-x64/
+
+# Local model cache — bake-model.mjs downloads inside the image during build
+# We do NOT want the Windows-downloaded cache files in the image
+data/
+
+# Git history
+.git/
+.gitignore
+
+# Development / build artifacts
+dist/
+*.log
+npm-debug.log*
+
+# OS artifacts
+.DS_Store
+Thumbs.db
+nul
+
+# Test and documentation
+scripts/verify-*.mjs
+scripts/verify-*.js
+DEPLOYMENT.md
+railway.toml
+Procfile
+
+# Editor
+.vscode/
+.idea/

@@ -10,7 +10,7 @@ import express from 'express';
 import cors from 'cors';
 import { requireAuth } from './middleware/auth.js';
 import { chatRateLimit, sessionRateLimit, feedbackRateLimit, uploadRateLimit, generalRateLimit } from './middleware/rateLimit.js';
-import { loadEmbedder } from './embeddings.js';
+import { loadEmbedder, isEmbedderReady } from './embeddings.js';
 
 import chatbotRoutes       from './routes/chatbots.js';
 import messageRoutes       from './routes/messages.js';
@@ -73,6 +73,16 @@ app.use(express.json({ limit: '25mb' }));
 app.get('/api/health', (req, res) =>
   res.json({ status: 'ok', timestamp: new Date().toISOString() })
 );
+
+// Model-readiness health check — used by ECS startup probes and monitoring.
+// Returns 200 once the BGE embedder is loaded; 503 while still initialising.
+app.get('/api/health/model', (req, res) => {
+  if (isEmbedderReady()) {
+    return res.json({ model_ready: true, model: 'Xenova/bge-small-en-v1.5' });
+  }
+  return res.status(503).json({ model_ready: false, message: 'Model still loading' });
+});
+
 // Rate-limit public chat — 30 req/min per IP
 app.use('/api/chat', chatRateLimit, chatRoutes);
 

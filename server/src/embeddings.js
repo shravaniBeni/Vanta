@@ -96,7 +96,7 @@ export async function loadEmbedder() {
 
   const t0 = Date.now();
   try {
-    _embedder = await pipeline('feature-extraction', MODEL_ID);
+    _embedder = await pipeline('feature-extraction', MODEL_ID, { dtype: 'fp32' });
     console.log(`[embeddings] ${MODEL_ID} ready in ${((Date.now() - t0) / 1000).toFixed(1)}s`);
   } catch (err) {
     console.error(`[embeddings] Failed to load ${MODEL_ID}: ${err.message}`);
