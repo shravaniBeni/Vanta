@@ -149,7 +149,7 @@ loadEmbedder()
     const killed = killStaleOnPort(PORT);
     if (killed) await new Promise(r => setTimeout(r, 500));
 
-    app.listen(PORT, () => {
+    app.listen(PORT, '0.0.0.0', () => {
       console.log(`\n🚀 Vanta server → http://localhost:${PORT}`);
       console.log(`   Health: http://localhost:${PORT}/api/health`);
       console.log(`   Auth:   GET http://localhost:${PORT}/api/me\n`);
