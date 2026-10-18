@@ -62,6 +62,8 @@ function formatApp(row) {
     draft_nodes:       row.draft_nodes       ?? null,
     draft_connections: row.draft_connections ?? null,
     draft_updated_at:  row.draft_updated_at  ?? null,
+    // Phase 10B: UI configuration (separate from RAG workflow)
+    ui_config:         row.ui_config         ?? null,
     created_at:        row.created_at,
     updated_at:        row.updated_at,
   };
@@ -83,7 +85,7 @@ router.get('/', async (req, res) => {
       // Must be deployed. Return only minimal public-safe fields.
       const { data, error } = await supabase
         .from('rag_apps')
-        .select('id, title, description, embed_id, nodes, connections, status')
+        .select('id, title, description, embed_id, nodes, connections, status, ui_config')
         .eq('embed_id', embed_id)
         .eq('status', 'deployed')
         .single();
@@ -103,6 +105,7 @@ router.get('/', async (req, res) => {
         nodes:       data.nodes       ?? [],
         connections: data.connections ?? [],
         status:      data.status,
+        ui_config:   data.ui_config   ?? null,
       }]);
     }
 

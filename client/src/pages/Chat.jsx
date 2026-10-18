@@ -1,46 +1,63 @@
+/**
+ * client/src/pages/Chat.jsx
+ *
+ * Phase 10B: Public deployed chat renders using the chatbot's ui_config.
+ * Phase 10C: Session persistence across turns + helpful/unhelpful feedback.
+ *
+ * Session lifecycle:
+ *   - On first load, session_token is null.
+ *   - After every response, the server returns a session_token.
+ *   - The token is stored in sessionStorage (tab-scoped, not persisted across tabs).
+ *   - Subsequent messages send the token back so the server can resume the session.
+ *   - This gives each browser tab an independent, isolated conversation.
+ */
+
 import React, { useState, useEffect, useRef } from 'react';
-import ReactMarkdown from 'react-markdown';
-import { Send, Loader2, Zap, ZapOff } from 'lucide-react';
-import { chatbotsApi, chatApi } from '@/api/apiClient';
+import { Zap, ZapOff, ThumbsUp, ThumbsDown } from 'lucide-react';
+import { chatbotsApi, chatApi, analyticsApi } from '@/api/apiClient';
 import DiagnosticPanel from '../components/diagnostic/DiagnosticPanel';
 import { runDiagnostics, buildTelemetry } from '../components/diagnostic/ragDiagnostics';
 import { useAppTheme } from '@/lib/ThemeContext';
+import { resolveUiConfig } from '@/lib/uiConfig';
+import WidgetRenderer from '../components/widget/WidgetRenderer';
 
-
-const mdComponentsChat = {
-  p:      ({ node, ...p }) => <p style={{ margin: '0 0 5px 0', lineHeight: 1.65 }} {...p} />,
-  strong: ({ node, ...p }) => <strong style={{ fontWeight: 700 }} {...p} />,
-  em:     ({ node, ...p }) => <em style={{ fontStyle: 'italic' }} {...p} />,
-  code:   ({ node, inline, children, ...p }) => inline
-    ? <code style={{ background: 'rgba(99,102,241,0.18)', padding: '1px 5px', borderRadius: 4, fontSize: '0.88em', fontFamily: 'JetBrains Mono, monospace' }}>{children}</code>
-    : <pre style={{ background: '#060a10', borderRadius: 8, padding: '10px', marginTop: 6, overflow: 'auto' }}><code style={{ fontSize: '0.85em', fontFamily: 'JetBrains Mono, monospace' }}>{children}</code></pre>,
-  ul:     ({ node, ...p }) => <ul style={{ margin: '4px 0', paddingLeft: 20, lineHeight: 1.65 }} {...p} />,
-  ol:     ({ node, ...p }) => <ol style={{ margin: '4px 0', paddingLeft: 20, lineHeight: 1.65 }} {...p} />,
-  li:     ({ node, ...p }) => <li style={{ marginBottom: 3 }} {...p} />,
-};
+// Session token persisted in sessionStorage (tab-scoped).
+// Key is per-embed-id so multiple embedded chatbots on the same page don't collide.
+function getStorageKey(embedId) {
+  return `vanta-session-${embedId}`;
+}
 
 export default function Chat() {
-  const [chatbot, setChatbot] = useState(null);
-  const [messages, setMessages] = useState([]);
-  const [input, setInput] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [amdLocal, setAmdLocal] = useState(false);
-  const messagesEndRef = useRef(null);
+  const [chatbot,      setChatbot]      = useState(null);
+  const [messages,     setMessages]     = useState([]);
+  const [input,        setInput]        = useState('');
+  const [loading,      setLoading]      = useState(false);
+  const [amdLocal,     setAmdLocal]     = useState(false);
+  const [sessionToken, setSessionToken] = useState(null);
   const { C } = useAppTheme();
 
   const embedId = new URLSearchParams(window.location.search).get('id');
 
+  // Restore session token from sessionStorage on mount
+  useEffect(() => {
+    if (embedId) {
+      const stored = sessionStorage.getItem(getStorageKey(embedId));
+      if (stored) setSessionToken(stored);
+    }
+  }, [embedId]);
+
   useEffect(() => { loadChatbot(); }, [embedId]);
-  useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
 
   const loadChatbot = async () => {
     try {
       const bots = await chatbotsApi.filter({ embed_id: embedId });
       if (bots.length > 0) {
-        setChatbot(bots[0]);
+        const bot = bots[0];
+        setChatbot(bot);
+        const uiCfg = resolveUiConfig(bot.ui_config ?? {});
         setMessages([{
-          role: 'assistant',
-          content: `Hi! I'm ${bots[0].title}. How can I help you today?`,
+          role:    'assistant',
+          content: uiCfg.chat_ui.messages.welcome_message ?? `Hi! I'm ${bot.title}. How can I help you today?`,
         }]);
       }
     } catch (err) {
@@ -48,43 +65,81 @@ export default function Chat() {
     }
   };
 
-  const handleSend = async () => {
-    if (!input.trim() || loading) return;
-    const query = input.trim();
+  const handleSend = async (text) => {
+    const query = (text ?? input).trim();
+    if (!query || loading) return;
     setMessages(prev => [...prev, { role: 'user', content: query }]);
     setInput('');
     setLoading(true);
 
     try {
-      // Use public embed path — server persists messages automatically
-      const result = await chatApi.sendPublic(embedId, query);
+      // Pass session_token so server can resume the session
+      const result = await chatApi.sendPublic(embedId, query, undefined, sessionToken);
+
+      // Persist the returned session_token for the next turn
+      if (result.session_token) {
+        setSessionToken(result.session_token);
+        if (embedId) {
+          sessionStorage.setItem(getStorageKey(embedId), result.session_token);
+        }
+      }
 
       const telemetry = buildTelemetry({
         query,
-        llmResponse: result.answer,
-        similarityScores: result.similarityScores || [],
-        retrievedChunks: result.retrievedChunks || [],
-        configUsed: result.telemetry?.configUsed || {},
+        llmResponse:      result.answer,
+        similarityScores: result.similarityScores ?? [],
+        retrievedChunks:  result.retrievedChunks  ?? [],
+        sourceMetadata:   [],
+        configUsed:       result.telemetry?.configUsed ?? {},
       });
-
       const diagnostics = runDiagnostics(telemetry);
 
       setMessages(prev => [...prev, {
-        role: 'assistant',
-        content: result.answer,
-        confidence: result.avgSimilarity,
+        role:                 'assistant',
+        content:              result.answer,
+        confidence:           result.avgSimilarity,
+        sources:              result.retrievedChunks?.slice(0, 3) ?? [],
         telemetry,
         diagnostics,
+        // Phase 10C: track interaction for feedback
+        interactionEventId:   result.interaction_event_id ?? null,
+        feedbackGiven:        null,   // null | true | false
       }]);
     } catch (err) {
       console.error('Chat error:', err);
       setMessages(prev => [...prev, {
-        role: 'assistant',
-        content: 'Sorry, something went wrong. Please try again.',
+        role:        'assistant',
+        content:     'Sorry, something went wrong. Please try again.',
         diagnostics: [],
       }]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Phase 10C: submit helpful/unhelpful feedback for a specific message
+  const handleFeedback = async (messageIndex, value) => {
+    const msg = messages[messageIndex];
+    if (!msg?.interactionEventId || msg.feedbackGiven !== null) return;
+
+    // Optimistic update
+    setMessages(prev => prev.map((m, i) =>
+      i === messageIndex ? { ...m, feedbackGiven: value } : m
+    ));
+
+    try {
+      await analyticsApi.submitFeedback({
+        session_token:        sessionToken,
+        interaction_event_id: msg.interactionEventId,
+        feedback_value:       value,
+        embed_id:             embedId,
+      });
+    } catch (err) {
+      // Roll back on failure
+      console.warn('Feedback submission failed:', err.message);
+      setMessages(prev => prev.map((m, i) =>
+        i === messageIndex ? { ...m, feedbackGiven: null } : m
+      ));
     }
   };
 
@@ -96,125 +151,65 @@ export default function Chat() {
     );
   }
 
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: C.bg, fontFamily: 'Inter, sans-serif' }}>
+  const uiConfig    = resolveUiConfig(chatbot.ui_config ?? {});
+  const widgetTempl = uiConfig.widget.template;
 
-      {/* Header */}
-      <div style={{ padding: '12px 20px', background: C.panel, borderBottom: `1px solid ${C.panelBorder}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
-        <div>
-          <div style={{ fontSize: 15, fontWeight: 700, color: C.t1 }}>{chatbot.title}</div>
-          <div style={{ fontSize: 11, color: C.t3, marginTop: 1 }}>{chatbot.description}</div>
+  return (
+    <div style={{
+      height: '100vh', width: '100vw', overflow: 'hidden',
+      position: 'relative',
+    }}>
+      {/* AMD diagnostics toggle */}
+      <div style={{
+        position: 'fixed', top: 10, right: 10, zIndex: 999,
+        display: amdLocal || widgetTempl === 'fullscreen' ? 'flex' : 'none',
+        alignItems: 'center', gap: 6,
+        padding: '5px 10px',
+        background: amdLocal ? 'rgba(239,68,68,0.12)' : 'rgba(0,0,0,0.4)',
+        border: `1px solid ${amdLocal ? 'rgba(239,68,68,0.35)' : 'rgba(255,255,255,0.1)'}`,
+        borderRadius: 8, cursor: 'pointer', transition: 'all 0.15s', backdropFilter: 'blur(8px)',
+      }}
+        onClick={() => setAmdLocal(p => !p)}
+      >
+        {amdLocal ? <Zap size={11} color="#ef4444" /> : <ZapOff size={11} color="rgba(255,255,255,0.4)" />}
+        <span style={{ fontSize: 10, fontFamily: 'JetBrains Mono, monospace', color: amdLocal ? '#ef4444' : 'rgba(255,255,255,0.4)' }}>
+          {amdLocal ? 'Diagnostics ON' : 'Diagnostics'}
+        </span>
+      </div>
+
+      {/* Widget */}
+      <WidgetRenderer
+        config={uiConfig}
+        chatbotTitle={chatbot.title}
+        messages={messages}
+        loading={loading}
+        input={input}
+        onInputChange={setInput}
+        onSend={() => handleSend()}
+        onSuggestedQuestion={(q) => handleSend(q)}
+        onFeedback={handleFeedback}
+        previewMode={false}
+        compact={false}
+      />
+
+      {/* Diagnostic panels */}
+      {amdLocal && messages.some(m => m.diagnostics?.length) && (
+        <div style={{
+          position: 'fixed', bottom: 80, left: 16, right: 16, zIndex: 500,
+          maxHeight: 200, overflowY: 'auto',
+          background: 'rgba(0,0,0,0.85)', borderRadius: 10, padding: 12,
+          border: '1px solid rgba(255,255,255,0.1)',
+          backdropFilter: 'blur(8px)',
+        }}>
+          {messages
+            .filter(m => m.role === 'assistant' && m.diagnostics?.length)
+            .slice(-1)
+            .map((m, i) => (
+              <DiagnosticPanel key={i} diagnostics={m.diagnostics} amdLocal={true} telemetry={m.telemetry} />
+            ))
+          }
         </div>
-        <button
-          onClick={() => setAmdLocal(p => !p)}
-          style={{
-            display: 'flex', alignItems: 'center', gap: 6, padding: '6px 11px',
-            background: amdLocal ? 'rgba(239,68,68,0.12)' : C.accentBg,
-            border: `1px solid ${amdLocal ? 'rgba(239,68,68,0.35)' : C.panelBorder}`,
-            borderRadius: 8, cursor: 'pointer', transition: 'all 0.15s',
-          }}
-        >
-          {amdLocal ? <Zap size={12} color="#ef4444" /> : <ZapOff size={12} color={C.t3} />}
-          <div style={{ textAlign: 'left' }}>
-            <div style={{ fontSize: 10, fontWeight: 700, color: amdLocal ? '#ef4444' : C.t3, fontFamily: 'JetBrains Mono, monospace', letterSpacing: '0.05em' }}>
-              {amdLocal ? 'Diagnostics · ON' : 'Diagnostics · OFF'}
-            </div>
-            <div style={{ fontSize: 9, color: C.t3 }}>
-              {amdLocal ? 'showing rag telemetry' : 'hide diagnostics'}
-            </div>
-          </div>
-        </button>
-      </div>
-
-      {/* Messages */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-        {messages.map((msg, idx) => (
-          <div key={idx}>
-            <div style={{ display: 'flex', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start' }}>
-              <div style={{
-                maxWidth: '78%', padding: '10px 14px',
-                borderRadius: msg.role === 'user' ? '14px 4px 14px 14px' : '4px 14px 14px 14px',
-                background: msg.role === 'user' ? 'rgba(124,58,237,0.7)' : C.surface,
-                border: `1px solid ${msg.role === 'user' ? 'rgba(124,58,237,0.5)' : C.border}`,
-                fontSize: 13, color: msg.role === 'user' ? '#fff' : C.t1,
-                lineHeight: 1.55, whiteSpace: 'pre-wrap',
-              }}>
-                {msg.role === 'assistant'
-                  ? <ReactMarkdown components={mdComponentsChat}>{msg.content}</ReactMarkdown>
-                  : msg.content}
-                {msg.role === 'assistant' && msg.confidence !== undefined && (
-                  <div style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <ConfidenceBar value={msg.confidence} />
-                    <span style={{ fontSize: 10, color: C.t3, fontFamily: 'JetBrains Mono, monospace' }}>
-                      {(msg.confidence * 100).toFixed(0)}% confidence
-                    </span>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {msg.role === 'assistant' && msg.diagnostics?.length > 0 && amdLocal && (
-              <div style={{ marginTop: 6 }}>
-                <DiagnosticPanel diagnostics={msg.diagnostics} amdLocal={amdLocal} telemetry={msg.telemetry} />
-              </div>
-            )}
-          </div>
-        ))}
-
-        {loading && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{ padding: '10px 14px', background: C.surface, border: `1px solid ${C.border}`, borderRadius: '4px 14px 14px 14px', display: 'flex', gap: 5, alignItems: 'center' }}>
-              {[0, 1, 2].map(d => (
-                <div key={d} style={{ width: 5, height: 5, borderRadius: '50%', background: C.accent, animation: `bounce 1s ease-in-out ${d * 0.18}s infinite` }} />
-              ))}
-            </div>
-          </div>
-        )}
-        <div ref={messagesEndRef} />
-      </div>
-
-      {/* Input */}
-      <div style={{ padding: '12px 20px', background: C.panel, borderTop: `1px solid ${C.panelBorder}`, display: 'flex', gap: 10, alignItems: 'center', flexShrink: 0 }}>
-        <input
-          value={input}
-          onChange={e => setInput(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && handleSend()}
-          placeholder="Type your message..."
-          disabled={loading}
-          style={{ flex: 1, padding: '10px 14px', background: C.input, border: `1px solid ${C.inputBorder}`, borderRadius: 10, color: C.t1, fontSize: 13, outline: 'none', fontFamily: 'Inter, sans-serif' }}
-        />
-        <button
-          onClick={handleSend}
-          disabled={loading || !input.trim()}
-          style={{
-            width: 38, height: 38,
-            background: input.trim() && !loading ? 'rgba(124,58,237,0.8)' : C.accentBg,
-            border: `1px solid ${C.panelBorder}`, borderRadius: 10,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            cursor: input.trim() && !loading ? 'pointer' : 'default',
-            transition: 'all 0.15s', flexShrink: 0,
-          }}
-        >
-          {loading
-            ? <Loader2 size={14} color={C.accent} style={{ animation: 'spin 1s linear infinite' }} />
-            : <Send size={14} color={input.trim() ? '#fff' : C.t3} />}
-        </button>
-      </div>
-
-      <style>{`
-        @keyframes bounce { 0%,100% { transform:translateY(0); opacity:.5; } 50% { transform:translateY(-4px); opacity:1; } }
-        @keyframes spin { to { transform:rotate(360deg); } }
-      `}</style>
-    </div>
-  );
-}
-
-function ConfidenceBar({ value }) {
-  const pct = Math.max(0, Math.min(1, value));
-  const color = pct > 0.7 ? '#22c55e' : pct > 0.45 ? '#a78bfa' : '#ef4444';
-  return (
-    <div style={{ width: 60, height: 3, background: 'rgba(255,255,255,0.1)', borderRadius: 2, overflow: 'hidden' }}>
-      <div style={{ width: `${pct * 100}%`, height: '100%', background: color, borderRadius: 2, transition: 'width 0.4s' }} />
+      )}
     </div>
   );
 }

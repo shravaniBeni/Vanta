@@ -12,7 +12,7 @@ import {
   LogOut, Clock, Rocket, Cpu, MoreHorizontal, Bot,
   Sun, Moon, Search, Package, CheckCircle, Timer,
   Settings, ChevronLeft, ChevronRight, GripVertical,
-  LayoutGrid, List, Copy, AlertTriangle,
+  LayoutGrid, List, Copy, AlertTriangle, BarChart2,
 } from "lucide-react";
 import { useAuth } from "@/lib/AuthContext";
 import { projectsApi, chatbotsApi } from "@/api/apiClient";
@@ -242,7 +242,7 @@ function StatCard({ value, label, desc, icon, iconBg, iconColor, C }) {
 
 // ─── App Card ─────────────────────────────────────────────────────────────────
 
-function AppCard({ app, onArchitect, onEdit, onDeploy, onDelete, index, C }) {
+function AppCard({ app, onArchitect, onEdit, onDeploy, onAnalytics, onDelete, index, C }) {
   const [hover, setHover] = useState(false);
   const [menu, setMenu] = useState(false);
 
@@ -252,6 +252,34 @@ function AppCard({ app, onArchitect, onEdit, onDeploy, onDelete, index, C }) {
     archived: C.t3,
   };
   const statusColor = STATUS_COLOR[app.status] || C.amber;
+
+  // Small icon-only button used in the top-right icon strip
+  const IconBtn = ({ icon, title, onClick, activeColor }) => (
+    <button
+      onClick={onClick}
+      title={title}
+      style={{
+        width: 26, height: 26, borderRadius: 6,
+        border: `1px solid ${C.border}`,
+        background: "transparent",
+        color: C.t3, cursor: "pointer",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        transition: "all 0.15s", flexShrink: 0,
+      }}
+      onMouseEnter={e => {
+        e.currentTarget.style.background = activeColor ? `${activeColor}18` : C.accentBg;
+        e.currentTarget.style.color      = activeColor || C.accentLt;
+        e.currentTarget.style.borderColor = activeColor ? `${activeColor}40` : C.borderHi;
+      }}
+      onMouseLeave={e => {
+        e.currentTarget.style.background  = "transparent";
+        e.currentTarget.style.color       = C.t3;
+        e.currentTarget.style.borderColor = C.border;
+      }}
+    >
+      {icon}
+    </button>
+  );
 
   return (
     <div
@@ -269,144 +297,154 @@ function AppCard({ app, onArchitect, onEdit, onDeploy, onDelete, index, C }) {
           ? `${C.shadowCard}, 0 0 0 1px ${C.accent}33, 0 0 28px ${C.accent}22`
           : C.shadow,
         display: "flex", flexDirection: "column",
-        minHeight: 222,
+        minHeight: 210,
         transform: hover ? "translateY(-3px)" : "translateY(0)",
         transition: "background 0.2s ease, border-color 0.2s ease, box-shadow 0.25s ease, transform 0.25s ease",
         position: "relative", cursor: "default", overflow: "hidden",
       }}>
+        {/* Top accent bar */}
         <div style={{
           position: "absolute", top: 0, left: 0, right: 0, height: 2,
           background: hover ? `linear-gradient(90deg, ${C.accentLt}, ${C.cyan || C.accentLt}, transparent 82%)` : "transparent",
           opacity: hover ? 1 : 0,
           transition: "opacity 0.25s ease",
         }} />
-        {/* Top row */}
+
+        {/* ── Top row: status + icon strip ──────────────────────────── */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
           <span style={{
             background: `${statusColor}18`, border: `1px solid ${statusColor}40`,
             color: statusColor,
-            fontSize: 11, fontWeight: 700, fontFamily: "JetBrains Mono, monospace",
+            fontSize: 10, fontWeight: 700, fontFamily: "JetBrains Mono, monospace",
             letterSpacing: "0.08em", textTransform: "uppercase",
-            padding: "3px 9px",
-            borderRadius: 0,
+            padding: "2px 8px", borderRadius: 0,
           }}>
             {app.status || "draft"}
           </span>
-          {/* Overflow menu */}
-          <div style={{ position: "relative" }}>
-              <button
-              onClick={() => setMenu(o => !o)}
-              style={{ width: 28, height: 28, borderRadius: 6, border: `1px solid ${menu ? C.borderHi : C.border}`, background: menu ? C.accentBg : "transparent", color: C.t3, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.15s" }}
-            >
-              <MoreHorizontal size={14} />
-            </button>
-            {menu && (
-              <div style={{
-                position: "absolute", right: 0, top: 32, zIndex: 20,
-                background: C.surface, border: `1px solid ${C.borderHi}`,
-                borderRadius: 0,
-                boxShadow: C.shadowCard, minWidth: 152, padding: "5px 0",
-                animation: "vFadeUp 0.15s ease both",
-              }}>
-                {[
-                  { icon: <Cpu size={12} />, label: "Architect", fn: () => onArchitect(app) },
-                  { icon: <Edit3 size={12} />, label: "Editor", fn: () => onEdit(app) },
-                  ...(app.status === "deployed" && app.embed_id ? [{ icon: <Rocket size={12} />, label: "View Deploy", fn: () => onDeploy(app) }] : []),
-                ].map(item => (
-                  <button key={item.label} onClick={() => { item.fn(); setMenu(false); }}
-                    style={{ width: "100%", padding: "9px 16px", background: "transparent", border: "none", color: C.t2, fontSize: 13, fontWeight: 600, cursor: "pointer", textAlign: "left", display: "flex", alignItems: "center", gap: 9, fontFamily: "Plus Jakarta Sans, sans-serif" }}
-                    onMouseEnter={e => e.currentTarget.style.background = C.accentBg}
-                    onMouseLeave={e => e.currentTarget.style.background = "transparent"}
-                  >{item.icon} {item.label}</button>
-                ))}
-                <div style={{ height: 1, background: C.border, margin: "4px 0" }} />
-                <button onClick={() => { onDelete(app); setMenu(false); }}
-                  style={{ width: "100%", padding: "9px 16px", background: "transparent", border: "none", color: "#f87171", fontSize: 13, fontWeight: 600, cursor: "pointer", textAlign: "left", display: "flex", alignItems: "center", gap: 9, fontFamily: "Plus Jakarta Sans, sans-serif" }}
-                  onMouseEnter={e => e.currentTarget.style.background = "rgba(239,68,68,0.07)"}
-                  onMouseLeave={e => e.currentTarget.style.background = "transparent"}
-                >
-                  <Trash2 size={12} /> Delete
-                </button>
-              </div>
+
+          {/* Icon strip: Analytics + Deploy (conditional) + More */}
+          <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+            <IconBtn
+              icon={<BarChart2 size={12} />}
+              title="Analytics"
+              onClick={() => onAnalytics(app)}
+            />
+            {app.status === "deployed" && app.embed_id && (
+              <IconBtn
+                icon={<Rocket size={12} />}
+                title="View Deploy"
+                onClick={() => onDeploy(app)}
+                activeColor={C.green}
+              />
             )}
+            {/* ⋯ overflow menu */}
+            <div style={{ position: "relative" }}>
+              <button
+                onClick={() => setMenu(o => !o)}
+                style={{
+                  width: 26, height: 26, borderRadius: 6,
+                  border: `1px solid ${menu ? C.borderHi : C.border}`,
+                  background: menu ? C.accentBg : "transparent",
+                  color: menu ? C.accentLt : C.t3,
+                  cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+                  transition: "all 0.15s",
+                }}
+              >
+                <MoreHorizontal size={13} />
+              </button>
+              {menu && (
+                <div style={{
+                  position: "absolute", right: 0, top: 30, zIndex: 20,
+                  background: C.surface, border: `1px solid ${C.borderHi}`,
+                  borderRadius: 0,
+                  boxShadow: C.shadowCard, minWidth: 152, padding: "5px 0",
+                  animation: "vFadeUp 0.15s ease both",
+                }}>
+                  {[
+                    { icon: <Cpu size={12} />,      label: "Architect",   fn: () => onArchitect(app) },
+                    { icon: <Edit3 size={12} />,     label: "Editor",      fn: () => onEdit(app) },
+                    { icon: <BarChart2 size={12} />, label: "Analytics",   fn: () => onAnalytics(app) },
+                    ...(app.status === "deployed" && app.embed_id
+                      ? [{ icon: <Rocket size={12} />, label: "View Deploy", fn: () => onDeploy(app) }]
+                      : []),
+                  ].map(item => (
+                    <button key={item.label} onClick={() => { item.fn(); setMenu(false); }}
+                      style={{ width: "100%", padding: "9px 16px", background: "transparent", border: "none", color: C.t2, fontSize: 13, fontWeight: 600, cursor: "pointer", textAlign: "left", display: "flex", alignItems: "center", gap: 9, fontFamily: "Plus Jakarta Sans, sans-serif" }}
+                      onMouseEnter={e => e.currentTarget.style.background = C.accentBg}
+                      onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+                    >{item.icon} {item.label}</button>
+                  ))}
+                  <div style={{ height: 1, background: C.border, margin: "4px 0" }} />
+                  <button onClick={() => { onDelete(app); setMenu(false); }}
+                    style={{ width: "100%", padding: "9px 16px", background: "transparent", border: "none", color: "#f87171", fontSize: 13, fontWeight: 600, cursor: "pointer", textAlign: "left", display: "flex", alignItems: "center", gap: 9, fontFamily: "Plus Jakarta Sans, sans-serif" }}
+                    onMouseEnter={e => e.currentTarget.style.background = "rgba(239,68,68,0.07)"}
+                    onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+                  >
+                    <Trash2 size={12} /> Delete
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
         {/* Arch status */}
         {app.architect_status && app.architect_status !== "pending" && (
-          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10 }}>
-            <div style={{ width: 7, height: 7, borderRadius: "50%", background: app.architect_status === "approved" ? C.green : C.accentLt, flexShrink: 0 }} />
-            <span style={{ fontSize: 11, fontFamily: "JetBrains Mono, monospace", fontWeight: 700, color: app.architect_status === "approved" ? C.green : C.accentLt, textTransform: "uppercase", letterSpacing: "0.08em" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
+            <div style={{ width: 6, height: 6, borderRadius: "50%", background: app.architect_status === "approved" ? C.green : C.accentLt, flexShrink: 0 }} />
+            <span style={{ fontSize: 10, fontFamily: "JetBrains Mono, monospace", fontWeight: 700, color: app.architect_status === "approved" ? C.green : C.accentLt, textTransform: "uppercase", letterSpacing: "0.08em" }}>
               Arch · {app.architect_status}
             </span>
-            {/* Animated shimmer bar on the arch line */}
             <div style={{ flex: 1, height: 2, background: `linear-gradient(90deg, ${app.architect_status === "approved" ? C.green : C.accentLt}40, transparent)`, borderRadius: 2 }} />
           </div>
         )}
 
-        <h3 style={{ fontSize: 16, fontWeight: 800, color: C.t1, marginBottom: 6, lineHeight: 1.35, fontFamily: "Plus Jakarta Sans, sans-serif", letterSpacing: "-0.01em", transition: "color 0.2s ease" }}>
+        <h3 style={{ fontSize: 15, fontWeight: 800, color: C.t1, marginBottom: 5, lineHeight: 1.35, fontFamily: "Plus Jakarta Sans, sans-serif", letterSpacing: "-0.01em" }}>
           {app.title}
         </h3>
         {app.description && (
-          <p style={{ fontSize: 13, color: C.t3, lineHeight: 1.6, marginBottom: 14, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
+          <p style={{ fontSize: 12, color: C.t3, lineHeight: 1.6, marginBottom: 12, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
             {app.description}
           </p>
         )}
 
-        <div style={{ display: "flex", alignItems: "center", gap: 5, color: C.t3, fontSize: 12, fontFamily: "JetBrains Mono, monospace", marginTop: "auto", marginBottom: 14 }}>
-          <Clock size={11} />
+        <div style={{ display: "flex", alignItems: "center", gap: 5, color: C.t3, fontSize: 11, fontFamily: "JetBrains Mono, monospace", marginTop: "auto", marginBottom: 12 }}>
+          <Clock size={10} />
           <span>{timeAgo(app.updated_at || app.created_at)}</span>
         </div>
 
-        {/* Two-tone action buttons like reference */}
-        <div style={{ display: "flex", gap: 8 }}>
+        {/* ── Two primary actions only ──────────────────────────────── */}
+        <div style={{ display: "flex", gap: 7 }}>
           <button
             onClick={() => onArchitect(app)}
             style={{
-              flex: 1, padding: "9px 0",
+              flex: 1, padding: "8px 0",
               borderRadius: 5,
               background: C.accentBg, border: `1px solid ${C.borderHi}`,
-              color: C.accentLt, fontSize: 13, fontWeight: 700, cursor: "pointer",
-              display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+              color: C.accentLt, fontSize: 12, fontWeight: 700, cursor: "pointer",
+              display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
               fontFamily: "Plus Jakarta Sans, sans-serif", transition: "background 0.15s ease, box-shadow 0.15s ease",
             }}
             onMouseEnter={e => { e.currentTarget.style.background = `${C.accent}28`; e.currentTarget.style.boxShadow = `0 0 14px ${C.accent}22`; }}
             onMouseLeave={e => { e.currentTarget.style.background = C.accentBg; e.currentTarget.style.boxShadow = "none"; }}
           >
-            <Cpu size={13} /> Architect
+            <Cpu size={12} /> Architect
           </button>
           <button
             onClick={() => onEdit(app)}
             style={{
-              flex: 1, padding: "9px 0",
+              flex: 1, padding: "8px 0",
               borderRadius: 5,
               background: C.amberBg, border: `1px solid ${C.amber}40`,
-              color: C.amber, fontSize: 13, fontWeight: 700, cursor: "pointer",
-              display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+              color: C.amber, fontSize: 12, fontWeight: 700, cursor: "pointer",
+              display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
               fontFamily: "Plus Jakarta Sans, sans-serif", transition: "background 0.15s ease, box-shadow 0.15s ease",
             }}
             onMouseEnter={e => { e.currentTarget.style.background = `${C.amber}20`; e.currentTarget.style.boxShadow = `0 0 14px ${C.amber}1c`; }}
             onMouseLeave={e => { e.currentTarget.style.background = C.amberBg; e.currentTarget.style.boxShadow = "none"; }}
           >
-            <Edit3 size={13} /> Editor
+            <Edit3 size={12} /> Editor
           </button>
-          {app.status === "deployed" && app.embed_id && (
-            <button
-              onClick={() => onDeploy(app)}
-              style={{
-                flex: 1, padding: "9px 0",
-                borderRadius: 5,
-                background: C.greenBg, border: `1px solid ${C.green}40`,
-                color: C.green, fontSize: 13, fontWeight: 700, cursor: "pointer",
-                display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
-                fontFamily: "Plus Jakarta Sans, sans-serif", transition: "background 0.15s ease, box-shadow 0.15s ease",
-              }}
-              onMouseEnter={e => { e.currentTarget.style.background = `${C.green}20`; e.currentTarget.style.boxShadow = `0 0 14px ${C.green}1c`; }}
-              onMouseLeave={e => { e.currentTarget.style.background = C.greenBg; e.currentTarget.style.boxShadow = "none"; }}
-            >
-              <Rocket size={13} /> View
-            </button>
-          )}
         </div>
       </div>
     </div>
@@ -866,6 +904,7 @@ export default function Dashboard() {
                     onArchitect={a => navigate(createPageUrl(`Architect?id=${a.id}`))}
                     onEdit={a => navigate(createPageUrl(`Editor?id=${a.id}`))}
                     onDeploy={a => navigate(createPageUrl(`Deploy?id=${a.id}`))}
+                    onAnalytics={a => navigate(createPageUrl(`Analytics?id=${a.id}`))}
                     onDelete={requestDeleteApp}
                   />
                 ))}

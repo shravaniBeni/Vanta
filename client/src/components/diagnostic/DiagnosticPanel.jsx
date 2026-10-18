@@ -13,9 +13,9 @@ const SEVERITY_CONFIG = {
   },
   warning: {
     icon: AlertTriangle,
-    bg: 'rgba(245,158,11,0.1)',
-    border: 'rgba(245,158,11,0.3)',
-    iconColor: '#f59e0b',
+    bg: 'rgba(167,139,250,0.1)',
+    border: 'rgba(167,139,250,0.3)',
+    iconColor: '#a78bfa',
     titleColor: '#fcd34d',
     textColor: '#fde68a',
     label: 'Warning',
@@ -122,8 +122,8 @@ export default function DiagnosticPanel({ diagnostics, amdLocal, telemetry }) {
       >
         <div style={{
           width: 6, height: 6, borderRadius: '50%',
-          background: worstSeverity === 'error' ? '#ef4444' : worstSeverity === 'warning' ? '#f59e0b' : '#3b82f6',
-          boxShadow: `0 0 6px ${worstSeverity === 'error' ? '#ef4444' : worstSeverity === 'warning' ? '#f59e0b' : '#3b82f6'}`,
+          background: worstSeverity === 'error' ? '#ef4444' : worstSeverity === 'warning' ? '#a78bfa' : '#3b82f6',
+          boxShadow: `0 0 6px ${worstSeverity === 'error' ? '#ef4444' : worstSeverity === 'warning' ? '#a78bfa' : '#3b82f6'}`,
           flexShrink: 0,
         }} />
         <span style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', letterSpacing: '0.05em' }}>

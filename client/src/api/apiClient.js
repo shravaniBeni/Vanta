@@ -264,27 +264,43 @@ export const crawlApi = {
     request('GET', `/api/crawl/status/${ragAppId}`),
 };
 
+// ─── UI Config (Phase 10B) ────────────────────────────────────────────────────
+
+export const uiConfigApi = {
+  /** Get current UI configuration for a chatbot */
+  get: (chatbotId) =>
+    request('GET', `/api/chatbots/${chatbotId}/ui-config`),
+
+  /** Save (full replace) UI configuration */
+  save: (chatbotId, config) =>
+    request('PUT', `/api/chatbots/${chatbotId}/ui-config`, config),
+};
+
+// ─── Chat ─────────────────────────────────────────────────────────────────────
+
 export const chatApi = {
   // Public deployed/embed chatbot
-  sendPublic: (embedId, query, sessionId) =>
+  sendPublic: (embedId, query, sessionId, sessionToken) =>
     request(
       'POST',
       '/api/chat',
       {
-        embed_id: embedId,
+        embed_id:      embedId,
         query,
-        session_id: sessionId,
+        session_id:    sessionId,
+        session_token: sessionToken,
       },
       false,
       true
     ),
 
   // Authenticated internal chat
-  send: (chatbotId, query, sessionId) =>
+  send: (chatbotId, query, sessionId, sessionToken) =>
     request('POST', '/api/chat', {
-      chatbot_id: chatbotId,
+      chatbot_id:    chatbotId,
       query,
-      session_id: sessionId,
+      session_id:    sessionId,
+      session_token: sessionToken,
     }),
 
   // Authenticated Editor preview
@@ -293,4 +309,52 @@ export const chatApi = {
       chatbot_id: chatbotId,
       query,
     }),
+};
+
+// ─── Analytics (Phase 10C) ────────────────────────────────────────────────────
+
+export const analyticsApi = {
+  /** Get analytics summary (owner only) */
+  getSummary: (chatbotId, { days = 30, from, to } = {}) => {
+    const params = new URLSearchParams({ days });
+    if (from) params.set('from', from);
+    if (to)   params.set('to', to);
+    return request('GET', `/api/analytics/${chatbotId}/summary?${params}`);
+  },
+
+  /** Get top topics (owner only) */
+  getTopics: (chatbotId, { days = 30, from, to, limit = 10 } = {}) => {
+    const params = new URLSearchParams({ days, limit });
+    if (from) params.set('from', from);
+    if (to)   params.set('to', to);
+    return request('GET', `/api/analytics/${chatbotId}/topics?${params}`);
+  },
+
+  /** Get daily trend (owner only) */
+  getTrend: (chatbotId, { days = 30, from, to } = {}) => {
+    const params = new URLSearchParams({ days });
+    if (from) params.set('from', from);
+    if (to)   params.set('to', to);
+    return request('GET', `/api/analytics/${chatbotId}/trend?${params}`);
+  },
+
+  /** Generate AI insights (owner only) */
+  getInsights: (chatbotId, { days = 30 } = {}) =>
+    request('POST', `/api/analytics/${chatbotId}/insights?days=${days}`, {}),
+
+  /** Get analytics settings (owner only) */
+  getSettings: (chatbotId) =>
+    request('GET', `/api/analytics/${chatbotId}/settings`),
+
+  /** Save analytics settings (owner only) */
+  saveSettings: (chatbotId, settings) =>
+    request('PUT', `/api/analytics/${chatbotId}/settings`, settings),
+
+  /** Submit helpful/unhelpful feedback (public — visitor) */
+  submitFeedback: (params) =>
+    request('POST', '/api/analytics/feedback', params, false, true),
+
+  /** Create or resume a visitor session (public) */
+  createSession: (params) =>
+    request('POST', '/api/analytics/session', params, false, true),
 };

@@ -2,12 +2,13 @@ node_modules/
 client/node_modules/
 server/node_modules/
 
-# Runtime data (SQLite DB, uploads, model cache)
+# Runtime data (model cache, uploads temp)
 data/
 
 # Environment files — never commit real secrets
 server/.env
 client/.env
+.env
 
 # Build output
 dist/
@@ -16,6 +17,23 @@ client/dist/
 # OS
 .DS_Store
 Thumbs.db
+nul
+server/nul
 
 # Editor
 .vscode/settings.json
+.idea/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Backup files
+*.bak
+
+# Empty Windows artifacts
+manifest.json
+package-lock.json
+
+# Sharp native binaries (rebuilt per platform on deploy)
+server/node_modules/sharp/

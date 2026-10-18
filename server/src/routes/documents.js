@@ -335,6 +335,60 @@ router.post('/:id/reprocess', async (req, res) => {
       });
     }
 
+    // ── Re-profile the document before indexing ─────────────────────────────
+    // The stored profile_data may have been computed with an older version of
+    // the profiler that had false-positive SCANNED classification. Re-profile
+    // from the original file to get an accurate classification.
+    try {
+      const { data: fileData, error: dlErr } = await supabase.storage
+        .from('knowledge-docs')
+        .download(doc.storage_path);
+
+      if (!dlErr && fileData) {
+        const arrayBuffer = await fileData.arrayBuffer();
+        const buffer = Buffer.from(arrayBuffer);
+        const freshProfile = await profileDocument(buffer, doc.file_name);
+        console.log(
+          `[documents/reprocess] Re-profiled ${doc.file_name}: ` +
+          `old=${doc.profile_data?.classification ?? 'null'} ` +
+          `new=${freshProfile.classification} ` +
+          `pages=${freshProfile.signals.page_count} ` +
+          `textPages=${freshProfile.signals.text_pages}`
+        );
+
+        // Update stored profile_data with the fresh classification
+        await supabase.from('documents').update({
+          profile_data: freshProfile,
+        }).eq('id', doc.id);
+
+        // If the fresh classification still needs OCR and workflow has no OCR node,
+        // return early with a clear message.
+        const needsOcr = classificationNeedsOcr(freshProfile.classification);
+        const workflowHasOcr = ragApp.nodes.some(n => n.type === 'OCR');
+        if (needsOcr && !workflowHasOcr) {
+          const msg = `Document "${doc.file_name}" is classified as ${freshProfile.classification} ` +
+            `but the active workflow does not contain an OCR node. ` +
+            `Add OCR to the workflow via the Architect before indexing this document.`;
+          await supabase.from('documents').update({
+            status: 'needs_architecture_review',
+            error_message: msg.slice(0, 500),
+          }).eq('id', doc.id);
+          return res.status(422).json({ error: msg });
+        }
+
+        // If previously needs_architecture_review but now text-extractable, clear it
+        if (doc.status === 'needs_architecture_review' && !needsOcr) {
+          await supabase.from('documents').update({
+            status: 'profiled',
+            error_message: null,
+          }).eq('id', doc.id);
+        }
+      }
+    } catch (reprofileErr) {
+      console.warn('[documents/reprocess] Re-profile failed (non-fatal):', reprofileErr.message);
+      // Continue with indexing using the existing profile_data
+    }
+
     // indexDocumentWithPlan requires architect_status = 'approved'
     // For chatbots with an already-built active workflow we can call it directly
     const result = await indexDocumentWithPlan(doc.id, doc.rag_app_id, req.user.id);

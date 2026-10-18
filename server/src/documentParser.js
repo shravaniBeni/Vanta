@@ -90,19 +90,22 @@ export async function profileDocument(buffer, fileName) {
       new Promise((_, reject) => setTimeout(() => reject(new Error('PDF profiling timed out')), 30000)),
     ]);
   } catch (err) {
-    // If pdf-parse fails (encrypted, malformed), we can't profile — assume it needs review.
-    console.warn('[profileDocument] pdf-parse failed:', err.message);
+    // pdf-parse failed — DON'T assume SCANNED. A parse failure could be caused
+    // by a valid text PDF with features pdf-parse doesn't support (PDF 2.0,
+    // certain compression types, linearized PDFs, etc.). Default to
+    // TEXT_EXTRACTABLE and let the normal extraction path surface any real errors.
+    console.warn('[profileDocument] pdf-parse failed, defaulting to TEXT_EXTRACTABLE:', err.message);
     return {
-      classification: DOC_CLASSIFICATION.SCANNED,
+      classification: DOC_CLASSIFICATION.TEXT_EXTRACTABLE,
       signals: { page_count: 0, chars_total: 0, chars_per_page: [], text_pages: 0, scanned_pages: 0, parse_error: err.message },
     };
   }
 
   const fullText  = pdfData.text || '';
   const pageCount = pdfData.numpages || 1;
+  const totalChars = fullText.replace(/[\s\f]/g, '').length;
 
   // Split on form-feed to get per-page text segments.
-  // pdf-parse uses \f as a page separator. The last segment may be empty if text ends with \f.
   const pageSegments = fullText.split('\f');
 
   // Count meaningful characters per page (strip whitespace/form-feeds before counting).
@@ -110,10 +113,51 @@ export async function profileDocument(buffer, fileName) {
     .slice(0, pageCount)  // guard against extra segments
     .map(seg => seg.replace(/[\s\f]/g, '').length);
 
-  // Pad if pdf-parse returned fewer segments than pages (can happen with some PDFs).
+  const T = PROFILER_THRESHOLDS;
+
+  // ── Guard: form-feed splitting didn't produce enough segments ──────────────
+  // Some PDFs don't insert \f between pages, causing pageSegments.length to be
+  // much less than pageCount. Padding with zeros would create false "blank pages"
+  // and a false SCANNED classification. When this happens, fall back to
+  // total-text-based classification.
+  if (pageSegments.length < Math.ceil(pageCount * 0.5)) {
+    console.warn(
+      `[profileDocument] Form-feed segments (${pageSegments.length}) < page count (${pageCount}). ` +
+      `Total chars: ${totalChars}. Using total-text classification.`
+    );
+
+    // If total text is zero, the PDF likely has no extractable text (scanned or
+    // uses embedded fonts pdf-parse can't decode). Only classify as SCANNED
+    // when we have multiple pages (single-page with 0 chars could be a blank cover).
+    if (totalChars === 0 && pageCount >= T.MIN_PAGES_FOR_RATIO_CLASSIFICATION) {
+      return {
+        classification: DOC_CLASSIFICATION.SCANNED,
+        signals: {
+          page_count: pageCount, chars_total: totalChars,
+          chars_per_page: charsPerPage,
+          text_pages: 0, scanned_pages: pageCount,
+          segment_mismatch: true,
+        },
+      };
+    }
+
+    // We have some text — classify as TEXT_EXTRACTABLE
+    const textSegments = pageSegments.filter(s => s.replace(/[\s\f]/g, '').length >= T.BLANK_PAGE_CHAR_THRESHOLD).length;
+    return {
+      classification: DOC_CLASSIFICATION.TEXT_EXTRACTABLE,
+      signals: {
+        page_count: pageCount, chars_total: totalChars,
+        chars_per_page: charsPerPage,
+        text_pages: textSegments || (totalChars > 0 ? 1 : 0),
+        scanned_pages: 0,
+        segment_mismatch: true,
+      },
+    };
+  }
+
+  // Pad if pdf-parse returned fewer segments than pages (small mismatch — OK).
   while (charsPerPage.length < pageCount) charsPerPage.push(0);
 
-  const T = PROFILER_THRESHOLDS;
   const blankPages = charsPerPage.filter(c => c < T.BLANK_PAGE_CHAR_THRESHOLD).length;
   const textPages  = pageCount - blankPages;
   const charsTotal = charsPerPage.reduce((s, c) => s + c, 0);
@@ -149,6 +193,12 @@ export async function profileDocument(buffer, fileName) {
       classification = DOC_CLASSIFICATION.TEXT_EXTRACTABLE;
     }
   }
+
+  console.log(
+    `[profileDocument] ${fileName}: classification=${classification} ` +
+    `pages=${pageCount} segments=${pageSegments.length} ` +
+    `textPages=${textPages} blankPages=${blankPages} totalChars=${charsTotal}`
+  );
 
   return { classification, signals };
 }

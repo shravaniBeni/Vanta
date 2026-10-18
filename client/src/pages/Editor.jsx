@@ -24,8 +24,8 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Rocket, Eye, EyeOff, Save, Trash2, GitBranch, AlertTriangle, CheckCircle, MessageSquare, Workflow, Code } from 'lucide-react';
-import { chatbotsApi, workflowApi } from '@/api/apiClient';
+import { ArrowLeft, Rocket, Eye, EyeOff, Save, Trash2, GitBranch, AlertTriangle, CheckCircle, MessageSquare, Workflow, Code, Palette, BarChart2 } from 'lucide-react';
+import { chatbotsApi, workflowApi, uiConfigApi } from '@/api/apiClient';
 import { createPageUrl } from '@/utils';
 import NodeEditor from '../components/editor/NodeEditor';
 import NodePalette from '../components/editor/NodePalette';
@@ -33,7 +33,9 @@ import NodeProperties from '../components/editor/NodeProperties';
 import WorkflowPreview from '../components/editor/WorkflowPreview';
 import ArchitectChatPanel from '../components/editor/ArchitectChatPanel';
 import WorkflowCodeView from '../components/editor/WorkflowCodeView';
+import AppearancePanel from '../components/editor/AppearancePanel';
 import { useAppTheme } from '@/lib/ThemeContext';
+import { resolveUiConfig } from '@/lib/uiConfig';
 
 export default function Editor() {
   const navigate     = useNavigate();
@@ -64,6 +66,12 @@ export default function Editor() {
   // Default: 'visual'. Switching to 'code' never mutates workflow.
   const [activeTab,      setActiveTab]       = useState('visual');
 
+  // Phase 10B: UI configuration state (completely separate from workflow)
+  const [uiConfig,       setUiConfig]        = useState(null);   // null = loading
+  const [uiDirty,        setUiDirty]         = useState(false);
+  const [savingUi,       setSavingUi]        = useState(false);
+  const [savedUi,        setSavedUi]         = useState(false);
+
   // Track the persisted draft to detect dirty state
   const persistedDraftRef = useRef({ nodes: [], connections: [] });
 
@@ -73,8 +81,11 @@ export default function Editor() {
     if (chatbotId) loadEditor();
   }, [chatbotId]);
 
-  const loadEditor = async () => {
-    setLoading(true);
+  // `silent = true` skips the full-screen loading indicator — used after
+  // architect activation so the ArchitectChatPanel stays mounted and the
+  // user sees the "Activated" confirmation while chatbot refreshes in-place.
+  const loadEditor = async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       // Try to load via the workflow endpoint for draft-aware data
       const [bots, workflowData] = await Promise.all([
@@ -82,7 +93,7 @@ export default function Editor() {
         workflowApi.get(chatbotId).catch(() => null),
       ]);
 
-      if (!bots.length) { setLoading(false); return; }
+      if (!bots.length) { if (!silent) setLoading(false); return; }
       const bot = bots[0];
       setChatbot(bot);
 
@@ -103,10 +114,18 @@ export default function Editor() {
         setDraftDirty(false);
         persistedDraftRef.current = { nodes: bot.nodes || [], connections: bot.connections || [] };
       }
+
+      // Phase 10B: Load UI config (separate from workflow)
+      try {
+        const cfg = await uiConfigApi.get(chatbotId);
+        setUiConfig(resolveUiConfig(cfg));
+      } catch {
+        setUiConfig(resolveUiConfig(bot.ui_config ?? {}));
+      }
     } catch (err) {
       console.error('Failed to load editor:', err);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
@@ -176,6 +195,30 @@ export default function Editor() {
       setDiscarding(false);
     }
   };
+
+  // ── UI Config Save (Phase 10B) ─────────────────────────────────────────────
+  // INVARIANT: Never touches nodes/connections/architect_plan
+
+  const handleSaveUiConfig = useCallback(async () => {
+    if (!uiConfig) return;
+    setSavingUi(true);
+    try {
+      const saved = await uiConfigApi.save(chatbotId, uiConfig);
+      setUiConfig(resolveUiConfig(saved));
+      setUiDirty(false);
+      setSavedUi(true);
+      setTimeout(() => setSavedUi(false), 2000);
+    } catch (err) {
+      console.error('[ui-config save]', err.message);
+    } finally {
+      setSavingUi(false);
+    }
+  }, [chatbotId, uiConfig]);
+
+  const handleUiConfigChange = useCallback((newConfig) => {
+    setUiConfig(newConfig);
+    setUiDirty(true);
+  }, []);
 
   // ── Deploy (uses ACTIVE workflow — unchanged from Phase 8) ─────────────────
 
@@ -277,8 +320,9 @@ export default function Editor() {
             borderRadius: 10, padding: 3, marginLeft: 8,
           }}>
             {[
-              { id: 'visual', icon: <Workflow size={13} />, label: 'Visual Workflow' },
-              { id: 'code',   icon: <Code size={13} />,     label: 'Code' },
+              { id: 'visual',     icon: <Workflow size={13} />, label: 'Visual Workflow' },
+              { id: 'code',       icon: <Code size={13} />,     label: 'Code' },
+              { id: 'appearance', icon: <Palette size={13} />,  label: 'Appearance' },
             ].map(tab => (
               <button
                 key={tab.id}
@@ -292,10 +336,15 @@ export default function Editor() {
                   fontSize: 12, fontWeight: activeTab === tab.id ? 700 : 500,
                   cursor: 'pointer', transition: 'all 0.15s',
                   boxShadow: activeTab === tab.id ? C.shadow : 'none',
+                  position: 'relative',
                 }}
               >
                 {tab.icon}
                 {tab.label}
+                {/* Dirty indicator for appearance tab */}
+                {tab.id === 'appearance' && uiDirty && (
+                  <div style={{ position: 'absolute', top: 4, right: 4, width: 5, height: 5, borderRadius: '50%', background: '#f59e0b' }} />
+                )}
               </button>
             ))}
           </div>
@@ -402,6 +451,25 @@ export default function Editor() {
             <Rocket size={14} />
             {deploying ? 'Deploying...' : 'Deploy'}
           </button>
+
+          {/* Analytics */}
+          <button
+            onClick={() => navigate(createPageUrl(`Analytics?id=${chatbot.id}`))}
+            title="View analytics dashboard"
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              padding: '9px 14px',
+              background: 'transparent',
+              border: `1px solid ${C.panelBorder}`,
+              borderRadius: 8, color: C.t2,
+              fontSize: 13, fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.color = C.accentLt; e.currentTarget.style.background = C.accentBg; }}
+            onMouseLeave={e => { e.currentTarget.style.color = C.t2; e.currentTarget.style.background = 'transparent'; }}
+          >
+            <BarChart2 size={14} />
+            Analytics
+          </button>
         </div>
       </div>
 
@@ -434,12 +502,31 @@ export default function Editor() {
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
 
         {/* ── Code tab (Phase 9D) — shown instead of canvas when activeTab === 'code' */}
+        {/* key forces remount when architect activates a new version, resetting file selection */}
         {activeTab === 'code' ? (
           <WorkflowCodeView
+            key={`code-${chatbot.architect_version ?? 0}-${(chatbot.nodes || []).length}`}
             chatbot={chatbot}
             hasDraft={hasDraft}
             draftDirty={draftDirty}
           />
+        ) : activeTab === 'appearance' ? (
+          /* ── Appearance tab (Phase 10B) ─────────────────────────────────── */
+          /* INVARIANT: never touches nodes/connections */
+          uiConfig ? (
+            <AppearancePanel
+              chatbot={chatbot}
+              uiConfig={uiConfig}
+              onChange={handleUiConfigChange}
+              onSave={handleSaveUiConfig}
+              saving={savingUi}
+              saved={savedUi}
+            />
+          ) : (
+            <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: C.t3, fontSize: 13, fontFamily: 'JetBrains Mono, monospace' }}>
+              Loading appearance settings…
+            </div>
+          )
         ) : (
           <>
             {/* Palette */}
@@ -491,8 +578,14 @@ export default function Editor() {
                 hasDraft={hasDraft}
                 onClose={() => setShowArchitect(false)}
                 onActivated={async (result) => {
-                  // Architect activated a proposal — reload the editor to show the new active workflow
-                  await loadEditor();
+                  // Silent reload — keeps ArchitectChatPanel mounted so user
+                  // sees the "Activated" confirmation while chatbot refreshes.
+                  await loadEditor(true);
+                  // Auto-switch to code tab so user immediately sees the
+                  // updated standalone code reflecting the new active workflow.
+                  if (result?.activated) {
+                    setActiveTab('code');
+                  }
                 }}
               />
             )}

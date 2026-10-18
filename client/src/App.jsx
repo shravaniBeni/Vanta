@@ -17,20 +17,28 @@
  * While session is loading, show a spinner rather than redirecting.
  */
 
-import { BrowserRouter as Router, Route, Routes, Navigate, useLocation, useNavigate } from 'react-router-dom';
-import { QueryClientProvider } from '@tanstack/react-query';
-import { queryClientInstance } from '@/lib/query-client';
-import { AuthProvider, useAuth } from '@/lib/AuthContext';
-import { Toaster } from '@/components/ui/toaster';
+import {
+  BrowserRouter as Router,
+  Route,
+  Routes,
+  Navigate,
+  useLocation,
+  useNavigate,
+} from "react-router-dom";
+import { QueryClientProvider } from "@tanstack/react-query";
+import { queryClientInstance } from "@/lib/query-client";
+import { AuthProvider, useAuth } from "@/lib/AuthContext";
+import { Toaster } from "@/components/ui/toaster";
 
-import Layout     from '@/Layout';
-import Login      from '@/pages/Login';
-import Dashboard  from '@/pages/Dashboard';
-import Home       from '@/pages/Home';
-import Chat       from '@/pages/Chat';
-import Editor     from '@/pages/Editor';
-import Deploy     from '@/pages/Deploy';
-import Architect  from '@/pages/Architect';
+import Layout from "@/Layout";
+import Login from "@/pages/Login";
+import Dashboard from "@/pages/Dashboard";
+import Home from "@/pages/Home";
+import Chat from "@/pages/Chat";
+import Editor from "@/pages/Editor";
+import Deploy from "@/pages/Deploy";
+import Architect from "@/pages/Architect";
+import Analytics from "@/pages/Analytics";
 
 // ─── Loading spinner ──────────────────────────────────────────────────────────
 
@@ -63,7 +71,7 @@ function RequireAuth({ children }) {
 function RootRedirect() {
   const { isAuthenticated, loading } = useAuth();
   if (loading) return <AuthLoader />;
-  return <Navigate to={isAuthenticated ? '/Dashboard' : '/Login'} replace />;
+  return <Navigate to={isAuthenticated ? "/Dashboard" : "/Login"} replace />;
 }
 
 // ─── Routes ───────────────────────────────────────────────────────────────────
@@ -78,26 +86,74 @@ function AppRoutes() {
       <Route path="/Login" element={<Login />} />
 
       {/* Public embed chat — no auth required */}
-      <Route path="/Chat" element={<Layout><Chat /></Layout>} />
+      <Route
+        path="/Chat"
+        element={
+          <Layout>
+            <Chat />
+          </Layout>
+        }
+      />
 
       {/* Protected */}
-      <Route path="/Dashboard" element={
-        <RequireAuth><Dashboard /></RequireAuth>
-      } />
-      <Route path="/Home" element={
-        <RequireAuth><Layout><Home /></Layout></RequireAuth>
-      } />
-      <Route path="/Editor" element={
-        <RequireAuth><Layout><Editor /></Layout></RequireAuth>
-      } />
-      <Route path="/Deploy" element={
-        <RequireAuth><Layout><Deploy /></Layout></RequireAuth>
-      } />
+      <Route
+        path="/Dashboard"
+        element={
+          <RequireAuth>
+            <Dashboard />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/Home"
+        element={
+          <RequireAuth>
+            <Layout>
+              <Home />
+            </Layout>
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/Editor"
+        element={
+          <RequireAuth>
+            <Layout>
+              <Editor />
+            </Layout>
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/Deploy"
+        element={
+          <RequireAuth>
+            <Layout>
+              <Deploy />
+            </Layout>
+          </RequireAuth>
+        }
+      />
 
       {/* Phase 7: AI Architect onboarding */}
-      <Route path="/Architect" element={
-        <RequireAuth><Architect /></RequireAuth>
-      } />
+      <Route
+        path="/Architect"
+        element={
+          <RequireAuth>
+            <Architect />
+          </RequireAuth>
+        }
+      />
+
+      {/* Phase 10C: Analytics dashboard */}
+      <Route
+        path="/Analytics"
+        element={
+          <RequireAuth>
+            <Analytics />
+          </RequireAuth>
+        }
+      />
 
       {/* Catch-all */}
       <Route path="*" element={<Navigate to="/" replace />} />
