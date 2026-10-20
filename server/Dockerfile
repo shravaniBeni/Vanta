@@ -104,12 +104,10 @@ ENV TRANSFORMERS_CACHE=/app/data/model-cache
 # USE_HF_API defaults to unset (local ONNX inference)
 
 # ── Health check ───────────────────────────────────────────────────────────────
-# /api/health returns {"status":"ok"} once Express is listening.
-# /api/health/model returns {"model_ready":true} once the embedder is loaded.
-# ECS uses this for service health; ALB uses it for target group health.
-# start_period=60s: allow time for the model to load before health checks start.
-HEALTHCHECK --interval=15s --timeout=5s --start-period=60s --retries=3 \
-    CMD node -e "fetch('http://localhost:'+process.env.PORT+'/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+# NOTE: Container-level HEALTHCHECK removed.
+# ECS/ALB target group health check is used instead (path: /api/health, port 3001).
+# The ALB health check is configured at the load balancer level, not inside the container.
+# This avoids the startPeriod vs healthCheckGracePeriodSeconds conflict.
 
 EXPOSE 3001
 
