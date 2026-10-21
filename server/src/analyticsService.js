@@ -426,36 +426,28 @@ export function classifyTopicAsync(interactionEventId, question, chatbotDescript
 }
 
 async function _classifyTopic(interactionEventId, question, chatbotDescription) {
-  // Lightweight classification — returns a slug + label
-  const prompt = `You are a topic classifier for a chatbot analytics system.
-${chatbotDescription ? `Chatbot context: ${chatbotDescription}\n` : ''}
-Classify this question into a short topic category.
-
-Question: "${question.slice(0, 300)}"
-
-Rules:
-- Return a JSON object with "category" (lowercase slug, max 30 chars, underscores not spaces) and "label" (human-readable, max 40 chars) and "confidence" (0.0–1.0)
-- category examples: "pointers_memory", "installation_setup", "error_handling", "pricing", "general"
-- If the question is completely off-topic or unclear, use category "other" and label "Other"
-- Do NOT include the raw question in your response
-
-Return ONLY valid JSON: {"category":"...","label":"...","confidence":0.9}`;
+  // Ultra-compact LLM classification — minimizes token usage (~60 input + ~20 output)
+  const ctx = chatbotDescription ? ` Context: ${chatbotDescription.slice(0, 80)}.` : '';
+  const prompt = `Classify this question into a topic.${ctx}
+Q: "${question.slice(0, 150)}"
+Return ONLY JSON: {"category":"slug_30chars","label":"Human Label 40chars","confidence":0.9}
+Use category "general" if unclear.`;
 
   let classification;
   try {
     const { invokeLLMJson } = await import('./openai.js');
     classification = await invokeLLMJson(prompt);
-  } catch {
-    return; // Classification failure is always non-fatal
+  } catch (err) {
+    console.warn('[analyticsService] topic classification failed (non-fatal):', err.message?.slice(0, 80));
+    return;
   }
 
   if (!classification?.category) return;
 
-  // Update the interaction_event with the classification
   await supabase
     .from('interaction_events')
     .update({
-      topic_category:   classification.category.toLowerCase().slice(0, 60),
+      topic_category:   classification.category.toLowerCase().replace(/\s+/g, '_').slice(0, 60),
       topic_label:      (classification.label || classification.category).slice(0, 80),
       topic_confidence: classification.confidence ?? null,
     })
