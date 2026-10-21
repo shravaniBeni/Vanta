@@ -37,6 +37,9 @@ export default function Chat() {
   const { C } = useAppTheme();
 
   const embedId = new URLSearchParams(window.location.search).get('id');
+  // ?mode=widget forces the floating widget regardless of ui_config template
+  // No ?mode param (shareable link) forces fullscreen
+  const modeParam = new URLSearchParams(window.location.search).get('mode');
 
   // Restore session token from sessionStorage on mount
   useEffect(() => {
@@ -152,6 +155,16 @@ export default function Chat() {
   }
 
   const uiConfig    = resolveUiConfig(chatbot.ui_config ?? {});
+  // Override template based on URL mode:
+  //   no ?mode  → fullscreen (shareable direct link)
+  //   ?mode=widget → floating widget (embedded in other websites)
+  if (modeParam === 'widget') {
+    uiConfig.widget.template = 'floating';
+  } else {
+    // Shareable link always shows fullscreen regardless of appearance settings
+    uiConfig.widget.template = 'fullscreen';
+    uiConfig.chat_ui.template = uiConfig.chat_ui.template || 'classic';
+  }
   const widgetTempl = uiConfig.widget.template;
 
   return (

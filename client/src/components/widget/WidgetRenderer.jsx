@@ -150,17 +150,19 @@ function FloatingWidget({ config, chatbotTitle, previewMode, compact, ...chatPro
       {/* Chat panel */}
       {open && (
         <div style={{
-          position: 'absolute',
+          position: 'fixed',
           bottom: panelBottom,
           [isRight ? 'right' : 'left']: edgeOffset,
           width: panelW,
+          // Clamp height so it never overflows the viewport
+          maxHeight: `calc(100vh - ${panelBottom + edgeOffset + 16}px)`,
           height: panelH,
           borderRadius: compact ? 16 : 20,
           overflow: 'hidden',
           background: bgColor,
           boxShadow: `0 24px 60px rgba(0,0,0,0.65), 0 8px 24px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.06)`,
           display: 'flex', flexDirection: 'column',
-          zIndex: 10,
+          zIndex: 2147483640,
           opacity: visible ? 1 : 0,
           transform: visible ? 'translateY(0) scale(1)' : 'translateY(14px) scale(0.97)',
           transition: 'opacity 0.25s ease, transform 0.3s cubic-bezier(0.34,1.56,0.64,1)',
@@ -179,10 +181,10 @@ function FloatingWidget({ config, chatbotTitle, previewMode, compact, ...chatPro
       {/* Launcher button */}
       {launcher.enabled && (
         <div style={{
-          position: 'absolute',
+          position: 'fixed',
           bottom: edgeOffset,
           [isRight ? 'right' : 'left']: edgeOffset,
-          zIndex: 11,
+          zIndex: 2147483641,
         }}>
           {/* Shimmer ring — outer */}
           <div style={{
