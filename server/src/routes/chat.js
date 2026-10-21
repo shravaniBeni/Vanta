@@ -112,6 +112,40 @@ function shouldExpandNeighbors(nodes) {
   return strategy === 'structure-aware' || strategy === 'recursive';
 }
 
+// ─── Similarity threshold ─────────────────────────────────────────────────────
+// Chunks below this cosine similarity score are filtered out before being sent
+// to the LLM. Without this filter, low-scoring irrelevant chunks confuse the
+// LLM and cause it to incorrectly say "not in knowledge base" even when better
+// chunks exist but happened to rank lower.
+//
+// BGE-small cosine similarity scale (empirical):
+//   > 0.60 — highly relevant, direct match
+//   0.40–0.60 — relevant, on-topic
+//   0.25–0.40 — loosely related
+//   < 0.25 — effectively unrelated
+//
+// We use 0.35 as the cutoff: keeps genuinely related chunks, discards noise.
+const SIMILARITY_THRESHOLD = 0.35;
+
+/**
+ * Detect conversational / greeting queries that don't require document retrieval.
+ * These should be answered using the LLM's general knowledge directly.
+ */
+function isConversationalQuery(query) {
+  const q = query.trim().toLowerCase();
+  // Short single-word or very short queries
+  if (q.length <= 3) return true;
+  // Common greetings and meta-questions
+  const conversationalPatterns = [
+    /^(hi|hello|hey|howdy|greetings|sup|yo)[\s!?.]*$/,
+    /^(good\s+(morning|afternoon|evening|night))[\s!?.]*$/,
+    /^(how are you|how's it going|what's up|what can you do|who are you)[\s!?.]*$/,
+    /^(thanks|thank you|bye|goodbye|see you|ok|okay|cool|great|nice)[\s!?.]*$/,
+    /^(what is your name|what are you|tell me about yourself)[\s!?.]*$/,
+  ];
+  return conversationalPatterns.some(p => p.test(q));
+}
+
 /**
  * Build a grounded RAG prompt using the runtime configuration.
  *
@@ -122,12 +156,14 @@ function shouldExpandNeighbors(nodes) {
  *   response_style: string,
  *   chunks: Array<{content: string}>,
  *   query: string,
- *   conversationContext: string,  — Phase 10C: prior session context
+ *   conversationContext: string,
  *   isPreview: boolean,
+ *   noDocumentsIndexed: boolean,  — true when the KB has zero chunks at all
+ *   conversational: boolean,      — true when query is a greeting/meta question
  * }} params
  * @returns {string}
  */
-function buildRagPrompt({ title, description, grounding_required, response_style, chunks, query, conversationContext = '', isPreview = false }) {
+function buildRagPrompt({ title, description, grounding_required, response_style, chunks, query, conversationContext = '', isPreview = false, noDocumentsIndexed = false, conversational = false }) {
   const previewNote = isPreview ? ' (preview mode)' : '';
 
   // ── Response style instruction ─────────────────────────────────────────────
@@ -152,7 +188,8 @@ function buildRagPrompt({ title, description, grounding_required, response_style
     ? `\n[Conversation History]\n${conversationContext}\n`
     : '';
 
-  if (chunks.length === 0) {
+  // ── Case 1: No documents indexed at all ───────────────────────────────────
+  if (noDocumentsIndexed) {
     return `You are "${title}", an AI assistant${previewNote}.
 ${description ? `About you: ${description}\n` : ''}${contextBlock}No documents have been indexed yet. Inform the user politely and suggest uploading and indexing documents.
 
@@ -160,6 +197,31 @@ User: ${query}
 Answer:`;
   }
 
+  // ── Case 2: Conversational / greeting query ────────────────────────────────
+  // Answer from general knowledge — no document context needed.
+  if (conversational || chunks.length === 0) {
+    if (grounding_required && !conversational) {
+      // Strict mode: must stay grounded — politely say topic not in KB
+      return `You are "${title}", an AI assistant${previewNote}.
+${description ? `About you: ${description}\n` : ''}${contextBlock}
+The user's question does not match any content in the knowledge base.
+Respond politely: explain that you can only answer questions covered by the available knowledge base, and suggest they ask something related to the topics you cover.
+Do NOT make up information.
+
+User: ${query}
+Answer:`;
+    }
+    // Flexible mode or conversational: answer from general knowledge
+    return `You are "${title}", an AI assistant${previewNote}.
+${description ? `About you: ${description}\n` : ''}${styleInstruction ? styleInstruction + '\n' : ''}${contextBlock}
+Answer the user's question using your general knowledge. Be helpful, accurate, and concise.
+If the question is a greeting or small talk, respond naturally and mention what topics you can help with based on: ${description || 'the available knowledge base'}.
+
+User: ${query}
+Answer:`;
+  }
+
+  // ── Case 3: Relevant chunks found ─────────────────────────────────────────
   const contextText = chunks
     .map((c, i) => `[Source ${i + 1}]\n${c.content}`)
     .join('\n\n---\n\n');
@@ -182,12 +244,13 @@ ${contextText}
 User: ${query}
 Answer:`;
   } else {
-    // Flexible grounding: context-first but general knowledge allowed
+    // Flexible grounding: context-first, general knowledge allowed as supplement
     return `You are "${title}", an AI assistant${previewNote}.
 ${description ? `About you: ${description}\n` : ''}${styleInstruction ? styleInstruction + '\n' : ''}${contextBlock}
-Use the following retrieved context as your primary source. Supplement with general knowledge only for non-document-specific facts.
+Use the following retrieved context as your PRIMARY source. If the context directly answers the question, use it.
+If the context is only partially relevant, combine it with your general knowledge to give a complete answer.
+Do NOT say "the knowledge base does not contain" if you can answer from your general knowledge.
 Preserve all safety warnings, caution notices, and numeric thresholds exactly as stated in the context.
-Do not tell the user to consult the source if the requested information is already present in the context below.
 
 Context:
 ${contextText}
@@ -275,34 +338,61 @@ router.post('/', async (req, res) => {
     const cfg = resolveRagRuntimeConfig(chatbot);
     const { top_k, model, temperature, grounding_required, response_style } = cfg;
 
+    // ── Conversational query detection ────────────────────────────────────
+    // Greetings and meta-questions skip retrieval entirely and use general LLM knowledge.
+    const conversational = isConversationalQuery(query);
+
     // ── Retrieve via pgvector ─────────────────────────────────────────────
     let chunks = [];
+    let allChunks = [];        // raw results before threshold filter
     let retrievalStatus = 'ok';
-    try {
-      const primary = await retrieveChunks(chatbot.id, query, top_k);
+    let noDocumentsIndexed = false;
 
-      // Apply neighbor expansion for structure-aware/recursive workflows
-      if (shouldExpandNeighbors(chatbot.nodes)) {
-        chunks = await expandWithNeighbors(chatbot.id, primary, 3);
-      } else {
-        chunks = primary;
+    if (!conversational) {
+      try {
+        const primary = await retrieveChunks(chatbot.id, query, top_k);
+
+        // Apply neighbor expansion for structure-aware/recursive workflows
+        if (shouldExpandNeighbors(chatbot.nodes)) {
+          allChunks = await expandWithNeighbors(chatbot.id, primary, 3);
+        } else {
+          allChunks = primary;
+        }
+
+        // ── Similarity threshold filter ────────────────────────────────────
+        // Only pass chunks above SIMILARITY_THRESHOLD to the LLM.
+        // Expansion chunks (score=0) are included only if their primary chunk passed.
+        const passedPrimaryIds = new Set(
+          allChunks.filter(c => !c.is_expansion && c.score >= SIMILARITY_THRESHOLD).map(c => c.id)
+        );
+        // Include expansion chunks whose parent primary chunk passed the threshold
+        chunks = allChunks.filter(c => {
+          if (!c.is_expansion) return c.score >= SIMILARITY_THRESHOLD;
+          // Expansion chunk: include if any primary chunk in the same document passed
+          return allChunks.some(p => !p.is_expansion && p.score >= SIMILARITY_THRESHOLD && p.document_id === c.document_id);
+        });
+
+        if (allChunks.length === 0) {
+          // Zero results from DB — either no documents indexed or empty KB
+          noDocumentsIndexed = true;
+          retrievalStatus = 'no_results';
+        } else if (chunks.length === 0) {
+          // Documents exist but nothing is relevant enough
+          retrievalStatus = 'low_confidence';
+        }
+      } catch (err) {
+        console.warn('[chat] retrieval error:', err.message);
+        retrievalStatus = 'error';
       }
-
-      if (chunks.length === 0) retrievalStatus = 'no_results';
-    } catch (err) {
-      console.warn('[chat] retrieval error:', err.message);
-      retrievalStatus = 'error';
     }
 
-    const similarityScores  = chunks.filter(c => !c.is_expansion).map(c => c.score);
+    // Use allChunks for metrics (raw retrieval scores before threshold filter)
+    const allPrimaryChunks  = (conversational ? [] : allChunks).filter(c => !c.is_expansion);
+    const similarityScores  = allPrimaryChunks.map(c => c.score);
     const retrievedChunkIds = chunks.map(c => c.id).filter(Boolean);
     const avgSimilarity = similarityScores.length
       ? similarityScores.reduce((a, b) => a + b, 0) / similarityScores.length
       : 0;
-
-    if (chunks.length > 0 && avgSimilarity < 0.2 && retrievalStatus === 'ok') {
-      retrievalStatus = 'low_confidence';
-    }
 
     const chunkPreviews = chunks.map(c =>
       c.content.substring(0, 120) + (c.content.length > 120 ? '...' : '')
@@ -318,6 +408,8 @@ router.post('/', async (req, res) => {
       query,
       conversationContext,
       isPreview: false,
+      noDocumentsIndexed,
+      conversational,
     });
 
     // ── Generate ──────────────────────────────────────────────────────────
@@ -364,7 +456,7 @@ router.post('/', async (req, res) => {
         sessionId:           visitorSession.id,
         eventType:           'question_answered',
         retrievalStatus,
-        retrievalChunkCount: chunks.length,
+        retrievalChunkCount: allChunks.length,  // raw count before threshold
         avgSimilarityScore:  avgSimilarity || null,
         responseStatus,
         abstained,
