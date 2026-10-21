@@ -132,16 +132,21 @@ const SIMILARITY_THRESHOLD = 0.35;
  * These should be answered using the LLM's general knowledge directly.
  */
 function isConversationalQuery(query) {
-  const q = query.trim().toLowerCase();
+  const q = query.trim().toLowerCase().replace(/[,!?.]+/g, ' ').replace(/\s+/g, ' ').trim();
   // Short single-word or very short queries
   if (q.length <= 3) return true;
   // Common greetings and meta-questions
   const conversationalPatterns = [
-    /^(hi|hello|hey|howdy|greetings|sup|yo)[\s!?.]*$/,
-    /^(good\s+(morning|afternoon|evening|night))[\s!?.]*$/,
-    /^(how are you|how's it going|what's up|what can you do|who are you)[\s!?.]*$/,
+    /^(hi|hello|hey|howdy|greetings|sup|yo)(\s.*)?$/,
+    /^(good\s+(morning|afternoon|evening|night))(\s.*)?$/,
+    /^how are you(\s.*)?$/,
+    /^how('s| is) it going(\s.*)?$/,
+    /^what('s| is) up(\s.*)?$/,
+    /^what can you do(\s.*)?$/,
+    /^who are you(\s.*)?$/,
     /^(thanks|thank you|bye|goodbye|see you|ok|okay|cool|great|nice)[\s!?.]*$/,
-    /^(what is your name|what are you|tell me about yourself)[\s!?.]*$/,
+    /^(what is your name|what are you|tell me about yourself)(\s.*)?$/,
+    /^(hello|hi)\s*(how are you|there|friend|everyone)(\s.*)?$/,
   ];
   return conversationalPatterns.some(p => p.test(q));
 }
@@ -230,13 +235,16 @@ Answer:`;
     // Strict grounding: only answer from retrieved context
     return `You are "${title}", an AI assistant${previewNote}.
 ${description ? `About you: ${description}\n` : ''}${styleInstruction ? styleInstruction + '\n' : ''}${contextBlock}
-IMPORTANT: Answer ONLY using the provided context below. Do NOT use any knowledge outside this context.
-If the retrieved context addresses the question, answer completely and accurately using it.
-If the context is partially relevant, provide what you can from the context and clearly state what is not covered.
-If the context does not address the question at all, state: "The available knowledge base does not contain information about this topic."
-Do NOT fabricate information. Do NOT invent document-specific facts, procedures, thresholds, or specifications.
-Preserve all safety warnings, caution notices, and numeric thresholds exactly as stated in the context.
-Do not tell the user to consult the source if the requested information is already present in the context below.
+You have been given relevant context from the knowledge base below. Your job is to answer the user's question using this context.
+
+Rules:
+- READ the context carefully. The answer IS in the context — find it and explain it clearly.
+- DO NOT say "the knowledge base does not contain information" if the context is related to the topic.
+- DO NOT refuse to answer if the topic is covered, even partially.
+- If the context covers the topic, give a complete, helpful answer.
+- If you need to, combine information from multiple sources in the context.
+- Only say you cannot answer if the context is completely about a different, unrelated topic.
+- Do NOT fabricate specific facts, numbers, or procedures not in the context.
 
 Context:
 ${contextText}
@@ -422,9 +430,9 @@ router.post('/', async (req, res) => {
 
       // Detect abstention: LLM said it doesn't know
       if (answer && (
-        answer.includes('does not contain information') ||
+        answer.includes('does not contain information about this topic') ||
         answer.includes('knowledge base does not') ||
-        answer.includes('I don\'t have information') ||
+        answer.includes("I don't have information") ||
         answer.includes('not covered in the')
       )) {
         abstained = true;
