@@ -430,13 +430,23 @@ async function _classifyTopic(interactionEventId, question, chatbotDescription) 
   const ctx = chatbotDescription ? ` Context: ${chatbotDescription.slice(0, 80)}.` : '';
   const prompt = `Classify this question into a topic.${ctx}
 Q: "${question.slice(0, 150)}"
-Return ONLY JSON: {"category":"slug_30chars","label":"Human Label 40chars","confidence":0.9}
+Return ONLY valid JSON (no markdown, no explanation): {"category":"slug_max30chars","label":"Human Label","confidence":0.9}
 Use category "general" if unclear.`;
 
   let classification;
   try {
-    const { invokeLLMJson, DEFAULT_CHAT_MODEL } = await import('./openai.js');
-    classification = await invokeLLMJson(prompt, DEFAULT_CHAT_MODEL);
+    const { invokeLLM, DEFAULT_CHAT_MODEL } = await import('./openai.js');
+    // Use invokeLLM (not invokeLLMJson) — gpt-3.5-turbo via OpenRouter
+    // does NOT support response_format:json_object, so we parse JSON manually.
+    const raw = await invokeLLM(prompt, DEFAULT_CHAT_MODEL, 0.1);
+    // Extract JSON from response (strip markdown code fences if present)
+    const jsonStr = raw.replace(/```json?\s*/gi, '').replace(/```\s*/g, '').trim();
+    const match = jsonStr.match(/\{[\s\S]*\}/);
+    if (!match) {
+      console.warn('[analyticsService] classifyTopic: no JSON in response:', raw?.slice(0, 60));
+      return;
+    }
+    classification = JSON.parse(match[0]);
   } catch (err) {
     console.warn('[analyticsService] topic classification failed (non-fatal):', err.message?.slice(0, 80));
     return;
@@ -451,7 +461,7 @@ Use category "general" if unclear.`;
       topic_label:      (classification.label || classification.category).slice(0, 80),
       topic_confidence: classification.confidence ?? null,
     })
-    .eq('id', interactionEventId);
+    .eq('idempotency_key', interactionEventId);
 }
 
 // ─── Analytics Queries ─────────────────────────────────────────────────────────
