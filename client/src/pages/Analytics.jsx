@@ -44,34 +44,78 @@ const DATE_PRESETS = [
 
 // ─── Mini bar chart ───────────────────────────────────────────────────────────
 
-function MiniBarChart({ data, C, dark }) {
+/**
+ * Zero-fills a sparse trend array to cover the full date range.
+ * Ensures the chart always shows a proper timeline even when most days have 0 questions.
+ */
+function fillDateRange(data, days) {
+  const filled = {};
+  // Seed all days with 0
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    const key = d.toISOString().slice(0, 10);
+    filled[key] = { date: key, count: 0, answered: 0, failed: 0, abstained: 0 };
+  }
+  // Overlay actual data
+  for (const row of (data || [])) {
+    if (filled[row.date]) filled[row.date] = row;
+  }
+  return Object.values(filled).sort((a, b) => a.date.localeCompare(b.date));
+}
+
+function MiniBarChart({ data, days = 30, C, dark }) {
+  const filled = fillDateRange(data, days);
+  const maxCount = Math.max(...filled.map(d => d.count), 1);
+  const CHART_H = 80;
+
   if (!data || data.length === 0) return (
-    <div style={{ height: 80, display: 'flex', alignItems: 'center', justifyContent: 'center', color: C.t3, fontSize: 12, fontFamily: 'JetBrains Mono, monospace' }}>
-      No data
+    <div style={{ height: CHART_H, display: 'flex', alignItems: 'flex-end', gap: 1, padding: '4px 0', position: 'relative' }}>
+      {filled.map((d) => (
+        <div
+          key={d.date}
+          title={`${d.date}: 0 questions`}
+          style={{
+            flex: 1, minWidth: 2,
+            height: 3,
+            background: C.border,
+            borderRadius: '2px 2px 0 0',
+            opacity: 0.4,
+          }}
+        />
+      ))}
+      <div style={{
+        position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        color: C.t3, fontSize: 12, fontFamily: 'JetBrains Mono, monospace',
+        pointerEvents: 'none',
+      }}>
+        No data yet
+      </div>
     </div>
   );
 
-  const maxCount = Math.max(...data.map(d => d.count), 1);
-
   return (
-    <div style={{ display: 'flex', alignItems: 'flex-end', gap: 2, height: 80, padding: '4px 0' }}>
-      {data.map((d, i) => {
-        const pct = (d.count / maxCount) * 100;
+    <div style={{ height: CHART_H, display: 'flex', alignItems: 'flex-end', gap: 1, padding: '4px 0' }}>
+      {filled.map((d) => {
+        const barPct = d.count > 0 ? Math.max((d.count / maxCount) * 100, 8) : 0;
+        const barH = d.count > 0 ? Math.max(Math.round((barPct / 100) * (CHART_H - 8)), 4) : 3;
         return (
           <div
             key={d.date}
-            style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}
-            title={`${d.date}: ${d.count} questions`}
-          >
-            <div style={{
-              width: '100%', minWidth: 4,
-              height: `${Math.max(pct, 4)}%`,
-              background: d.count > 0 ? `linear-gradient(180deg, ${C.accent}, ${C.accentLt})` : C.border,
-              borderRadius: '3px 3px 0 0',
+            title={`${d.date}: ${d.count} question${d.count !== 1 ? 's' : ''}`}
+            style={{
+              flex: 1, minWidth: 2,
+              height: barH,
+              background: d.count > 0
+                ? `linear-gradient(180deg, ${C.accentLt}, ${C.accent})`
+                : C.border,
+              borderRadius: '2px 2px 0 0',
+              opacity: d.count > 0 ? 1 : 0.25,
               transition: 'height 0.3s ease',
-              opacity: d.count > 0 ? 1 : 0.3,
-            }} />
-          </div>
+              cursor: d.count > 0 ? 'default' : 'default',
+            }}
+          />
         );
       })}
     </div>
@@ -659,20 +703,22 @@ export default function Analytics() {
                 <TrendingUp size={14} color={C.accentLt} />
                 <span style={{ fontSize: 13, fontWeight: 700, color: C.t1 }}>Daily Questions</span>
                 <span style={{ fontSize: 11, color: C.t3, fontFamily: 'JetBrains Mono, monospace', marginLeft: 'auto' }}>
-                  {trend.length} days with activity
+                  {trend.length} day{trend.length !== 1 ? 's' : ''} with activity
                 </span>
               </div>
-              <MiniBarChart data={trend} C={C} dark={dark} />
-              {trend.length > 0 && (
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6 }}>
-                  <span style={{ fontSize: 10, color: C.t3, fontFamily: 'JetBrains Mono, monospace' }}>{trend[0]?.date}</span>
-                  <span style={{ fontSize: 10, color: C.t3, fontFamily: 'JetBrains Mono, monospace' }}>{trend[trend.length - 1]?.date}</span>
-                </div>
-              )}
+              <MiniBarChart data={trend} days={days} C={C} dark={dark} />
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6 }}>
+                <span style={{ fontSize: 10, color: C.t3, fontFamily: 'JetBrains Mono, monospace' }}>
+                  {(() => { const d = new Date(); d.setDate(d.getDate() - (days - 1)); return d.toISOString().slice(0, 10); })()}
+                </span>
+                <span style={{ fontSize: 10, color: C.t3, fontFamily: 'JetBrains Mono, monospace' }}>
+                  {new Date().toISOString().slice(0, 10)}
+                </span>
+              </div>
             </div>
 
             {/* Top 3 topics preview */}
-            {topics.length > 0 && (
+            {topics.length > 0 ? (
               <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: '18px 20px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
                   <Target size={14} color={C.accentLt} />
@@ -688,7 +734,21 @@ export default function Analytics() {
                   <TopicRow key={t.category} topic={t} rank={i + 1} C={C} dark={dark} />
                 ))}
               </div>
-            )}
+            ) : s.total_questions > 0 ? (
+              <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: '18px 20px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                  <Target size={14} color={C.accentLt} />
+                  <span style={{ fontSize: 13, fontWeight: 700, color: C.t1 }}>Top Topics</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', background: C.accentBg, border: `1px solid ${C.borderHi}`, borderRadius: 8 }}>
+                  <div style={{ width: 8, height: 8, borderRadius: '50%', background: C.accentLt, flexShrink: 0 }} />
+                  <span style={{ fontSize: 12, color: C.t2 }}>
+                    Topic classification will appear here after deploying the latest update.
+                    Your {s.total_questions} existing question{s.total_questions !== 1 ? 's' : ''} will be classified going forward.
+                  </span>
+                </div>
+              </div>
+            ) : null}
 
             {/* Empty state */}
             {!dataLoading && s.total_questions === 0 && (
@@ -728,7 +788,13 @@ export default function Analytics() {
             {topics.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '48px 0', color: C.t3 }}>
                 <Target size={40} style={{ margin: '0 auto 12px', opacity: 0.4 }} />
-                <p style={{ fontSize: 13 }}>Topics are classified asynchronously. They'll appear here as interactions are recorded.</p>
+                <p style={{ fontSize: 14, fontWeight: 600, color: C.t2, marginBottom: 6 }}>No topics classified yet</p>
+                <p style={{ fontSize: 12, maxWidth: 420, margin: '0 auto', lineHeight: 1.6 }}>
+                  Topics are AI-classified after each question. They appear here once the latest server update is deployed.
+                  {s.total_questions > 0 && (
+                    <span> You have <strong style={{ color: C.accentLt }}>{s.total_questions} recorded questions</strong> — topics will be classified on new conversations after deployment.</span>
+                  )}
+                </p>
               </div>
             ) : (
               topics.map((t, i) => (
