@@ -428,10 +428,13 @@ export function classifyTopicAsync(interactionEventId, question, chatbotDescript
 async function _classifyTopic(interactionEventId, question, chatbotDescription) {
   // Ultra-compact LLM classification — minimizes token usage (~60 input + ~20 output)
   const ctx = chatbotDescription ? ` Context: ${chatbotDescription.slice(0, 80)}.` : '';
-  const prompt = `Classify this question into a topic.${ctx}
+  const prompt = `Classify this question into a SPECIFIC topic.${ctx}
 Q: "${question.slice(0, 150)}"
-Return ONLY valid JSON (no markdown, no explanation): {"category":"slug_max30chars","label":"Human Label","confidence":0.9}
-Use category "general" if unclear.`;
+Return ONLY valid JSON (no markdown): {"category":"specific_topic_slug","label":"Specific Topic Name","confidence":0.9}
+Rules:
+- category must be a SPECIFIC slug like "dereferencing", "memory_management", "polymorphism", "inheritance" — NOT generic like "programming" or "general"
+- Use the actual concept being asked about as the slug
+- Use underscores, no spaces, max 30 chars`;
 
   let classification;
   try {
@@ -585,15 +588,15 @@ export async function getTopTopics(ragAppId, userId, { from, to, limit = 10 }) {
     return [];
   }
 
-  // Aggregate by topic_category
+  // Aggregate by topic_label (more specific than topic_category slug)
   const topicMap = {};
   for (const evt of (events || [])) {
-    const key = evt.topic_category;
+    const key = evt.topic_label || evt.topic_category;
     if (!key) continue;
     if (!topicMap[key]) {
       topicMap[key] = {
-        category:      key,
-        label:         evt.topic_label || key,
+        category:      evt.topic_category || key,
+        label:         key,
         count:         0,
         answered:      0,
         abstained:     0,
