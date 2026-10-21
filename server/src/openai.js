@@ -66,9 +66,9 @@ export async function invokeLLMChat(messages, model, temperature = 0.7) {
  * question JSON output. Reduced from 4096 to stay within credit limits.
  * Throws a descriptive error if the LLM returns malformed JSON.
  */
-export async function invokeLLMJson(prompt) {
+export async function invokeLLMJson(prompt, model) {
   const resp = await openai.chat.completions.create({
-    model:           DEFAULT_JSON_MODEL,
+    model:           model || DEFAULT_JSON_MODEL,
     temperature:     0.3,
     max_tokens:      2048,
     response_format: { type: 'json_object' },

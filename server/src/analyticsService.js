@@ -435,8 +435,8 @@ Use category "general" if unclear.`;
 
   let classification;
   try {
-    const { invokeLLMJson } = await import('./openai.js');
-    classification = await invokeLLMJson(prompt);
+    const { invokeLLMJson, DEFAULT_CHAT_MODEL } = await import('./openai.js');
+    classification = await invokeLLMJson(prompt, DEFAULT_CHAT_MODEL);
   } catch (err) {
     console.warn('[analyticsService] topic classification failed (non-fatal):', err.message?.slice(0, 80));
     return;
