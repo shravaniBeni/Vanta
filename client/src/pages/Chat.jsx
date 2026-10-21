@@ -107,6 +107,7 @@ export default function Chat() {
         // Phase 10C: track interaction for feedback
         interactionEventId:   result.interaction_event_id ?? null,
         feedbackGiven:        null,   // null | true | false
+        suggestedQuestions:   result.suggested_questions ?? [],
       }]);
     } catch (err) {
       console.error('Chat error:', err);

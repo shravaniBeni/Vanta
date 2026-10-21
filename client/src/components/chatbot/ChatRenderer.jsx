@@ -182,48 +182,67 @@ function ConfidencePill({ value, primaryColor }) {
 
 // ─── Suggested questions ──────────────────────────────────────────────────────
 
-function SuggestedQuestions({ questions, primaryColor, onSelect }) {
+function SuggestedQuestions({ questions, primaryColor, onSelect, isFollowUp = false }) {
   if (!questions?.length) return null;
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '6px 0 4px' }}>
-      <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.08em', paddingLeft: 2 }}>
-        Suggested
+    <div style={{
+      display: 'flex', flexDirection: 'column', gap: 6,
+      padding: isFollowUp ? '8px 0 4px' : '6px 0 4px',
+      // Follow-up chips are indented under the bot message
+      marginLeft: isFollowUp ? 42 : 0,
+    }}>
+      <div style={{
+        fontSize: 10, fontWeight: 700,
+        color: isFollowUp ? `${primaryColor}90` : 'rgba(255,255,255,0.35)',
+        textTransform: 'uppercase', letterSpacing: '0.08em', paddingLeft: 2,
+        display: 'flex', alignItems: 'center', gap: 5,
+      }}>
+        {isFollowUp ? (
+          <>
+            <svg width="9" height="9" viewBox="0 0 9 9" fill="none">
+              <path d="M1 4.5h7M5 1.5l3 3-3 3" stroke={primaryColor} strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+            You might also ask
+          </>
+        ) : 'Suggested'}
       </div>
-      {questions.map((q, i) => (
-        <button
-          key={i}
-          onClick={() => onSelect(q)}
-          style={{
-            fontSize: 12, padding: '9px 14px',
-            background: 'rgba(255,255,255,0.04)',
-            border: `1px solid rgba(255,255,255,0.09)`,
-            borderRadius: 12, color: 'rgba(255,255,255,0.75)',
-            cursor: 'pointer', textAlign: 'left', lineHeight: 1.4,
-            transition: 'all 0.15s', fontFamily: 'inherit',
-            display: 'flex', alignItems: 'center', gap: 8,
-          }}
-          onMouseEnter={e => {
-            e.currentTarget.style.background = `${primaryColor}14`;
-            e.currentTarget.style.borderColor = `${primaryColor}40`;
-            e.currentTarget.style.color = '#fff';
-          }}
-          onMouseLeave={e => {
-            e.currentTarget.style.background = 'rgba(255,255,255,0.04)';
-            e.currentTarget.style.borderColor = 'rgba(255,255,255,0.09)';
-            e.currentTarget.style.color = 'rgba(255,255,255,0.75)';
-          }}
-        >
-          <span style={{
-            width: 18, height: 18, borderRadius: 6, flexShrink: 0,
-            background: `${primaryColor}22`, border: `1px solid ${primaryColor}44`,
-            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 9, color: primaryColor, fontWeight: 700,
-          }}>
-            {i + 1}
-          </span>
-          {q}
-        </button>
-      ))}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+        {questions.map((q, i) => (
+          <button
+            key={i}
+            onClick={() => onSelect(q)}
+            style={{
+              fontSize: 12, padding: '8px 12px',
+              background: isFollowUp ? `${primaryColor}0d` : 'rgba(255,255,255,0.04)',
+              border: `1px solid ${isFollowUp ? `${primaryColor}28` : 'rgba(255,255,255,0.09)'}`,
+              borderRadius: 10, color: 'rgba(255,255,255,0.72)',
+              cursor: 'pointer', textAlign: 'left', lineHeight: 1.4,
+              transition: 'all 0.15s', fontFamily: 'inherit',
+              display: 'flex', alignItems: 'center', gap: 8,
+            }}
+            onMouseEnter={e => {
+              e.currentTarget.style.background = `${primaryColor}20`;
+              e.currentTarget.style.borderColor = `${primaryColor}55`;
+              e.currentTarget.style.color = '#fff';
+            }}
+            onMouseLeave={e => {
+              e.currentTarget.style.background = isFollowUp ? `${primaryColor}0d` : 'rgba(255,255,255,0.04)';
+              e.currentTarget.style.borderColor = isFollowUp ? `${primaryColor}28` : 'rgba(255,255,255,0.09)';
+              e.currentTarget.style.color = 'rgba(255,255,255,0.72)';
+            }}
+          >
+            <span style={{
+              width: 17, height: 17, borderRadius: 5, flexShrink: 0,
+              background: `${primaryColor}22`, border: `1px solid ${primaryColor}44`,
+              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 8, color: primaryColor, fontWeight: 700, fontFamily: 'JetBrains Mono, monospace',
+            }}>
+              {i + 1}
+            </span>
+            {q}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }
@@ -537,9 +556,27 @@ export default function ChatRenderer({
           </div>
         )}
 
-        {messages.map((msg, i) => (
-          <MessageBubble key={i} msg={msg} config={config} compact={compact} template={template} />
-        ))}
+        {messages.map((msg, i) => {
+          // Is this the last assistant message and not loading?
+          const isLastAssistant = !loading
+            && msg.role === 'assistant'
+            && i === messages.length - 1
+            && msg.suggestedQuestions?.length > 0;
+
+          return (
+            <React.Fragment key={i}>
+              <MessageBubble msg={msg} config={config} compact={compact} template={template} />
+              {isLastAssistant && (
+                <SuggestedQuestions
+                  questions={msg.suggestedQuestions}
+                  primaryColor={primaryColor}
+                  onSelect={onSuggestedQuestion ?? (() => {})}
+                  isFollowUp={true}
+                />
+              )}
+            </React.Fragment>
+          );
+        })}
 
         {/* Typing indicator */}
         {loading && behavior.show_typing_indicator && (

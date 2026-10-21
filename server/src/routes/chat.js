@@ -268,7 +268,100 @@ Answer:`;
   }
 }
 
-// ─── POST /api/chat ───────────────────────────────────────────────────────────
+// ─── Suggested follow-up questions generator ──────────────────────────────────
+/**
+ * Generate up to 3 contextual follow-up questions.
+ * Extracts topics from the LLM's own answer (clean structured text),
+ * not the raw chunk content (which is noisy).
+ *
+ * @param {string} query   — the user's question
+ * @param {string} answer  — the LLM's answer (clean markdown text)
+ * @returns {string[]}     — up to 3 follow-up question strings
+ */
+function generateSuggestedQuestions(query, answer) {
+  if (!answer || answer.length < 30) return [];
+
+  const queryLower = query.toLowerCase();
+
+  // Clean the answer: strip markdown, code blocks, punctuation clutter
+  const clean = answer
+    .replace(/```[\s\S]*?```/g, ' ')       // strip code blocks
+    .replace(/`[^`]+`/g, ' ')              // strip inline code
+    .replace(/\*\*([^*]+)\*\*/g, '$1')    // **bold** → bold
+    .replace(/[*_#>|\\]/g, ' ')            // strip markdown symbols
+    .replace(/^\d+\.\s+/gm, '')            // strip numbered list prefixes
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  // ── Extract bold/header terms that the LLM itself wrote ───────────────────
+  // The answer uses "**Term**:" or "**Term**" — extract these directly
+  const boldTerms = [];
+  for (const m of answer.matchAll(/\*\*([A-Z][A-Za-z\s]{3,30})\*\*/g)) {
+    const t = m[1].trim().replace(/\s+/g, ' ');
+    if (!t.includes('\n') && t.split(' ').length <= 4) boldTerms.push(t);
+  }
+
+  // ── Extract "X is a/an ..." definitions from the answer ───────────────────
+  const definedTerms = [];
+  for (const m of clean.matchAll(/\b([A-Z][a-zA-Z]{3,}(?:\s+[a-zA-Z]{3,}){0,2})\s+(?:is|are|refers to|means)\b/g)) {
+    const t = m[1].trim().replace(/\s+/g, ' ');
+    if (!t.includes('\n') && t.length <= 35 && t.split(' ').length <= 3) definedTerms.push(t);
+  }
+
+  // ── Deduplicate and merge in priority order ────────────────────────────────
+  const genericSectionHeaders = new Set([
+    'definition', 'purpose', 'summary', 'overview', 'introduction', 'conclusion',
+    'example', 'examples', 'note', 'notes', 'syntax', 'usage', 'output', 'result',
+    'explanation', 'description', 'declaration', 'initialization', 'key points',
+    'important', 'remember', 'benefit', 'benefits', 'advantage', 'advantages',
+    'feature', 'features', 'step', 'steps', 'rule', 'rules', 'best practice',
+    'how it works', 'how it work', 'how they work', 'how to use', 'when to use',
+    'common causes', 'common mistakes', 'common errors', 'best practices',
+  ]);
+
+  const seen = new Set();
+  const candidates = [];
+  for (const t of [...boldTerms, ...definedTerms]) {
+    const tl = t.toLowerCase().trim();
+    // Skip if already in the original query, generic, duplicate, or repeats term just asked
+    if (
+      !queryLower.includes(tl) &&
+      !seen.has(tl) &&
+      !genericSectionHeaders.has(tl) &&
+      t.length >= 5
+    ) {
+      seen.add(tl);
+      candidates.push(t);
+    }
+  }
+
+  if (candidates.length === 0) return [];
+
+  // ── Build 3 varied questions ───────────────────────────────────────────────
+  // Strip noisy prefixes that come from answer section headers
+  const noisePrefixes = /^(Definition of|Purpose of|Types of|Example of|Use of|Usage of|Role of|Concept of|Overview of|Introduction to|Benefits of|Advantages of|Using the|Understanding|What is)\s+/i;
+
+  const templates = [
+    t => `What is ${t}?`,
+    t => `How does ${t} work?`,
+    t => `Can you give an example of ${t}?`,
+  ];
+
+  const questions = [];
+  for (let term of candidates) {
+    if (questions.length >= 3) break;
+    // Clean noisy prefix
+    term = term.replace(noisePrefixes, '').trim();
+    if (term.length < 4) continue;
+    const q = templates[questions.length](term);
+    if (q.length <= 80) questions.push(q);
+  }
+
+  return questions;
+}
+
+
+
 
 router.post('/', async (req, res) => {
   const { chatbot_id, embed_id, query, session_id, session_token } = req.body;
@@ -507,6 +600,10 @@ router.post('/', async (req, res) => {
       // Phase 10C: return session_token for client to persist
       session_token:        visitorSession?.session_token ?? sessionId,
       interaction_event_id: interactionEventId,
+      // Suggested follow-up questions (extracted from the LLM answer, no extra LLM call)
+      suggested_questions: (!abstained && !conversational && answer && chunks.length > 0)
+        ? generateSuggestedQuestions(query, answer)
+        : [],
     });
   } catch (err) {
     console.error('[chat]', err);
